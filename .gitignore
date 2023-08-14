@@ -112,3 +112,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# local project files
+users/
+data/brain_responses.jsonl
+audio/

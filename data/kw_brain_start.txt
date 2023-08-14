@@ -1,0 +1,24 @@
+active_brain Data: 
+
+Subject:
+Person: demo
+-
+Favorite color: demo
+Favorite,...
+
+Preferences:
+user demo prefers x...
+
+-
+Subject: Important Dates and Numbers 
+-
+
+-
+Subject: Instructions to Remember 
+-
+Memory cleaning: Remove drone and light instructions, as well as any duplicate or overlapping facts.
+Live status: House status and drone status are obtained from another API.
+Web search results: First search for results, then visit a link from those results.
+Web search instruction: Only search the web for dynamic data, like the stock prices, but not for general knowledge such as recipes.
+Memory search instruction: Do not use the get_search_results addon to search my memory, rely on own capabilities to write recipes and other general knowledge.
+-

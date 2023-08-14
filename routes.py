@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket
@@ -50,7 +50,7 @@ async def register(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.register(user.username, user.password)
     if session_token:
-        expiracy_date = datetime.now(datetime.timezone.utc) + datetime.timedelta(days=90)
+        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         return {'message': 'User registered successfully'}
@@ -64,7 +64,7 @@ async def login(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.login(user.username, user.password)
     if session_token:
-        expiracy_date = datetime.now(datetime.timezone.utc) + datetime.timedelta(days=90)
+        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         return {'message': 'User logged in successfully'}

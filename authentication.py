@@ -1,7 +1,9 @@
-import sqlite3
-import bcrypt
 import os
+import psycopg2
+import bcrypt
 import binascii
+
+DATABASE_URL = os.environ['DATABASE_URL']
 
 class Authentication:
     def __init__(self):
@@ -9,7 +11,7 @@ class Authentication:
         self.cursor = None
 
     def open(self):
-        self.conn = sqlite3.connect("users.db", check_same_thread=False)
+        self.conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         self.cursor = self.conn.cursor()
         self.create_table()
 
@@ -28,12 +30,13 @@ class Authentication:
     def create_table(self):
         self.cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            session_token TEXT NOT NULL
+            id SERIAL PRIMARY KEY,
+            username VARCHAR(255) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            session_token VARCHAR(255) NOT NULL
         )
         """)
+        self.conn.commit()
 
     def register(self, username, password):
         self.open()
@@ -45,7 +48,7 @@ class Authentication:
             self.cursor.execute("INSERT INTO users (username, password, session_token) VALUES (?, ?, ?)", (username, hashed_password_str, session_token))
             self.conn.commit()
             return session_token
-        except sqlite3.IntegrityError:
+        except psycopg2.IntegrityError:
             return False
         finally:
             self.close()

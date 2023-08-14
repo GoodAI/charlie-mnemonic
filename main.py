@@ -33,6 +33,7 @@ origins = [
     "http://127.0.0.1",
     "https://airobin.net",
     "http://airobin.net",
+    "https://clang.airobin.net",
 ]
 
 app.add_middleware(

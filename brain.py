@@ -57,7 +57,8 @@ class DatabaseManager:
         if not os.path.exists(memory_name):
             os.makedirs(memory_name)
         chroma_client = chromadb.PersistentClient(path=memory_name)
-        embedding_function = CrossEncoderEmbeddingFunction()
+        # embedding_function = CrossEncoderEmbeddingFunction()
+        embedding_function = OpenAIEmbeddingFunction()
         collection = chroma_client.get_or_create_collection(name="conversations", embedding_function=embedding_function)
         collection_count = collection.count()
         print(f"LTM Entries: {collection_count}")
@@ -190,10 +191,10 @@ class TestQueryCollection(unittest.TestCase):
         scores = {}
         for message in predefined_messages:
             result = db_manager.query_collection(self.collection, message)
-            # Reverse the order of the results
-            result['documents'][0] = result['documents'][0][::-1]
-            result['distances'][0] = result['distances'][0][::-1]
-            result['metadatas'][0] = result['metadatas'][0][::-1]
+            # Reverse the order of the results (for local llm)
+            # result['documents'][0] = result['documents'][0][::-1]
+            # result['distances'][0] = result['distances'][0][::-1]
+            # result['metadatas'][0] = result['metadatas'][0][::-1]
             result_length = len(result['documents'][0])
             print(colored(f"Result length: {result_length}", 'blue'))
             result_string = 'Input: ' + message + '\nResults: \n'

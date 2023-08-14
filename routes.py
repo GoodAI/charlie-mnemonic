@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket
@@ -49,8 +50,9 @@ async def register(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.register(user.username, user.password)
     if session_token:
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", max_age=360000, domain=".airobin.net")
-        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", max_age=360000, domain=".airobin.net")
+        expiracy_date = datetime.datetime.now() + datetime.timedelta(days=90)
+        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         return {'message': 'User registered successfully'}
     else:
         raise HTTPException(status_code=400, detail="User registration failed")
@@ -62,8 +64,9 @@ async def login(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.login(user.username, user.password)
     if session_token:
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", max_age=360000, domain=".airobin.net")
-        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", max_age=360000, domain=".airobin.net")
+        expiracy_date = datetime.datetime.now() + datetime.timedelta(days=90)
+        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
         return {'message': 'User logged in successfully'}
     else:
         raise HTTPException(status_code=401, detail="User login failed")

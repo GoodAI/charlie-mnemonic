@@ -26,6 +26,10 @@ origins = [
     "http://localhost",
     "http://127.0.0.1",
     "http://127.0.0.1/*",
+    "https://airobin.net/*",
+    "http://airobin.net/*",
+    "https://airobin.net/clang/",
+    "http://airobin.net/clang/",
 ]
 
 app.add_middleware(

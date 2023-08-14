@@ -49,7 +49,8 @@ async def register(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.register(user.username, user.password)
     if session_token:
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=isOnHttps, samesite="Lax", max_age=360000)
+        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=isOnHttps, samesite="None", max_age=360000)
+        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=isOnHttps, samesite="None", max_age=360000)
         return {'message': 'User registered successfully'}
     else:
         raise HTTPException(status_code=400, detail="User registration failed")
@@ -61,8 +62,8 @@ async def login(user: User, response: Response):
     with Authentication() as auth:
         session_token = auth.login(user.username, user.password)
     if session_token:
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=isOnHttps, samesite="Lax", max_age=360000)
-        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=isOnHttps, samesite="Lax", max_age=360000)
+        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=isOnHttps, samesite="None", max_age=360000)
+        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=isOnHttps, samesite="None", max_age=360000)
         return {'message': 'User logged in successfully'}
     else:
         raise HTTPException(status_code=401, detail="User login failed")

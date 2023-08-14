@@ -86,7 +86,7 @@ async def load_addons(username, users_dir):
             # Check if the addon is in the settings
             if addon_name not in settings:
                 # If not, add it with a default value of True
-                settings[addon_name] = False
+                settings[addon_name] = True
 
             if settings.get(addon_name, True):
                 file_path = os.path.join('addons', filename)

@@ -12,7 +12,7 @@ router = APIRouter()
 
 connections = {}
 
-isOnHttps = False
+isOnHttps = True
 
 users_dir = 'users/' # end with a slash
 

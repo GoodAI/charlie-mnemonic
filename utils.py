@@ -7,7 +7,7 @@ import time
 import uuid
 from fastapi.responses import JSONResponse, PlainTextResponse
 import openai
-from fastapi import HTTPException, BackgroundTasks
+from fastapi import HTTPException, BackgroundTasks, UploadFile
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import chromadb
 from elevenlabs import generate, play, set_api_key
@@ -176,18 +176,26 @@ class OpenAIResponser:
             current_content = chunk["choices"][0]["delta"].get("content", "")
             yield current_content
 
-async def upload_audio(userdir, audio_file, background_tasks: BackgroundTasks):
+async def upload_audio(userdir, audio_file: UploadFile, background_tasks: BackgroundTasks):
+    # save the file to the user's folder
     filename = secure_filename(audio_file.filename)
-    filepath = os.path.join(userdir + '/audio', filename)
-    audio_file.save(filepath)
+    filepath = os.path.join(userdir, 'audio', filename)
+    with open(filepath, 'wb') as f:
+        f.write(audio_file.file.read())
+    print("File size after saving:", os.path.getsize(filepath))
+
     # Now you can use the saved file path to transcribe the audio
     transcription = await transcribe_audio(filepath)
     return {'transcription': transcription}
-    
-    
+
+
 async def transcribe_audio(audio_file_path):
     with open(audio_file_path, 'rb') as audio_file:
-        transcription = await openai.Audio.atranscribe("whisper-1", audio_file)
+        transcription = await openai.Audio.atranscribe(
+            model = "whisper-1",
+            file =  audio_file,
+            language = "af",
+            )
     return transcription['text']
 
 

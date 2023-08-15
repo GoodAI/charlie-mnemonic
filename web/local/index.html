@@ -601,13 +601,12 @@
 
         // Add the file to the form data
         formData.append("audio_file", file);
-        formData.append("username", username);
-        formData.append("session_token", session_token);
 
         // Send the form data using fetch
-        fetch(API_URL + "/message_audio", {
+        fetch(API_URL + "/message_audio/", {
             method: "POST",
-            body: formData
+            body: formData,
+            credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {
@@ -685,7 +684,7 @@
                 await login(username, password);
                 loginModal.hide();
                 user_name = username;
-                get_settings(user_name);
+                loadCookies();
             } catch (error) {
                 console.error('Login failed: ', error);
             }
@@ -718,7 +717,7 @@
                 await register(username, password);
                 registerModal.hide();
                 user_name = username;
-                get_settings(user_name);
+                loadCookies();
             }
             catch (error) {
                 console.error('Registration failed: ', error);
@@ -761,9 +760,7 @@
         return null;
     }
 
-
-    // check for session token when page loads
-    window.onload = function() {
+    function loadCookies(){
         var sessionToken = getCookie('session_token');
         if(sessionToken) {
             // session token exists, no need to login
@@ -775,6 +772,12 @@
             // no session token, show the login modal
             loginModal.show();
         }
+    }
+
+
+    // check for session token when page loads
+    window.onload = function() {
+        loadCookies();
     }
     </script>
 </body>

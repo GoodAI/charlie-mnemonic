@@ -174,9 +174,14 @@ async def handle_message_no_modules(request: Request, message: userMessage, audi
 # message route with audio
 @router.post("/message_audio/",
     tags=["Messaging"])
-async def handle_message_audio(username: str, session_token: str, audio_file: UploadFile, background_tasks: BackgroundTasks = None):
+async def handle_message_audio(request: Request, audio_file: UploadFile, background_tasks: BackgroundTasks = None):
+    session_token = request.cookies.get("session_token")
+    username = request.cookies.get("username")
     with Authentication() as auth:
         success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    return await upload_audio(users_dir + username, audio_file, background_tasks)
+
+    result = await upload_audio(users_dir + username, audio_file, background_tasks)
+
+    return result 

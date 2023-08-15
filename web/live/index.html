@@ -596,19 +596,19 @@
         }
     });
 
+
     function send_audio(file) {
         // Create a FormData object
         var formData = new FormData();
 
         // Add the file to the form data
         formData.append("audio_file", file);
-        formData.append("username", username);
-        formData.append("session_token", session_token);
 
         // Send the form data using fetch
         fetch(API_URL + "/message_audio", {
             method: "POST",
-            body: formData
+            body: formData,
+            credentials: 'include'
         })
         .then(response => response.json())
         .then(data => {

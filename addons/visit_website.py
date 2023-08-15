@@ -1,5 +1,8 @@
+import os
 import requests
 from bs4 import BeautifulSoup
+
+PRODUCTION = os.environ['PRODUCTION']
 
 description = "Used to visit websites"
 
@@ -39,8 +42,10 @@ def visit_website(url, include_links=True, include_images=True):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
-        #driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
-        driver = webdriver.Chrome(ChromeDriverManager("114.0.5735.90").install(), options=options)
+        if PRODUCTION:
+          driver = webdriver.Chrome(ChromeDriverManager().install(), chrome_options=options)
+        else:
+          driver = webdriver.Chrome(ChromeDriverManager("114.0.5735.90").install(), options=options)
         driver.get(url)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')

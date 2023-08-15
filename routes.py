@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from utils import process_message, OpenAIResponser, upload_audio
 from authentication import Authentication
 from pydantic import BaseModel
 from classes import User, UserCheckToken, UserName, editSettings, userMessage
 import openai
-from utils import load_addons
+from utils import load_addons, generate_audio
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ connections = {}
 PRODUCTION = os.environ['PRODUCTION']
 isOnHttps = PRODUCTION # False
 
-users_dir = 'users/' # end with a slash
+users_dir = 'users' # end with a slash
 
 
 def get_token(request: Request):
@@ -25,7 +25,6 @@ def get_token(request: Request):
 
 async def send_debug_message(username: str, message: str):
     if username in connections:
-        print(f"Sending message to user {username}:\n{message}")
         await connections[username].send_text(message)
     else:
         print(f"No active websocket connection for user {username}")
@@ -114,7 +113,7 @@ async def handle_get_settings(request: Request, user: UserName):
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     await load_addons(user.username, users_dir)
-    with open(users_dir + user.username + '/settings.json', 'r') as f:
+    with open(os.path.join(users_dir, user.username, 'settings.json'), 'r') as f:
         settings = json.load(f)
     print(settings)
     return settings
@@ -129,30 +128,32 @@ async def handle_update_settings(request: Request, user: editSettings):
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     # create the directory if it doesn't exist
-    if not os.path.exists(users_dir + user.username):
-        os.makedirs(users_dir + user.username)
+    user_dir = os.path.join(users_dir, user.username)
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
     # check if the settings file exists
-    if not os.path.exists(users_dir + user.username + '/settings.json'):
+    settings_file = os.path.join(user_dir, 'settings.json')
+    if not os.path.exists(settings_file):
         # create the settings file
-        with open(users_dir + user.username + '/settings.json', 'w') as f:
+        with open(settings_file, 'w') as f:
             json.dump({}, f)
-    with open(users_dir + user.username + '/settings.json', 'r') as f:
+    with open(settings_file, 'r') as f:
         settings = json.load(f)
     settings[user.addon] = user.enabled
-    with open(users_dir + user.username + '/settings.json', 'w') as f:
+    with open(settings_file, 'w') as f:
         json.dump(settings, f)
     return settings
 
 # openAI response route
 @router.post("/message/",
     tags=["Messaging"])
-async def handle_message(request: Request, message: userMessage, audio_path: str = None, background_tasks: BackgroundTasks = None):
+async def handle_message(request: Request, message: userMessage, background_tasks: BackgroundTasks = None):
     session_token = request.cookies.get("session_token")
     with Authentication() as auth:
         success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    return await process_message(message.prompt,message. username, audio_path, background_tasks, users_dir)
+    return await process_message(message.prompt, message.username, background_tasks, users_dir)
 
 # openAI response route without modules
 @router.post("/message_no_modules/",
@@ -182,6 +183,19 @@ async def handle_message_audio(request: Request, audio_file: UploadFile, backgro
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
 
-    result = await upload_audio(users_dir + username, audio_file, background_tasks)
+    result = await upload_audio(users_dir, username, audio_file, background_tasks)
 
     return result 
+
+@router.post("/generate_audio/",
+    tags=["Text to Speech"])
+async def handle_generate_audio(request: Request, message: userMessage, background_tasks: BackgroundTasks = None):
+    session_token = request.cookies.get("session_token")
+    username = request.cookies.get("username")
+    with Authentication() as auth:
+        success = auth.check_token(username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    
+    audio_path, audio = await generate_audio(message.prompt, username)
+    return FileResponse(audio_path, media_type="audio/wav")

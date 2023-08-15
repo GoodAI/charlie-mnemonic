@@ -167,11 +167,16 @@
                 console.log('Message from server: ', event.data);
                 
                 let msg = {};
+                // event data = f"debug{number}:{color}:\n{message}"
                 if (event.data.startsWith('debug1:')){
                     msg.debug1 = event.data.replace('debug1:', '');
+                    msg.color = msg.debug1.split(' ')[0].replace(':', '');
+                    msg.debug1 = msg.debug1.replace(msg.color + ':', '');
                 }
                 else if (event.data.startsWith('debug2:')) {
                     msg.debug2 = event.data.replace('debug2:', '');
+                    msg.color = msg.debug2.split(' ')[0].replace(':', '');
+                    msg.debug2 = msg.debug2.replace(msg.color + ':', '');
                 }
 
                 else if (event.data.startsWith('[Executing')) {
@@ -323,13 +328,26 @@
                     tempFormatted = marked(tempReceived);
                 }
                 audioElement = '';
-                if(msg.audio) {
-                    // Use the local path as the src of the audio element
-                    var audioSrc = msg.audio;
-                    audioElement = `<br><audio controls><source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.</audio>`;
+                if(settings.voice_output) {
+                    var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
+                    document.getElementById('messages').innerHTML += chatMessage;
+
+                    var playButtons = document.querySelectorAll('.play-button');
+                    var playButton = playButtons[playButtons.length - 1];
+                    playButton.addEventListener('click', async function() {
+                        // replace the play button with a loading icon
+                        this.classList.remove('fa-play');
+                        this.classList.add('fa-spinner');
+                        var audioSrc = await request_audio(msg.content);
+                        var audioElement = document.createElement('audio');
+                        audioElement.controls = true;
+                        audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+                        this.replaceWith(audioElement);
+                    });
+                } else {
+                    var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '</div>'; 
+                    document.getElementById('messages').innerHTML += chatMessage;
                 }
-                var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + audioElement + '</div>'; 
-                document.getElementById('messages').innerHTML += chatMessage;
                 tempReceived = '';
                 tempFormatted = '';
                 var lastMessage = document.querySelector('.last-message');
@@ -519,10 +537,11 @@
         // disable the send button
         document.getElementById('send').disabled = true;
     }
-    
-    
-    document.getElementById('send').addEventListener('click', async function() {
-        var message = document.getElementById('message').value;
+
+    async function sendMessageToServer(message) {
+        if (message === undefined) {
+            message = document.getElementById('message').value;
+        }
         addUserMessage(message);
         try {
             const response = await fetch(API_URL + '/message/', {
@@ -543,6 +562,35 @@
         } catch (error) {
             console.error('Failed to send message: ', error);
         }
+    }
+
+    async function request_audio(message) {
+        try {
+            const response = await fetch(API_URL + '/generate_audio/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'prompt': message, 'username': user_name}),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // response is an audio file
+            const data = await response.blob();
+            var audioSrc = URL.createObjectURL(data);
+            return audioSrc;
+
+        } catch (error) {
+            console.error('Failed to send message: ', error);
+        }
+    }
+    
+    
+    document.getElementById('send').addEventListener('click', async function() {
+        sendMessageToServer();
     });
 
     document.getElementById('message').addEventListener('keydown', function(e) {
@@ -613,7 +661,8 @@
             // Now you can send the transcription to your server
             //socket.send(JSON.stringify({'message': data.transcription, 'history': message, 'username': user_name, 'session_token': session_token}));
             console.log('received transcription: ' + data.transcription);
-            addUserMessage(data.transcription);
+            // send the transcription to the server as user message
+            sendMessageToServer(data.transcription);
         })
         .catch(console.error);
     }

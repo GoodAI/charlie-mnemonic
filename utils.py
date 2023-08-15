@@ -16,6 +16,7 @@ from brain import BrainManager
 from classes import AsciiColors, config
 from werkzeug.utils import secure_filename
 import routes
+from pathlib import Path
 
 
 # Set ElevenLabs API key
@@ -33,12 +34,13 @@ last_messages = {}
 COT_RETRIES = {}
 
 async def send_debug(message, number, color, username):
+    """Send a debug message to the user and print it to the console with a color, 1 is llm debug, 2 is system debug"""
     new_message = ''
     if number <= 2:
         # add a horizontal line in front and after the message
         message = f"{'-' * 50}\n{message}\n{'-' * 50}"  
         #socketio.send(json.dumps({'debug' + str(number): message, 'color': color}))
-        new_message = f"debug{number}: {message}"
+        new_message = f"debug{number}:{color}: \n{message}"
     else:
         new_message = message
     await routes.send_debug_message(username, new_message)
@@ -56,16 +58,20 @@ async def load_addons(username, users_dir):
     module_timestamps = {}
 
     # create the username folder if it doesn't exist
-    if not os.path.exists(users_dir + username):
-        os.makedirs(users_dir + username)
+    user_path = os.path.join(users_dir, username)
+    settings_file = os.path.join(user_path, 'settings.json')
+
+    # create the user dir if it doesn't exist
+    if not os.path.exists(user_path):
+        os.makedirs(user_path)
 
     # create the settings file if it doesn't exist
-    if not os.path.exists(users_dir + username + '/settings.json'):
-        with open(users_dir + username + '/settings.json', 'w') as f:
+    if not os.path.exists(settings_file):
+        with open(settings_file, 'w') as f:
             json.dump({}, f)
 
     # Load the settings
-    with open(users_dir + username + '/settings.json', 'r') as f:
+    with open(settings_file, 'r') as f:
         settings = json.load(f)
 
     # Check if voice input and output settings exist in settings
@@ -112,16 +118,11 @@ async def load_addons(username, users_dir):
                         "parameters": getattr(module, 'parameters', 'No parameters'),
                     })
                 else:
-                    print(f"Module {module.__name__} does not have a function with the same name.")
+                    await send_debug(f"Module {module.__name__} does not have a function with the same name.", 2, 'red', username)
 
     # Write the new settings back to the file
-    with open(users_dir + username + '/settings.json', 'w') as f:
+    with open(settings_file, 'w') as f:
         json.dump(settings, f)
-    # Send an update to the frontend
-    #try:
-        #send(json.dumps({'settings': settings}))
-    #except:
-    #    pass
 
     return function_dict, function_metadata
 
@@ -176,13 +177,16 @@ class OpenAIResponser:
             current_content = chunk["choices"][0]["delta"].get("content", "")
             yield current_content
 
-async def upload_audio(userdir, audio_file: UploadFile, background_tasks: BackgroundTasks):
+async def upload_audio(user_dir, username, audio_file: UploadFile, background_tasks: BackgroundTasks):
     # save the file to the user's folder
+    userdir = os.path.join(user_dir, username)
     filename = secure_filename(audio_file.filename)
-    filepath = os.path.join(userdir, 'audio', filename)
+    audio_dir = os.path.join(userdir, 'audio')
+    if not os.path.exists(audio_dir):
+        os.makedirs(audio_dir)
+    filepath = os.path.join(audio_dir, filename)
     with open(filepath, 'wb') as f:
         f.write(audio_file.file.read())
-    print("File size after saving:", os.path.getsize(filepath))
 
     # Now you can use the saved file path to transcribe the audio
     transcription = await transcribe_audio(filepath)
@@ -194,16 +198,16 @@ async def transcribe_audio(audio_file_path):
         transcription = await openai.Audio.atranscribe(
             model = "whisper-1",
             file =  audio_file,
-            language = "af",
+            language = "af", # for the demo
             )
     return transcription['text']
 
 
 async def generate_audio(text, username):
     # make sure the dir exists
-    if not os.path.exists('audio/' + username):
-        os.makedirs('audio/' + username)
-    audio_path = 'audio/' + username + '/' + str(uuid.uuid4()) + '.mp3'
+    audio_dir = os.path.join('audio', username)
+    Path(audio_dir).mkdir(parents=True, exist_ok=True)
+    audio_path = os.path.join(audio_dir, f'{uuid.uuid4()}.mp3')
     # find pairs of 3 backticks and strip the code inside them including the backticks
     # because we don't want to generate audio for code blocks
     code_blocks = []
@@ -236,17 +240,21 @@ async def generate_audio(text, username):
         return print(e)
 
 async def load_brain(username, users_dir):
-    if not os.path.exists(users_dir + username):
-        os.makedirs(users_dir + username)
-    if not os.path.exists(users_dir + username + '/kw_brain.txt'):
-        with open(users_dir + username + '/kw_brain.txt', 'w') as f:
-            with open('data/kw_brain_start.txt', 'r') as f2:
+    user_dir = os.path.join(users_dir, username)
+    brain_path = os.path.join(user_dir, 'kw_brain.txt')
+    Path(user_dir).mkdir(parents=True, exist_ok=True)
+    if not os.path.exists(brain_path):
+        with open(brain_path, 'w') as f:
+            start_brain_path = os.path.join('data', 'kw_brain_start.txt')
+            with open(start_brain_path, 'r') as f2:
                 f.write(f2.read())
-    with open(users_dir + username + '/kw_brain.txt', 'r') as f:
+    with open(brain_path, 'r') as f:
         return f.read()
     
 def write_brain(brain, username, users_dir):
-    with open(users_dir + username + '/kw_brain.txt', 'w') as f:
+    user_dir = os.path.join(users_dir, username)
+    brain_path = os.path.join(user_dir, 'kw_brain.txt')
+    with open(brain_path, 'w') as f:
         f.write(brain)
 
 async def get_drone_state(username):
@@ -264,7 +272,7 @@ async def get_drone_state(username):
         return "Drone state: Failed to get drone state"
 
 
-async def process_message(og_message, username, audio_path, background_tasks: BackgroundTasks, users_dir):
+async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
         chat_history = []
         chat_metadata = []
         history_ids = []
@@ -273,19 +281,11 @@ async def process_message(og_message, username, audio_path, background_tasks: Ba
 
         # load the setting for the user
         settings = {}
-        with open(users_dir + username + '/settings.json', 'r') as f:
+        settings_file = os.path.join(users_dir, username, 'settings.json')
+        with open(settings_file, 'r') as f:
             settings = json.load(f)
 
-        message = username + ': '
-
-        if audio_path is not None:
-            await send_debug(f"Audio received: {audio_path}", 2, 'cyan', username)
-            audio = audio_path
-            audio_transcription = transcribe_audio(audio)
-            await send_debug(f"Audio transcription: {audio_transcription}", 2, 'cyan', username)
-            message += audio_transcription
-        else:
-            message += og_message
+        message = username + ': ' + og_message
 
         old_kw_brain = {}
         kw_brain_string = ''
@@ -397,8 +397,8 @@ Home info:
                 history_ids.append(str(uuid.uuid4()))
                 brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
                 if settings.get('voice_output', True):
-                    audio_path, audio = await generate_audio(response['content'], username)
-                    return response, audio_path
+                    # audio_path, audio = await generate_audio(response['content'], username)
+                    return response
                     # socketio.send(json.dumps({'content': response['content'], 'audio': audio_path}), room=user_id)
                     # socketio.sleep(0.01)
                     # socketio.send(json.dumps({'end': 'true'}), room=user_id)
@@ -415,7 +415,7 @@ Home info:
 async def keyword_generation(message, username, history_string, last_messages_string, old_kw_brain, users_dir):
     # Generate a new kw_brain
     almost_full_message = f"Most relevant past messages (higher score = better relevancy):\n{history_string}\n\n10 most recent messages:\n{last_messages_string}\n\nLast message: {message}"
-    kw_brain = await generate_keywords(almost_full_message, old_kw_brain)
+    kw_brain = await generate_keywords(almost_full_message, old_kw_brain, username)
     json_str = kw_brain
     kw_brain_string = ''
     full_brain_string = f"Old Brain Data: {old_kw_brain}\n\nNew messages:\n{almost_full_message}\n\n"
@@ -426,7 +426,8 @@ async def keyword_generation(message, username, history_string, last_messages_st
         "completion": ' ' + str(kw_brain_string)
     }
     # save the user message and bot message to a file
-    with open('data/brain_responses.jsonl', 'a') as f:
+    brain_responses_file = os.path.join('data', 'brain_responses.jsonl')
+    with open(brain_responses_file, 'a') as f:
         f.write(json.dumps(file_message) + '\n')
     write_brain(json_str, username, users_dir)
     await send_debug(f"New Brain Data: {json_str}", 2, 'cyan', username)
@@ -443,18 +444,18 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 
     final_response = response
     
-    print (f"cot final_response: {final_response}")
+    await send_debug(f"cot final_response: {final_response}", 1, 'green', username)
     cot_response = await process_chain_thoughts(response, message, og_message, function_dict, function_metadata, username, users_dir)
-    print(f"cot_response: {cot_response}")
+    await send_debug(f"cot_response: {cot_response}", 1, 'green', username)
     return_string = cot_response
     try:
         return_string = json.dumps({'content': cot_response})
     except:
-        print(f"can't parse cot_response: {cot_response}")
+        await send_debug(f"can't parse cot_response: {cot_response}", 2, 'red', username)
         try:
             return_string = cot_response['content']
         except:
-            print(f"can't parse cot_response 2nd yime: {cot_response}")
+            await send_debug(f"can't parse cot_response 2nd time: {cot_response}", 2, 'red', username)
 
     return return_string
 
@@ -464,8 +465,6 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
     if 'function_call' in response:
         function_call_name = response['function_call']['name']
         function_call_arguments = response['function_call']['arguments']
-        print(f"Function call: {function_call_name}")
-        print(f"Function arguments: {function_call_arguments}")
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
         #socketio.sleep(0.01)
@@ -494,7 +493,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         # create a string of the steps
         steps_list = []
         for i, step in enumerate(steps):
-            print(f"processing step: {step}")
+            await send_debug(f"processing step: {step}", 2, 'green', username)
             # convert the list to a string before passing it to process_cot_messages
             steps_string = ''.join(steps_list)
             response = await process_cot_messages(step, steps_string, function_dict, function_metadata, og_message, username, users_dir)
@@ -510,12 +509,12 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         return await summarize_cot_responses(steps_string, message, og_message, username, users_dir)
     
     else:
-        print(f"{AsciiColors.RED}Invalid response: {final_response}{AsciiColors.END}")
-        print(f"retrying CoT...")
+        await send_debug(f"{AsciiColors.RED}Invalid response: {final_response}{AsciiColors.END}", 1, 'red', username)
+        await send_debug(f"retrying CoT...", 1, 'red', username)
         await start_chain_thoughts(message, og_message, username, users_dir)
     
 
-async def generate_keywords(prompt, old_kw_brain):
+async def generate_keywords(prompt, old_kw_brain, username):
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
     system_message = f"""Your role is an AI Brain Emulation. You will receive two types of data: 'old active_brain data' and 'new messages'. Each new message will be associated with a specific user. Your task is to update the 'old active_brain data' for each individual user, based on the 'new messages' you receive.
 You should focus on retaining important keywords, instructions, numbers, dates, and events from each user. You can add or remove categories per user request. However, it's crucial that you retain and do not mix up information between users. Each user's data should be kept separate and not influence the data of others. New memories should be added instantly.
@@ -531,7 +530,7 @@ Remember, the goal is to mimic a human brain's ability to retain important infor
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
     response = await openai_response.get_response(new_message)
 
-    print(f"kw resp: {response}")
+    await send_debug(f"kw resp: {response}", 1, 'green', username)
     return response['choices'][0]['message']['content']
 
 
@@ -546,7 +545,7 @@ async def process_function_call(function_call_name, function_call_arguments, fun
             print(f"JSONDecodeError: {e}")
             print(f"Invalid JSON: {converted_function_call_arguments}")
 
-    print(f'{AsciiColors.BLUE}function {function_call_name} call arguments: {str(function_call_arguments)}{AsciiColors.END}')
+    await send_debug(f'{AsciiColors.BLUE}function {function_call_name} call arguments: {str(function_call_arguments)}{AsciiColors.END}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
     function_response = function(**converted_function_call_arguments)
@@ -558,7 +557,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
             {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. brain file is data\kw_brain.txt'},
             {"role": "user", "content": f'previous steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
         ]
-        print(f"{AsciiColors.RED}process_cot_messages messages: {messages}{AsciiColors.END}")
+        await send_debug(f"{AsciiColors.RED}process_cot_messages messages: {messages}{AsciiColors.END}", 1, 'red', username)
 
         openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
         response = await openai_response.get_response(messages, function_metadata=function_metadata)
@@ -569,15 +568,13 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
-            print(f"Function call: {function_call_name}")
-            print(f"Function arguments: {function_call_arguments}")
-            await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
+            await send_debug(f"[Executing {function_call_name} function with arguments:\n{function_call_arguments}]", 3, 'green', username)
             #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
             #socketio.sleep(0.01)
             response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir)
             return response
         else:
-            print(f'{AsciiColors.GREEN}{response}{AsciiColors.END}')
+            await send_debug(f'{AsciiColors.GREEN}{response}{AsciiColors.END}', 1, 'green', username)
             return response['content']
 
 async def summarize_cot_responses(steps_string, message, og_message, username, users_dir):
@@ -587,7 +584,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
         COT_RETRIES[username] = 0
     function_dict, function_metadata = await load_addons(username, users_dir)
     if COT_RETRIES[username] > 1:
-        print(f'{AsciiColors.RED}Too many CoT retries, skipping...{AsciiColors.END}')
+        await send_debug(f'{AsciiColors.RED}Too many CoT retries, skipping...{AsciiColors.END}', 1, 'red', username)
         messages = [
             {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Respond with YES: <your summary>'},
             {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Respond with YES: <your summary>'},
@@ -615,7 +612,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
         return await process_final_message(message, og_message, response, username, users_dir)
 
 async def process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge=True, users_dir='users/'):
-    print(f'{AsciiColors.PINK}processing function {function_call_name} response: {str(function_response)}{AsciiColors.END}')
+    await send_debug(f'{AsciiColors.PINK}processing function {function_call_name} response: {str(function_response)}{AsciiColors.END}', 1, 'pink', username)
     
     second_response = None
     function_dict, function_metadata = await load_addons(username, users_dir)
@@ -667,30 +664,23 @@ async def process_final_message(message, og_message, response, username, users_d
 
     full_message = f"Relevant info: {message}\n\nEverything above this line is for context only!\n\nThe user asked for {og_message}\nYour last response was:\n\n{response}\n\nTry to complete your task again with the new information."
 
-    print(f'{AsciiColors.CYAN}{full_message}{AsciiColors.END}')
     await send_debug(f'{AsciiColors.CYAN}{full_message}{AsciiColors.END}', 1, 'cyan', username)
 
     #response = generate_response(messages, function_dict, function_metadata)
     response = await start_chain_thoughts(full_message, og_message, username, users_dir)
     response = json.loads(response)
 
-    print(f"Retry CoT Response: {response}")
+    await send_debug(f"Retry CoT Response: {response}", 1, 'green', username)
 
     if 'function_call' in response:
         function_call_name = response['function_call']['name']
         function_call_arguments = response['function_call']['arguments']
-        print(f"Function call: {function_call_name}")
-        print(f"Function arguments: {function_call_arguments}")
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         # socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}))
         # socketio.sleep(0.01)
         response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username)
         return response
     else:
-        
-
-        print(f'{AsciiColors.GREEN}{message}{AsciiColors.END}')
-        print(f'{AsciiColors.PINK}Assistant: {response["content"]}{AsciiColors.END}')
         await send_debug(f'{AsciiColors.GREEN}{message}{AsciiColors.END}', 1, 'green', username)
         await send_debug(f'{AsciiColors.PINK}Assistant: {response["content"]}{AsciiColors.END}', 1, 'pink', username)
 

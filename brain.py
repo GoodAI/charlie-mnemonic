@@ -227,8 +227,9 @@ class BrainManager:
         self.db_manager = DatabaseManager()
         self.openai_manager = OpenAIManager()
 
-    async def run(self, user_input, last_messages, memory_name='memory2', users_dir='users/'):
-        self.collection = self.db_manager.init_db(users_dir + memory_name)
+    async def run(self, user_input, last_messages, memory_name='memory2', users_dir='users'):
+        memory_file = os.path.join(users_dir, memory_name)
+        self.collection = self.db_manager.init_db(memory_file)
         combined_messages = last_messages + "\nLast Message: " + user_input
         print(colored(f"Combined messages: {combined_messages}", 'blue'))
         try:

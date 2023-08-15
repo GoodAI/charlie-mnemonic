@@ -755,7 +755,6 @@
     // function to get a cookie by name
     function getCookie(name) {
         var cookieArr = document.cookie.split("; ");
-        console.log(cookieArr);
         for(var i = 0; i < cookieArr.length; i++) {
             var cookiePair = cookieArr[i].split("=");
             if(cookiePair[0] === name) {

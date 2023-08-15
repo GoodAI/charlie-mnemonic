@@ -8,43 +8,14 @@ import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import unittest
 from termcolor import colored
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
-from typing import Dict, Any
-from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
+
 import traceback
 
 class Config:
     MAX_RETRY_ATTEMPTS = 10
     openai.api_key = os.environ["OPENAI_API_KEY"]
 
-class CrossEncoderEmbeddingFunction(EmbeddingFunction):
-    models: Dict[str, Any] = {}
-    tokenizers: Dict[str, Any] = {}
 
-    def __init__(
-        self,
-        model_name: str = 'cross-encoder/mmarco-mMiniLMv2-L12-H384-v1',
-        device: str = 'cpu',
-        normalize_embeddings: bool = False,
-    ):
-        if model_name not in self.models:
-            self.models[model_name] = AutoModelForSequenceClassification.from_pretrained(model_name)
-            self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
-        self._model = self.models[model_name]
-        self.tokenizer = self.tokenizers[model_name]
-        self._normalize_embeddings = normalize_embeddings
-        self.device = torch.device(device)
-        self._model.to(self.device)
-        self._model.eval()
-
-    def __call__(self, texts: Documents) -> Embeddings:
-        with torch.no_grad():
-            features = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(self.device)
-            embeddings = self._model(**features).logits
-            if self._normalize_embeddings:
-                embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)
-            return embeddings.cpu().numpy().tolist()
 
 class DatabaseManager:
     def __init__(self):
@@ -58,6 +29,7 @@ class DatabaseManager:
             os.makedirs(memory_name)
         chroma_client = chromadb.PersistentClient(path=memory_name)
         if os.environ['PRODUCTION'] == 'false':
+            from crossencoder import CrossEncoderEmbeddingFunction
             embedding_function = CrossEncoderEmbeddingFunction()
         else:
             # using openai on production for now because the server went OOM with the cross-encoder

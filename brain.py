@@ -57,8 +57,12 @@ class DatabaseManager:
         if not os.path.exists(memory_name):
             os.makedirs(memory_name)
         chroma_client = chromadb.PersistentClient(path=memory_name)
-        # embedding_function = CrossEncoderEmbeddingFunction()
-        embedding_function = OpenAIEmbeddingFunction()
+        if os.environ['PRODUCTION'] == 'false':
+            embedding_function = CrossEncoderEmbeddingFunction()
+        else:
+            # using openai on production for now because the server went OOM with the cross-encoder
+            # revert to cross-encoder when we have a better server
+            embedding_function = OpenAIEmbeddingFunction()
         collection = chroma_client.get_or_create_collection(name="conversations", embedding_function=embedding_function)
         collection_count = collection.count()
         print(f"LTM Entries: {collection_count}")

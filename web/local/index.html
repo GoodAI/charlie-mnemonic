@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <title>Chatbot</title>
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
+    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/marked/2.1.3/marked.min.js"></script>
+    <script src="https://unpkg.com/json5@2/dist/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js" integrity="sha512-3gJwYpMe3QewGELv8k/BX9vcqhryRdzRMxVfq6ngyWXwo03GFEzjsUm8Q7RZcHPHksttq7/GFoxjCVUjkjvPdw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.js" integrity="sha512-MBa5biLyZuJEdQR7TkouL0i1HAqpq8lh8suPgA//wpxGx4fU1SGz1hGSlZhYmm+b7HkoncCWpfVKN3NDcowZgQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css" integrity="sha512-ZKX+BvQihRJPA8CROKBhDNvoc2aDMOdAlcm7TUQY+35XYtrd3yh95QOOhsPDQY9QnKE0Wqag9y38OIgEvb88cA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="styles.css">
+
+
+</head>
+    <script>
+        // const API_URL = 'https://' + document.domain + ':' + location.port;
+        const port = 8002;
+        const url = 'http://127.0.0.1';
+        const API_URL = url + ':' + port;
+        var chatHistory = [];
+        var tempReceived = '';
+        var tempFormatted = '';
+        var settings = {};
+        let user_name = '';
+
+        // set a temporary socket
+        var socket = {
+            emit: function() {},
+            on: function() {}
+        };
+
+        // create a new marked renderer to add lightbox to images
+        var renderer = new marked.Renderer();
+        renderer.image = function(href, title, text) {
+            // display images with 250px width and lightbox js
+            return `<a href="${href}" data-lightbox="${text}" data-title="${title}"><img src="${href}" width="250px" alt="${text}"></a>`;
+        };
+        renderer.link = function(href, title, text) {
+        return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
+        };
+        // set the options for marked and a highlighter and copy button
+        marked.setOptions({
+            highlight: function(code, lang) {
+                return '<div class="language">' + (lang || 'code') + '</div>' + 
+                    '<button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>' +
+                    '<pre><code>' + hljs.highlightAuto(code, [lang]).value + '</code></pre>';
+            },
+            renderer: renderer,
+        });
+
+        // keep the last 10 messages in history
+        // need to update this to a better system
+        function updateHistory(msg) {
+            chatHistory.push(msg);
+            if (chatHistory.length > 10) {
+                chatHistory.shift();
+            }
+        }
+
+        // parse a json with json5
+        function parseComplexJson(jsonStr) {
+            // Now parse the JSON string using JSON5
+            return JSON5.parse(jsonStr);
+        }
+
+        // copy the code to the clipboard
+        function copyToClipboard(btn) {
+            var code = btn.nextElementSibling.innerText;
+            var textarea = document.createElement('textarea');
+            textarea.textContent = code;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            var overlay = document.getElementById('overlay');
+            overlay.textContent = 'Code copied to clipboard';
+            overlay.classList.add('active');
+            setTimeout(function() {
+                overlay.classList.remove('active');
+            }, 1000);
+        }
+
+        // populate the settings menu
+        function populateSettingsMenu(settings) {
+            var settingsMenu = document.getElementById("SidenavAddons");
+            settingsMenu.innerHTML = ''; // clear the menu
+            settingsMenu.innerHTML += '<a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>';
+            settingsMenu.innerHTML += '<h2>Settings</h2><br>';
+            settingsMenu.innerHTML += '<h3>Addons</h3><br>';
+            for (let addon in settings) {
+                // loop through the settings and create a menu item for each addon
+                if (settings.hasOwnProperty(addon)) {
+                    var status = settings[addon] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+                    var menuItem = document.createElement('a');
+                    menuItem.href = "#";
+                    menuItem.innerHTML = addon + ": " + status;
+                    menuItem.onclick = (function(addon) {
+                        return function(e) {
+                            e.preventDefault(); // prevent the default action
+                            // socket.emit('change_addon_status', { 
+                            //     addon: addon, 
+                            //     enabled: !settings[addon],
+                            //     username: user_name 
+                            // });
+                            edit_addon_status(addon, !settings[addon]);
+                            console.log('change_addon_status: ', addon, !settings[addon]);
+                        };
+                    })(addon);
+                    settingsMenu.appendChild(menuItem);
+                }
+            }
+            // create a new div for other settings
+            var otherSettings = document.createElement('div');
+            otherSettings.innerHTML = '<br><br><h3>Other settings</h3><br>';
+            //append the div to the menu
+            settingsMenu.appendChild(otherSettings);
+        }
+
+        function edit_addon_status(addon, enabled) {
+            // edit the addon status
+            fetch(API_URL + '/update_settings/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ addon: addon, enabled: enabled, username: user_name }),
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                setSettings(data);
+            })
+            .catch(console.error);
+        }
+
+        function setSettings(newSettings) {            
+            // import the settings and populate the settings menu
+            if (newSettings) {
+                console.log('received settings:');
+                for (let addon in newSettings) {
+                    if (newSettings.hasOwnProperty(addon)) {
+                        console.log('addon: ' + addon + ' enabled: ' + newSettings[addon]);
+                    }
+                }
+                settings = newSettings;
+                populateSettingsMenu(settings);
+                if (newSettings.voice_input) {
+                $('#record').show();
+                } else {
+                    $('#record').hide();
+                }
+                return;
+            }
+        };
+
+        function get_settings(username) {
+            var timestamp = new Date().toLocaleTimeString();
+            socket = new WebSocket('ws://localhost:8002/ws/' + username);
+
+            socket.addEventListener('message', function (event) {
+                console.log('Message from server: ', event.data);
+                
+                let msg = {};
+                if (event.data.startsWith('debug1:')){
+                    msg.debug1 = event.data.replace('debug1:', '');
+                }
+                else if (event.data.startsWith('debug2:')) {
+                    msg.debug2 = event.data.replace('debug2:', '');
+                }
+
+                else if (event.data.startsWith('[Executing')) {
+                    // remove newlines from the content
+                    var content = event.data.replace(/\n/g, '');
+                    console.log('using addon');
+                    console.log('content:' + content);
+                    tempchild = document.getElementById('messages').lastChild;
+                    if (tempchild) {
+                        // check if the tempchild has a spinner, if so, remove it
+                        if (tempchild.querySelector('.spinner') != null) {
+                            tempchild.querySelector('.spinner').remove();
+                            document.getElementById('messages').lastChild.remove();
+                        }
+                    }
+                    var match = content.match(/\[Executing (\w+) function with arguments: ({.*?})\]/);
+                    if (match) {
+                        var addon = match[1];
+                        var args = parseComplexJson(match[2]);
+
+                        var lastMessage = document.querySelector('.last-message');
+                        if (lastMessage) {
+                            lastMessage.classList.remove('last-message');
+                        }
+
+                        // Create a string representation of args properties
+                        var argsString = '';
+                        for (var key in args) {
+                            if (args.hasOwnProperty(key)) {
+                                argsString += `<div class="arg"><b>${key}:</b> ${escapeHTML(args[key])}</div>`;
+                            }
+                        }
+
+                        var chatMessage = `
+                            <div class="message system">
+                                <span class="timestamp">${timestamp}</span>
+                                <div class="bubble">
+                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                                        <div class="title">Using: ${addon}<div class="arrow"></div></div>
+                                        ${argsString}  <!-- Insert the args properties here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById('messages').innerHTML += chatMessage;
+                    }
+                    
+                    // create a bot message div with a loading spinner
+                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+                    var element = document.createElement('div');
+                    element.innerHTML = botMessage;
+                    document.getElementById('messages').innerHTML += botMessage;
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    content = '';
+                    tempReceived = '';
+                    tempFormatted = '';
+                }
+
+                
+                if (msg.debug1 !== undefined) {
+                    var debug1 = msg.debug1.replace(/\n/g, '<br>');
+                    var color1 = msg.color ? msg.color : 'white';
+                    var objDiv = document.getElementById('debugContent1');
+                    var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                    document.getElementById('debugContent1').innerHTML += '<p style="color:' + color1 + ';">' + debug1 + '</p>';
+                    if (isNearBottom) {
+                        objDiv.scrollTop = objDiv.scrollHeight;
+                    }
+                }
+                if (msg.debug2 !== undefined) {
+                    var debug2 = msg.debug2.replace(/\n/g, '<br>');
+                    var color2 = msg.color ? msg.color : 'white';
+                    var objDiv = document.getElementById('debugContent2');
+                    var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                    document.getElementById('debugContent2').innerHTML += '<p style="color:' + color2 + ';">' + debug2 + '</p>';
+                    if (isNearBottom) {
+                        objDiv.scrollTop = objDiv.scrollHeight;
+                    }
+                }
+            });
+            // get the settings from the server
+            fetch(API_URL + '/load_settings/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: username}),
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                setSettings(data);
+            })
+            .catch(console.error);
+        }
+
+        function externalMessage(msg) {
+            console.log('External message received: ', msg);
+            addExternalMessage(msg);
+        };
+
+        function onResponse(msg){
+            var timestamp = new Date().toLocaleTimeString();
+            
+            // be sure the msg is converted to json
+            if (typeof msg === 'string') {
+                try {
+                    msg = JSON.parse(msg);
+                } catch (e) {
+                    console.error('Error parsing JSON: ', e);
+                }
+            }
+            
+            console.log(msg);
+
+            // replace the occassional \n with in the openAI responses
+            let content = msg.content;
+
+            if (content) {
+                content = content.replace(/\n/g,'').trim();
+
+                console.log('1 start msg');
+                // remove the spinner
+                var lastMessage = document.querySelector('.last-message');
+                if (lastMessage) {
+                    lastMessage.classList.remove('last-message');
+                    if(lastMessage.querySelector('.spinner') != null) {
+                        lastMessage.querySelector('.spinner').remove();
+                        document.getElementById('messages').lastChild.remove();
+                    }
+                }
+                tempReceived += msg.content;
+                tempFormatted = tempReceived;
+                // count the amount of ``` if there is none, use marked, if there is 1 do not use marked, if there are 2, use marked
+                var count = (tempReceived.match(/```/g) || []).length;
+                if (count > 0) {
+                    if (count % 2 == 0) {
+                        tempFormatted = marked(tempReceived);
+                    }
+                    else {
+                        // add ``` to the end of the message
+                        tempFormatted = tempReceived + '\n```';
+                        // format it
+                        tempFormatted = marked(tempFormatted);
+                    }
+                }
+                else {
+                    tempFormatted = marked(tempReceived);
+                }
+                audioElement = '';
+                if(msg.audio) {
+                    // Use the local path as the src of the audio element
+                    var audioSrc = msg.audio;
+                    audioElement = `<br><audio controls><source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.</audio>`;
+                }
+                var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + audioElement + '</div>'; 
+                document.getElementById('messages').innerHTML += chatMessage;
+                tempReceived = '';
+                tempFormatted = '';
+                var lastMessage = document.querySelector('.last-message');
+                if (lastMessage) {
+                    //lastMessage.querySelector('.bubble').innerHTML = marked(lastMessage.querySelector('.bubble').innerHTML);
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                }
+                content = '';
+                document.getElementById('send').disabled = false;
+            }
+            // enable the send button if the message received contains 'end': 'true'
+            if (msg && msg.end && msg.end === 'true') {
+                document.getElementById('send').disabled = false;
+            }
+        }
+
+        function escapeHTML(str) {
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+    </script>
+</head>
+<body>
+    <!-- Login Modal -->
+    <div class="modal" tabindex="-1" role="dialog" id="login-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Enter your username and password</h5>
+                </div>
+                <div class="modal-body">
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label for="username-input">Username</label>
+                            <input type="text" class="form-control" id="username-input" placeholder="Enter your username" maxlength="20" pattern="^[a-zA-Z0-9_]*$" required>
+                            <small class="form-text text-muted">Max 20 characters, no special characters except underscore.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="password-input">Password</label>
+                            <input type="password" class="form-control" id="password-input" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Login</button>
+                    </form>
+                    <p class="mt-3">Don't have an account? <a href="#" id="register-link">Register</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Register Modal -->
+    <div class="modal" tabindex="-1" role="dialog" id="register-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register a new account</h5>
+                </div>
+                <div class="modal-body">
+                    <form id="register-form">
+                        <div class="form-group">
+                            <label for="register-username-input">Username</label>
+                            <input type="text" class="form-control" id="register-username-input" placeholder="Enter your username" maxlength="20" pattern="^[a-zA-Z0-9_]*$" required>
+                            <small class="form-text text-muted">Max 20 characters, no special characters except underscore.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password-input">Password</label>
+                            <input type="password" class="form-control" id="register-password-input" placeholder="Enter your password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Register</button>
+                    </form>
+                    <p class="mt-3">Don't have an account? <a href="#" id="register-link">Register</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="mySidenav" class="sidenav">
+        <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
+        <div id="SidenavAddons"></div>
+    </div>
+    <!-- Right side navigation -->
+    <div class="bottomright-with-nw-resize-outer bgcolorstack" id="debugNav">
+        <div class="bottomright-with-nw-resize-inner">
+            <div id="resizeHandle" class="resize-handle"></div>
+            <a href="javascript:void(0)" class="dclosebtn" onclick="event.stopPropagation(); closeDebugNav()">&times;</a>
+            <div id="debugWindow1" class="debugWindow">
+                <h2>LLM Debug</h2>
+                <div id="debugContent1"></div>
+            </div>
+            <div id="debugWindow2" class="debugWindow">
+                <h2>System Debug</h2>
+                <div id="debugContent2"></div>
+            </div>
+        </div>
+    </div>
+    <h1>Chatbot</h1>
+    <div id="overlay">
+        <div class="text">Code copied to clipboard</div>
+    </div>
+        <div id="chat-container" class="chat-container">
+            <div id="messages"></div>
+            <divclass="message-container">
+                <div class="preset-text-container">
+                    <button class="preset-text-button" onclick="insertPresetText('Continue')">Continue</button>
+                    <button class="preset-text-button" onclick="insertPresetText('Hi')">Hi</button>
+                    <button class="preset-text-button" onclick="insertPresetText('turn all the lights on')">turn all the lights on</button>
+                    <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
+                    <!-- Add more buttons as needed -->
+                </div>
+                <div class="input-field">
+                    <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i><textarea id="message" placeholder="Type a message..."></textarea>
+                    <button id="record" class="record-button">Record</button>
+                    <div id="recordingIndicator" style="display: none;">Recording...</div>
+                    <button id="send" class="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </body>
+    <script>
+    let session_token = '';
+    function insertPresetText(text) {
+        var messageInput = document.getElementById('message');
+        messageInput.value += text;
+        document.getElementById('send').click();
+    }
+
+    function openNav() {
+        document.getElementById("mySidenav").style.width = "350px";
+        document.getElementById("chat-container").style.marginLeft = "350px";
+        }
+
+    function closeNav() {
+        document.getElementById("mySidenav").style.width = "0";
+        document.getElementById("chat-container").style.marginLeft = "0";
+        }
+
+    function addUserMessage(message) {
+        var escaped_message = escapeHTML(message); 
+        var messageFormatted = escaped_message.replace(/\n/g, "<br>"); 
+        var timestamp = new Date().toLocaleTimeString();
+        var lastMessage = document.querySelector('.last-message');
+        if (lastMessage) {
+            lastMessage.classList.remove('last-message');
+        }
+        var chatMessage = '<div class="message user last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>'; 
+        document.getElementById('messages').innerHTML += chatMessage;
+        var lastMessage2 = document.querySelector('.last-message');
+                    if (lastMessage2) {
+                        lastMessage2.classList.remove('last-message');
+                    }
+
+        // create a bot message div with a loading spinner
+        var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+        var element = document.createElement('div');
+        element.innerHTML = botMessage;
+        document.getElementById('messages').innerHTML += botMessage;
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        // remove input text
+        document.getElementById('message').value = '';
+
+        // disable the send button
+        document.getElementById('send').disabled = true;
+    }
+
+    function addExternalMessage(message) {
+        var escaped_message = escapeHTML(message); 
+        var messageFormatted = escaped_message.replace(/\n/g, "<br>"); 
+        var timestamp = new Date().toLocaleTimeString();
+        var lastMessage = document.querySelector('.last-message');
+        if (lastMessage) {
+            lastMessage.classList.remove('last-message');
+        }
+        var chatMessage = '<div class="message external last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>'; 
+        document.getElementById('messages').innerHTML += chatMessage;
+        var lastMessage2 = document.querySelector('.last-message');
+                    if (lastMessage2) {
+                        lastMessage2.classList.remove('last-message');
+                    }
+
+        // create a bot message div with a loading spinner
+        var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+        var element = document.createElement('div');
+        element.innerHTML = botMessage;
+        document.getElementById('messages').innerHTML += botMessage;
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        // remove input text
+        document.getElementById('message').value = '';
+
+        // disable the send button
+        document.getElementById('send').disabled = true;
+    }
+    
+    
+    document.getElementById('send').addEventListener('click', async function() {
+        var message = document.getElementById('message').value;
+        addUserMessage(message);
+        try {
+            const response = await fetch(API_URL + '/message/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'prompt': message, 'username': user_name}),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            onResponse(data);
+
+        } catch (error) {
+            console.error('Failed to send message: ', error);
+        }
+    });
+
+    document.getElementById('message').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            document.getElementById('send').click();
+        }
+    });
+    var mediaRecorder;
+    var chunks = [];
+
+    document.getElementById('record').addEventListener('click', function() {
+        // Check if we're currently recording
+        if (mediaRecorder && mediaRecorder.state == "recording") {
+            // If we are, stop the recording and reset our data
+            mediaRecorder.stop();
+            chunks = [];
+            document.getElementById('record').innerText = "Record";
+            document.getElementById('recordingIndicator').style.display = "none";
+        } else {
+            // If we're not, start a new recording
+            navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function(stream) {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
+
+                mediaRecorder.ondataavailable = function(e) {
+                    chunks.push(e.data);
+                }
+
+                mediaRecorder.onstop = function(e) {
+                    var blob = new Blob(chunks, { 'type' : 'audio/mp3' });
+                    chunks = [];
+
+                    // Convert the blob to a File
+                    var file = new File([blob], "audio.mp3", { type: "audio/mp3" });
+
+                    send_audio(file);
+
+                    document.getElementById('record').innerText = "Record";
+                    document.getElementById('recordingIndicator').style.display = "none";
+                }
+            })
+            .catch(function(err) {
+                console.log('The following error occurred: ' + err);
+            })
+
+            document.getElementById('record').innerText = "Stop";
+            document.getElementById('recordingIndicator').style.display = "block";
+        }
+    });
+
+    function send_audio(file) {
+        // Create a FormData object
+        var formData = new FormData();
+
+        // Add the file to the form data
+        formData.append("audio_file", file);
+        formData.append("username", username);
+        formData.append("session_token", session_token);
+
+        // Send the form data using fetch
+        fetch(API_URL + "/message_audio", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Now you can send the transcription to your server
+            //socket.send(JSON.stringify({'message': data.transcription, 'history': message, 'username': user_name, 'session_token': session_token}));
+            console.log('received transcription: ' + data.transcription);
+            addUserMessage(data.transcription);
+        })
+        .catch(console.error);
+    }
+
+    $('#voice-input, #voice-output').change(function() {
+        var settings = {
+            voice_input: $('#voice-input').prop('checked'),
+            voice_output: $('#voice-output').prop('checked')
+        };
+        //socket.emit('update_settings', settings, user_name); // Emit update_settings event
+
+        // Show or hide the record button based on the voice input setting
+        if (settings.voice_input) {
+            $('#record').show();
+        } else {
+            $('#record').hide();
+        }
+    });
+
+    // Show the username modal
+    var loginModal = new bootstrap.Modal(document.getElementById('login-modal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
+    var registerModal = new bootstrap.Modal(document.getElementById('register-modal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
+    registerModal.hide();
+    loginModal.show();
+
+    // Show the register modal
+    document.getElementById('register-link').addEventListener('click', function (event) {
+        event.preventDefault();
+        loginModal.hide();
+        registerModal.show();
+    });
+    
+    // function to login a user
+    async function login(username, password) {
+        const response = await fetch(API_URL + '/login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username: username, password: password }),
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        else {
+            // set the session token
+            console.log('setting session token');
+            session_token = getCookie('session_token');
+            console.log('session token: ' + session_token);
+        }
+    }
+
+    // function to handle the login form submission
+    document.getElementById('login-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const username = document.getElementById('username-input').value.trim();
+        const password = document.getElementById('password-input').value.trim();
+        if (username && password) {
+            try {
+                await login(username, password);
+                loginModal.hide();
+                user_name = username;
+                get_settings(user_name);
+            } catch (error) {
+                console.error('Login failed: ', error);
+            }
+        }
+    });
+
+    // function to register a user
+    async function register(username, password) {
+        const response = await fetch(API_URL + '/register/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username: username, password: password }),
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    }
+
+    // function to handle the register form submission
+    document.getElementById('register-form').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        username = document.getElementById('register-username-input').value.trim();
+        var password = document.getElementById('register-password-input').value.trim();
+        if (username && password) {
+            try {
+                await register(username, password);
+                registerModal.hide();
+                user_name = username;
+                get_settings(user_name);
+            }
+            catch (error) {
+                console.error('Registration failed: ', error);
+            }
+        }
+    });
+    
+    // function to open the debug navigation
+    function openDebugNav() {
+        document.getElementById("debugNav").style.width = "60%";
+        document.getElementById("debugNav").style.height = "100vh";
+        // add event listener to the document
+        document.addEventListener('click', closeDebugNavOnClickOutside);
+    }
+
+    // function to close the debug navigation
+    function closeDebugNav() {
+        document.getElementById("debugNav").style.width = "0";
+        document.getElementById("debugNav").style.height = "0";
+        // remove event listener from the document
+        document.removeEventListener('click', closeDebugNavOnClickOutside);
+    }
+
+    // function to close the debug navigation when click happens outside of it
+    function closeDebugNavOnClickOutside(event) {
+        var debugNav = document.getElementById("debugNav");
+        if (!debugNav.contains(event.target)) {
+            closeDebugNav();
+        }
+    }
+    // function to get a cookie by name
+    function getCookie(name) {
+        var cookieArr = document.cookie.split("; ");
+        for(var i = 0; i < cookieArr.length; i++) {
+            var cookiePair = cookieArr[i].split("=");
+            if(cookiePair[0] === name) {
+                return decodeURIComponent(cookiePair[1]);
+            }
+        }
+        return null;
+    }
+
+
+    // check for session token when page loads
+    window.onload = function() {
+        var sessionToken = getCookie('session_token');
+        if(sessionToken) {
+            // session token exists, no need to login
+            user_name = getCookie('username');
+            console.log('session token found, logging in as ' + user_name);
+            loginModal.hide();
+            get_settings(user_name);
+        } else {
+            // no session token, show the login modal
+            loginModal.show();
+        }
+    }
+    </script>
+</body>
+</html>

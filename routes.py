@@ -13,7 +13,8 @@ router = APIRouter()
 
 connections = {}
 
-isOnHttps = True
+PRODUCTION = os.environ['PRODUCTION']
+isOnHttps = PRODUCTION # False
 
 users_dir = 'users/' # end with a slash
 
@@ -23,7 +24,7 @@ def get_token(request: Request):
 
 async def send_debug_message(username: str, message: str):
     if username in connections:
-        print(f"Sending message to user {username}: {message}")
+        print(f"Sending message to user {username}:\n{message}")
         await connections[username].send_text(message)
     else:
         print(f"No active websocket connection for user {username}")
@@ -51,8 +52,12 @@ async def register(user: User, response: Response):
         session_token = auth.register(user.username, user.password)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
-        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        if PRODUCTION == 'true':
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True, samesite="None", expires=expiracy_date, domain=".airobin.net")
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=True, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        else:
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
         return {'message': 'User registered successfully'}
     else:
         raise HTTPException(status_code=400, detail="User registration failed")
@@ -65,8 +70,12 @@ async def login(user: User, response: Response):
         session_token = auth.login(user.username, user.password)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        response.set_cookie(key="session_token", value=session_token, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
-        response.set_cookie(key="username", value=user.username, secure=isOnHttps, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        if PRODUCTION == 'true':
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=True, samesite="None", expires=expiracy_date, domain=".airobin.net")
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=True, samesite="None", expires=expiracy_date, domain=".airobin.net")
+        else:
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
         return {'message': 'User logged in successfully'}
     else:
         raise HTTPException(status_code=401, detail="User login failed")
@@ -98,6 +107,7 @@ async def check_token(user: UserCheckToken):
     tags=["Settings"])
 async def handle_get_settings(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
+    print('session_token: ' + str(session_token))
     with Authentication() as auth:
         success = auth.check_token(user.username, session_token)
     if not success:

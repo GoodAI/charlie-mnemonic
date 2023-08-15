@@ -23,6 +23,3 @@ def execute_command(command):
 
     # Return a success message
     return "Command executed successfully"
-
-# Test the function
-print(execute_command(json.dumps({"command": "Hello, World!"})))

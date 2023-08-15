@@ -20,8 +20,9 @@
 </head>
     <script>
         // const API_URL = 'https://' + document.domain + ':' + location.port;
-        const port = 8002;
-        const url = 'http://127.0.0.1';
+        const port = '';
+        const domain = 'clang.airobin.net';
+        const url = 'https://' + domain;
         const API_URL = url + ':' + port;
         var chatHistory = [];
         var tempReceived = '';
@@ -142,7 +143,12 @@
         function setSettings(newSettings) {            
             // import the settings and populate the settings menu
             if (newSettings) {
-                console.log('settings: ' + newSettings);
+                console.log('received settings:');
+                for (let addon in newSettings) {
+                    if (newSettings.hasOwnProperty(addon)) {
+                        console.log('addon: ' + addon + ' enabled: ' + newSettings[addon]);
+                    }
+                }
                 settings = newSettings;
                 populateSettingsMenu(settings);
                 if (newSettings.voice_input) {
@@ -156,7 +162,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('ws://localhost:8002/ws/' + username);
+            socket = new WebSocket('wss://' + domain + '/ws/' + username);
 
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);
@@ -662,6 +668,14 @@
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
+    }
+
+    // function to set a cookie with an expiration date
+    function setCookie(name, value, days) {
+        var date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        var expires = "; expires=" + date.toUTCString();
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
     }
 
     // function to handle the login form submission

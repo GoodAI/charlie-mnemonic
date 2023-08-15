@@ -4,6 +4,7 @@ import bcrypt
 import binascii
 
 DATABASE_URL = os.environ['DATABASE_URL']
+PRODUCTION = os.environ['PRODUCTION']
 
 class Authentication:
     def __init__(self):
@@ -11,7 +12,10 @@ class Authentication:
         self.cursor = None
 
     def open(self):
-        self.conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        if PRODUCTION == 'false':
+            self.conn = psycopg2.connect(DATABASE_URL)
+        else:
+            self.conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         self.cursor = self.conn.cursor()
         self.create_table()
 

@@ -113,7 +113,7 @@ async def handle_get_settings(request: Request, user: UserName):
         success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    load_addons(user.username, users_dir)
+    await load_addons(user.username, users_dir)
     with open(users_dir + user.username + '/settings.json', 'r') as f:
         settings = json.load(f)
     print(settings)

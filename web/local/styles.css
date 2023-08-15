@@ -496,6 +496,7 @@ pre {
    /* initial size can be anything, but usually wise to set it to something sensible initially. */
    height: 0;
    width: 0;
+   z-index: 5;
    background-color: #111;
 }
 

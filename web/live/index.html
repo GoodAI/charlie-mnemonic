@@ -425,6 +425,7 @@
     </div>
     <div id="mySidenav" class="sidenav">
         <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
+        <button id="logout-button">Logout</button>
         <div id="SidenavAddons"></div>
     </div>
     <!-- Right side navigation -->
@@ -780,6 +781,45 @@
             catch (error) {
                 console.error('Registration failed: ', error);
             }
+        }
+    });
+    
+    // function to delete a cookie
+    function deleteCookie(name) {
+        document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    }
+
+    // function to logout a user
+    async function logout() {
+        const response = await fetch(API_URL + '/logout/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username: getCookie('username'), session_token: getCookie('session_token') }),
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        else {
+            // delete the session token and username
+            deleteCookie('session_token');
+            deleteCookie('username');
+            // reload the page
+            location.reload();
+        }
+    }
+
+    // function to handle the logout button click
+    document.getElementById('logout-button').addEventListener('click', async function(event) {
+        event.preventDefault();
+        try {
+            await logout();
+            console.log('User logged out successfully');
+        } catch (error) {
+            console.error('Logout failed: ', error);
         }
     });
     

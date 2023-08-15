@@ -92,7 +92,7 @@ class Authentication:
             stored_token = result[0]
             if stored_token == session_token:
                 # If the session token is correct, delete it from the database
-                self.cursor.execute("UPDATE users SET session_token = NULL WHERE username = %s", (username,))
+                self.cursor.execute("UPDATE users SET session_token = '' WHERE username = %s", (username,))
                 self.conn.commit()
                 self.close()
                 return True
@@ -102,6 +102,8 @@ class Authentication:
             return False
 
     def check_token(self, username, session_token):
+        if session_token == '':
+            return False
         self.open()
         self.cursor.execute("SELECT session_token FROM users WHERE username = %s", (username,))
         result = self.cursor.fetchone()

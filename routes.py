@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 import json
 import os
-from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket
+from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from utils import process_message, OpenAIResponser, upload_audio
 from authentication import Authentication
@@ -40,9 +40,18 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
             print(f'User {username} sent: {data}')
             # Send a response back to the client
             await websocket.send_text(f'Received: {data}')
-    except:
-        # Handle disconnection
+    except WebSocketDisconnect:
+        # Handle client disconnection
         del connections[username]
+        print(f'User {username} disconnected')
+    except ConnectionResetError:
+        # Handle client disconnection
+        del connections[username]
+        print(f'User {username} disconnected')
+    except Exception as e:
+        # Handle any other exceptions
+        del connections[username]
+        print(f'An error occurred with user {username}: {e}')
 
 # register route
 @router.post("/register/",

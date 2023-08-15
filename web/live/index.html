@@ -670,7 +670,7 @@
         }
     }
 
-    // function to set a cookie with an expiration date
+    // function to set a cookie with an expiration date (not used atm)
     function setCookie(name, value, days) {
         var date = new Date();
         date.setTime(date.getTime() + (days*24*60*60*1000));
@@ -688,7 +688,7 @@
                 await login(username, password);
                 loginModal.hide();
                 user_name = username;
-                get_settings(user_name);
+                loadCookies();
             } catch (error) {
                 console.error('Login failed: ', error);
             }
@@ -721,7 +721,7 @@
                 await register(username, password);
                 registerModal.hide();
                 user_name = username;
-                get_settings(user_name);
+                loadCookies();
             }
             catch (error) {
                 console.error('Registration failed: ', error);
@@ -764,9 +764,7 @@
         return null;
     }
 
-
-    // check for session token when page loads
-    window.onload = function() {
+    function loadCookies(){
         var sessionToken = getCookie('session_token');
         if(sessionToken) {
             // session token exists, no need to login
@@ -778,6 +776,12 @@
             // no session token, show the login modal
             loginModal.show();
         }
+    }
+
+
+    // check for session token when page loads
+    window.onload = function() {
+        loadCookies();
     }
     </script>
 </body>

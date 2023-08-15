@@ -8,6 +8,7 @@ from authentication import Authentication
 from pydantic import BaseModel
 from classes import User, UserCheckToken, UserName, editSettings, userMessage
 import openai
+from utils import load_addons
 
 router = APIRouter()
 
@@ -112,14 +113,7 @@ async def handle_get_settings(request: Request, user: UserName):
         success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    # create the directory if it doesn't exist
-    if not os.path.exists(users_dir + user.username):
-        os.makedirs(users_dir + user.username)
-    # check if the settings file exists
-    if not os.path.exists(users_dir + user.username + '/settings.json'):
-        # create the settings file
-        with open(users_dir + user.username + '/settings.json', 'w') as f:
-            json.dump({}, f)
+    load_addons(user.username, users_dir)
     with open(users_dir + user.username + '/settings.json', 'r') as f:
         settings = json.load(f)
     print(settings)

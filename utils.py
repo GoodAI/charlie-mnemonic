@@ -509,7 +509,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         return await summarize_cot_responses(steps_string, message, og_message, username, users_dir)
     
     else:
-        await send_debug(f"{AsciiColors.RED}Invalid response: {final_response}{AsciiColors.END}", 1, 'red', username)
+        await send_debug(f"Invalid response: {final_response}", 1, 'red', username)
         await send_debug(f"retrying CoT...", 1, 'red', username)
         await start_chain_thoughts(message, og_message, username, users_dir)
     
@@ -545,7 +545,7 @@ async def process_function_call(function_call_name, function_call_arguments, fun
             print(f"JSONDecodeError: {e}")
             print(f"Invalid JSON: {converted_function_call_arguments}")
 
-    await send_debug(f'{AsciiColors.BLUE}function {function_call_name} call arguments: {str(function_call_arguments)}{AsciiColors.END}', 1, 'blue', username)
+    await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
     function_response = function(**converted_function_call_arguments)
@@ -557,7 +557,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
             {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. brain file is data\kw_brain.txt'},
             {"role": "user", "content": f'previous steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
         ]
-        await send_debug(f"{AsciiColors.RED}process_cot_messages messages: {messages}{AsciiColors.END}", 1, 'red', username)
+        await send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
 
         openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
         response = await openai_response.get_response(messages, function_metadata=function_metadata)
@@ -574,7 +574,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
             response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir)
             return response
         else:
-            await send_debug(f'{AsciiColors.GREEN}{response}{AsciiColors.END}', 1, 'green', username)
+            await send_debug(f'{response}', 1, 'green', username)
             return response['content']
 
 async def summarize_cot_responses(steps_string, message, og_message, username, users_dir):
@@ -584,7 +584,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
         COT_RETRIES[username] = 0
     function_dict, function_metadata = await load_addons(username, users_dir)
     if COT_RETRIES[username] > 1:
-        await send_debug(f'{AsciiColors.RED}Too many CoT retries, skipping...{AsciiColors.END}', 1, 'red', username)
+        await send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
         messages = [
             {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Respond with YES: <your summary>'},
             {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Respond with YES: <your summary>'},
@@ -612,7 +612,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
         return await process_final_message(message, og_message, response, username, users_dir)
 
 async def process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge=True, users_dir='users/'):
-    await send_debug(f'{AsciiColors.PINK}processing function {function_call_name} response: {str(function_response)}{AsciiColors.END}', 1, 'pink', username)
+    await send_debug(f'processing function {function_call_name} response: {str(function_response)}', 1, 'pink', username)
     
     second_response = None
     function_dict, function_metadata = await load_addons(username, users_dir)
@@ -664,7 +664,7 @@ async def process_final_message(message, og_message, response, username, users_d
 
     full_message = f"Relevant info: {message}\n\nEverything above this line is for context only!\n\nThe user asked for {og_message}\nYour last response was:\n\n{response}\n\nTry to complete your task again with the new information."
 
-    await send_debug(f'{AsciiColors.CYAN}{full_message}{AsciiColors.END}', 1, 'cyan', username)
+    await send_debug(f'{full_message}', 1, 'cyan', username)
 
     #response = generate_response(messages, function_dict, function_metadata)
     response = await start_chain_thoughts(full_message, og_message, username, users_dir)
@@ -681,8 +681,8 @@ async def process_final_message(message, og_message, response, username, users_d
         response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username)
         return response
     else:
-        await send_debug(f'{AsciiColors.GREEN}{message}{AsciiColors.END}', 1, 'green', username)
-        await send_debug(f'{AsciiColors.PINK}Assistant: {response["content"]}{AsciiColors.END}', 1, 'pink', username)
+        await send_debug(f'{message}', 1, 'green', username)
+        await send_debug(f'Assistant: {response["content"]}', 1, 'pink', username)
 
         # if settings.get('voice_output', True):
         #     audio_path, audio = generate_audio(response['content'])

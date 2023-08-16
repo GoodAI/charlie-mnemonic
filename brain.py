@@ -39,6 +39,16 @@ class DatabaseManager:
         collection_count = collection.count()
         print(f"LTM Entries: {collection_count}")
         return collection
+    
+    def delete_db(self, memory_name):
+        try:
+            chroma_client = chromadb.PersistentClient(path=memory_name)
+            chroma_client.delete_collection("conversations")
+            print(f"Deleted database: {memory_name}")
+        except Exception as e:
+            print(f"Failed to delete database: {memory_name}")
+            print(e)
+
 
     def add_to_collection(self, collection, chat_history, chat_metadata, history_ids):
         print(colored(f"Adding to collection: \n{chat_history}", 'blue'))
@@ -284,8 +294,8 @@ if __name__ == '__main__':
     # unittest.main()
     brainManager = BrainManager()
 
-    while True:
-        user_input = input('User: ')
-        if user_input.lower() == 'exit':
-            break
-        asyncio.run(brainManager.run(user_input))
+    # while True:
+    #     user_input = input('User: ')
+    #     if user_input.lower() == 'exit':
+    #         break
+    #     asyncio.run(brainManager.run(user_input))

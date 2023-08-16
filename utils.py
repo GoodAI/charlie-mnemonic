@@ -203,9 +203,9 @@ async def transcribe_audio(audio_file_path):
     return transcription['text']
 
 
-async def generate_audio(text, username):
+async def generate_audio(text, username, users_dir):
     # make sure the dir exists
-    audio_dir = os.path.join('audio', username)
+    audio_dir = os.path.join(users_dir, username, 'audio')
     Path(audio_dir).mkdir(parents=True, exist_ok=True)
     audio_path = os.path.join(audio_dir, f'{uuid.uuid4()}.mp3')
     # find pairs of 3 backticks and strip the code inside them including the backticks

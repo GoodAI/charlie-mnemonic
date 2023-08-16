@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 import json
 import os
@@ -9,6 +10,8 @@ from pydantic import BaseModel
 from classes import User, UserCheckToken, UserName, editSettings, userMessage
 import openai
 from utils import load_addons, generate_audio
+import shutil
+from brain import DatabaseManager
 
 router = APIRouter()
 
@@ -206,5 +209,64 @@ async def handle_generate_audio(request: Request, message: userMessage, backgrou
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
-    audio_path, audio = await generate_audio(message.prompt, username)
+    audio_path, audio = await generate_audio(message.prompt, username, users_dir)
     return FileResponse(audio_path, media_type="audio/wav")
+
+@router.post("/save_data/",
+    tags=["Data"])
+async def handle_save_data(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    with Authentication() as auth:
+        success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    
+    # Create a .zip file of the user's directory
+    shutil.make_archive(os.path.join(users_dir, user.username), 'zip', os.path.join(users_dir, user.username))
+    
+    # Serve the .zip file
+    return FileResponse(os.path.join(users_dir, user.username) + '.zip', media_type="application/octet-stream", filename=user.username + ".zip")
+
+@router.post("/delete_data/",
+    tags=["Data"])
+async def handle_delete_data(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    with Authentication() as auth:
+        success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    memory_file = os.path.join(users_dir, user.username)
+    dbmanager = DatabaseManager()
+    dbmanager.delete_db(memory_file)
+    await asyncio.sleep(1)
+    # Delete the user's directory
+    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True, onerror=None)
+    
+    return {'message': 'User data deleted successfully'}
+
+@router.post("/upload_data/",
+    tags=["Data"])
+async def handle_upload_data(request: Request, user: UserName, data_file: UploadFile):
+    session_token = request.cookies.get("session_token")
+    with Authentication() as auth:
+        success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    
+    # Delete the user's directory
+    shutil.rmtree(os.path.join(users_dir, user.username))
+    
+    # Create the user's directory
+    os.makedirs(os.path.join(users_dir, user.username))
+    
+    # Save the uploaded file to the user's directory
+    with open(os.path.join(users_dir, user.username, data_file.filename), "wb") as buffer:
+        shutil.copyfileobj(data_file.file, buffer)
+    
+    # Unzip the file
+    shutil.unpack_archive(os.path.join(users_dir, user.username, data_file.filename), os.path.join(users_dir, user.username))
+    
+    # Delete the .zip file
+    os.remove(os.path.join(users_dir, user.username, data_file.filename))
+    
+    return {'message': 'User data uploaded successfully'}

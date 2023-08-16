@@ -425,6 +425,10 @@
     </div>
     <div id="mySidenav" class="sidenav">
         <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
+        <button id="saveDataBtn">Save Data</button>
+        <button id="deleteDataBtn">Delete Data</button>
+        <input type="file" id="uploadDataInput">
+        <button id="uploadDataBtn">Upload Data</button>
         <button id="logout-button">Logout</button>
         <div id="SidenavAddons"></div>
     </div>
@@ -590,6 +594,83 @@
         }
     }
     
+    async function save_user_data() {
+        try {
+            const response = await fetch(API_URL + '/save_data/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'username': user_name}),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            // response is a zip file
+            const data = await response.blob();
+            var downloadUrl = URL.createObjectURL(data);
+            var a = document.createElement("a");
+            document.body.appendChild(a);
+            a.style = "display: none";
+            a.href = downloadUrl;
+            a.download = user_name + ".zip";
+            a.click();
+            window.URL.revokeObjectURL(downloadUrl);
+
+        } catch (error) {
+            console.error('Failed to save data: ', error);
+        }
+    }
+
+    async function delete_user_data() {
+        try {
+            const response = await fetch(API_URL + '/delete_data/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'username': user_name}),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(data.message);
+
+        } catch (error) {
+            console.error('Failed to delete data: ', error);
+        }
+    }
+
+    async function upload_user_data(file) {
+        try {
+            const formData = new FormData();
+            formData.append('username', user_name);
+            formData.append('data_file', file);
+
+            const response = await fetch(API_URL + '/upload_data/', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log(data.message);
+
+        } catch (error) {
+            console.error('Failed to upload data: ', error);
+        }
+    }
+
     
     document.getElementById('send').addEventListener('click', async function() {
         sendMessageToServer();
@@ -878,6 +959,15 @@
     window.onload = function() {
         loadCookies();
     }
+    
+    document.getElementById('saveDataBtn').addEventListener('click', save_user_data);
+    document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
+    document.getElementById('uploadDataBtn').addEventListener('click', function() {
+        const fileInput = document.getElementById('uploadDataInput');
+        if (fileInput.files.length > 0) {
+            upload_user_data(fileInput.files[0]);
+        }
+    });
     </script>
 </body>
 </html>

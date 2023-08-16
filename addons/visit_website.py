@@ -29,23 +29,24 @@ parameters = {
 
 
 from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 
 def visit_website(url, include_links=True, include_images=True):
     try:
-        options = webdriver.ChromeOptions()
+        options = Options()
         options.add_argument('--headless')
-        options.add_argument("start-maximized")
-        options.add_argument("disable-infobars")
-        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-gpu")
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3")
         if PRODUCTION:
-          driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+          service = Service(ChromeDriverManager().install())
+          driver = webdriver.Chrome(service=service, options=options)
         else:
-          driver = webdriver.Chrome(ChromeDriverManager("114.0.5735.90").install(), options=options)
+          service = Service(ChromeDriverManager("114.0.5735.90").install())
+          driver = webdriver.Chrome(service, options=options)
         driver.get(url)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')

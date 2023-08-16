@@ -449,7 +449,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     await send_debug(f"cot_response: {cot_response}", 1, 'green', username)
     return_string = cot_response
     try:
-        return_string = json.dumps({'content': cot_response})
+        return_string = cot_response
     except:
         await send_debug(f"can't parse cot_response: {cot_response}", 2, 'red', username)
         try:

@@ -42,9 +42,12 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     try:
         while True:
             data = await websocket.receive_text()
-            print(f'User {username} sent: {data}')
-            # Send a response back to the client
-            await websocket.send_text(f'Received: {data}')
+            if data == 'ping':
+                await websocket.send_text('pong')
+            else:
+                print(f'User {username} sent: {data}')
+                # Send a response back to the client
+                await websocket.send_text(f'Received: {data}')
     except WebSocketDisconnect:
         # Handle client disconnection
         del connections[username]

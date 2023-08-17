@@ -163,6 +163,13 @@
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
             socket = new WebSocket('wss://' + domain + '/ws/' + username);
+            
+            // Send a ping message every 10 seconds
+            setInterval(() => {
+                if (socket.readyState === WebSocket.OPEN) {
+                    socket.send('ping');
+                }
+            }, 10000);
 
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);

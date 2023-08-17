@@ -20,6 +20,8 @@ connections = {}
 PRODUCTION = os.environ['PRODUCTION']
 isOnHttps = PRODUCTION # False
 
+LIVE_DOMAIN = ".airobin.net"
+
 users_dir = 'users' # end with a slash
 
 
@@ -65,8 +67,8 @@ async def register(user: User, response: Response):
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
-            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
-            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
         else:
             response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
             response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
@@ -83,8 +85,8 @@ async def login(user: User, response: Response):
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
-            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
-            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=".airobin.net")
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
         else:
             response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
             response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)

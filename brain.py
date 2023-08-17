@@ -163,47 +163,6 @@ class OpenAIManager:
             role_content = "You get a small chathistory and a last message. Break the last message down in 4 search queries to retrieve relevant messages with a cross-encoder. A subject, 2 queries, a category. Only reply in this format: subject\nquery\nquery\ncategory"
         return role_content
 
-class TestQueryCollection(unittest.TestCase):
-    def setUp(self):
-        db_manager = DatabaseManager()
-        self.collection = db_manager.init_db('memory2')
-        print(colored('Initialized database', 'green'))
-        print(colored(f"Collection count: {self.collection.count()}", 'green'))
-        print(colored(f"Collection name: {self.collection.name}", 'green'))
-
-    def test_query_collection(self):
-        db_manager = DatabaseManager()
-        predefined_messages = ['its antony, whats my favorite dish?', 'whats my favorite dish?', 'what do i like to eat?', 'whats antony his favorite dish?', 'what does antony like to eat?']  # Add your predefined messages here
-        scores = {}
-        for message in predefined_messages:
-            result = db_manager.query_collection(self.collection, message)
-            # Reverse the order of the results (for local llm)
-            # result['documents'][0] = result['documents'][0][::-1]
-            # result['distances'][0] = result['distances'][0][::-1]
-            # result['metadatas'][0] = result['metadatas'][0][::-1]
-            result_length = len(result['documents'][0])
-            print(colored(f"Result length: {result_length}", 'blue'))
-            result_string = 'Input: ' + message + '\nResults: \n'
-            total_score = 0
-            for i in range(result_length):
-                score = round(result['distances'][0][i], 2)
-                total_score += score
-                if result['metadatas'][0][i]['role'] == 'user':
-                    result_string += f"{result['documents'][0][i]} (score: {score})\n"
-                else:
-                    result_string += f"Assistant: {result['documents'][0][i]} (score: {score})\n"
-            scores[message] = total_score
-            print(colored(result_string, 'yellow'))
-            print(colored(f"Total score: {total_score}", 'yellow'))
-
-        winner = max(scores, key=scores.get)
-        print(colored(f"Message: '{winner}' with a score of {scores[winner]}", "green"))
-
-        for message in scores:
-            if message != winner:
-                print(colored(f"Message: '{message}' with a score of {scores[message]}", "red"))
-
-
 class BrainManager:
     def __init__(self):
         self.db_manager = DatabaseManager()
@@ -269,14 +228,6 @@ class BrainManager:
                     result_string += f"{role.title()}: {result['documents'][i]} (score: {score})\n"
             
             print(colored(result_string, 'yellow'))
-
-
-            # add the input to the collection
-            # disabled for now, adding it to the collection when we get a reply from the llm
-            # chat_history = [user_input]
-            # chat_metadata = [{"role": "user"}]
-            # history_ids = [str(uuid.uuid4())]
-            #self.db_manager.add_to_collection(self.collection, chat_history, chat_metadata, history_ids)
             
             # return the list of results
             return result
@@ -291,7 +242,6 @@ class BrainManager:
 
 
 if __name__ == '__main__':
-    # unittest.main()
     brainManager = BrainManager()
 
     # while True:

@@ -29,8 +29,13 @@ def get_token(request: Request):
     return request.cookies.get('session_token')
 
 async def send_debug_message(username: str, message: str):
-    if username in connections:
-        await connections[username].send_text(message)
+    connection = connections.get(username)
+    print(f"connection length: {len(connections)}")
+    if connection:
+        try:
+            await connection.send_text(message)
+        except Exception as e:
+            print(f"An error occurred when sending a message to user {username}: {e}")
     else:
         print(f"No active websocket connection for user {username}")
 

@@ -193,6 +193,9 @@
                         }
                     }
                     var match = content.match(/\[Executing (\w+) function with arguments: ({.*?})\]/);
+                    if (!match) {
+                        match = content.match(/\[Executing (\w+) function with arguments:({.*?})\]/);
+                    }
                     if (match) {
                         var addon = match[1];
                         var args = parseComplexJson(match[2]);

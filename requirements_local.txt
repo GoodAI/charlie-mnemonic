@@ -98,3 +98,5 @@ wsproto==1.2.0
 yarl==1.9.2
 werkzeug==2.3.6
 python-multipart==0.0.6
+geopy==2.3.0
+pyproj==3.6.0

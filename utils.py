@@ -257,6 +257,16 @@ def write_brain(brain, username, users_dir):
     with open(brain_path, 'w') as f:
         f.write(brain)
 
+def extract_content(data):
+    try:
+        response = json.loads(data)
+    except:
+        return data
+    if isinstance(response, dict):
+        if 'content' in response:
+            return extract_content(response['content'])
+    return response
+
 async def get_drone_state(username):
     try:
         # call the drone API for drone state
@@ -349,12 +359,11 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         else:
             await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
 
+# {await get_drone_state(username)}
         instruction_string = f"""
 Observations:
 {{"object":"house","coordinates":[45,65]}}
 {{"object":"car","coordinates":[12,43]}}
-
-{await get_drone_state(username)}
 
 Home info:
 {home_info}
@@ -369,6 +378,9 @@ Home info:
         #response = generate_response(messages, function_dict, function_metadata)
         response = await start_chain_thoughts(full_message, og_message, username, users_dir)
         await send_debug(f"Response after CoT: {response}", 1, 'green', username)
+        
+        response = extract_content(response)
+        response = json.dumps({'content': response})
         response = json.loads(response)
 
         await send_debug(f"Response after CoT json loads: {response}", 1, 'green', username)
@@ -380,7 +392,7 @@ Home info:
             #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
             #socketio.sleep(0.01)
             
-            response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False)
+            response = await process_function_call_pm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, background_tasks)
             return response
         else:
             #write_brain(json_str, username)
@@ -391,7 +403,7 @@ Home info:
                 chat_history.append(message)
                 last_messages[username].append(f"{username}: "  + message)
                 chat_metadata.append({"role": "assistant"})
-                chat_history.append(response['content'])
+                chat_history.append(str(response['content']))
                 last_messages[username].append("assistant: " + str(response['content']))
                 history_ids.append(str(uuid.uuid4()))
                 history_ids.append(str(uuid.uuid4()))
@@ -434,9 +446,10 @@ async def keyword_generation(message, username, history_string, last_messages_st
 
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await load_addons(username, users_dir)
+    kw_brain_string = await load_brain(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, each step on a seperate line, nothing else! Function usage goes in 1 line!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details!'},
-        {"role": "user", "content": f'{message}\nInstructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a detailed step plan, each step on a seperate line, nothing else! Function usage goes in 1 line!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, this plan will be executed step by step by another ai, so include all the details!'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, each step is a function call, each function call goes on a seperate line, nothing else!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details!'},
+        {"role": "user", "content": f'Nenories: {kw_brain_string}--\nLast message: {message}\nInstructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a detailed step plan, each step is a function call, each function call goes on a seperate line, nothing else!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, this plan will be executed step by step by another ai, so include all the details!'},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
@@ -447,19 +460,20 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     await send_debug(f"cot final_response: {final_response}", 1, 'green', username)
     cot_response = await process_chain_thoughts(response, message, og_message, function_dict, function_metadata, username, users_dir)
     await send_debug(f"cot_response: {cot_response}", 1, 'green', username)
-    return_string = cot_response
-    try:
-        return_string = cot_response
-    except:
-        await send_debug(f"can't parse cot_response: {cot_response}", 2, 'red', username)
-        try:
-            return_string = cot_response['content']
-        except:
-            await send_debug(f"can't parse cot_response 2nd time: {cot_response}", 2, 'red', username)
+    
+    # try:
+    #     return_string = json.dumps({'content': cot_response})
+    # except:
+    #     await send_debug(f"can't parse cot_response: {cot_response}", 2, 'red', username)
+    #     try:
+    #         return_string = cot_response['content']
+    #     except:
+    #         await send_debug(f"can't parse cot_response 2nd time: {cot_response}", 2, 'red', username)
 
-    return return_string
+    return cot_response
 
 async def process_chain_thoughts(full_response, message, og_message, function_dict, function_metadata, username, users_dir):
+    kw_brain_string = await load_brain(username, users_dir)
     response = full_response['choices'][0]['message']
     # if its a function call anyway, process it
     if 'function_call' in response:
@@ -468,7 +482,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
         #socketio.sleep(0.01)
-        response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir)
+        response = await process_function_call_ct(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir, full_response)
         return response
     
     # check if the final response starts with SAY: or PLAN:
@@ -500,7 +514,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
             # truncate the response string if it's not one of the last three steps
             response_str = str(response)
             if i < len(steps) - 3:
-                truncated_response = response_str[:100] + '...' + response_str[-100:] if len(response_str) > 200 else response_str
+                truncated_response = response_str
             else:
                 truncated_response = response_str
             steps_list.append('step:' + step + '\nresponse:' + truncated_response + '\n')
@@ -534,16 +548,52 @@ Remember, the goal is to mimic a human brain's ability to retain important infor
     return response['choices'][0]['message']['content']
 
 
-async def process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/'):
+async def process_function_call_fm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string=''):
     try:
         converted_function_call_arguments = json.loads(function_call_arguments)
-    except json.JSONDecodeError as e:
-        function_call_arguments = function_call_arguments.replace('\n', '')
-        try:
-            converted_function_call_arguments = json.loads(function_call_arguments)
-        except json.JSONDecodeError as e:
-            print(f"JSONDecodeError: {e}")
-            print(f"Invalid JSON: {converted_function_call_arguments}")
+    except:
+        process_final_message(message, og_message, function_dict, function_metadata, username, users_dir)
+        raise
+
+    await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
+
+    function = function_dict[function_call_name]
+    function_response = function(**converted_function_call_arguments)
+    return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
+
+async def process_function_call_ct(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
+    try:
+        converted_function_call_arguments = json.loads(function_call_arguments)
+    except:
+        process_chain_thoughts(full_response, message, og_message, function_dict, function_metadata, username, users_dir)
+        raise
+
+    await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
+
+    function = function_dict[function_call_name]
+    function_response = function(**converted_function_call_arguments)
+    return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
+
+async def process_function_call_ctm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
+    try:
+        converted_function_call_arguments = json.loads(function_call_arguments)
+    except:
+        process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir)
+        raise
+
+    await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
+
+    function = function_dict[function_call_name]
+    function_response = function(**converted_function_call_arguments)
+    return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
+
+
+async def process_function_call_pm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', background_tasks: BackgroundTasks = None):
+    try:
+        converted_function_call_arguments = json.loads(function_call_arguments)
+    except:
+        process_message(og_message, username, background_tasks, users_dir)
+        raise
 
     await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
@@ -553,9 +603,10 @@ async def process_function_call(function_call_name, function_call_arguments, fun
 
 async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir):
         function_dict, function_metadata = await load_addons(username, users_dir)
+        kw_brain_string = await load_brain(username, users_dir)
         messages = [
-            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. brain file is data\kw_brain.txt'},
-            {"role": "user", "content": f'previous steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
+            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can.'},
+            {"role": "user", "content": f'Memory:{kw_brain_string}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
         ]
         await send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
 
@@ -568,10 +619,10 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
-            await send_debug(f"[Executing {function_call_name} function with arguments:\n{function_call_arguments}]", 3, 'green', username)
+            await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
             #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
             #socketio.sleep(0.01)
-            response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir)
+            response = await process_function_call_ctm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir, steps_string)
             return response
         else:
             await send_debug(f'{response}', 1, 'green', username)
@@ -579,6 +630,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
 
 async def summarize_cot_responses(steps_string, message, og_message, username, users_dir):
     global COT_RETRIES
+    # kw_brain_string = await load_brain(username, users_dir)
     # add user to COT_RETRIES if they don't exist
     if username not in COT_RETRIES:
         COT_RETRIES[username] = 0
@@ -639,6 +691,7 @@ async def process_function_reply(function_call_name, function_response, message,
         return final_response
 
 async def process_final_message(message, og_message, response, username, users_dir):
+    kw_brain_string = await load_brain(username, users_dir)
     if response.startswith('YES: '):
         # remove the YES: part
         response = await response[5:]
@@ -668,21 +721,28 @@ async def process_final_message(message, og_message, response, username, users_d
 
     #response = generate_response(messages, function_dict, function_metadata)
     response = await start_chain_thoughts(full_message, og_message, username, users_dir)
-    response = json.loads(response)
+
+    fc_check = None
+    try:
+        fc_check = json.loads(response)
+    except:
+        fc_check = response
+
+    response = extract_content(response)
 
     await send_debug(f"Retry CoT Response: {response}", 1, 'green', username)
 
-    if 'function_call' in response:
-        function_call_name = response['function_call']['name']
-        function_call_arguments = response['function_call']['arguments']
+    if 'function_call' in fc_check:
+        function_call_name = fc_check['function_call']['name']
+        function_call_arguments = fc_check['function_call']['arguments']
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         # socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}))
         # socketio.sleep(0.01)
-        response = await process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username)
-        return response
+        new_fc_check = await process_function_call_fm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username)
+        return new_fc_check
     else:
         await send_debug(f'{message}', 1, 'green', username)
-        await send_debug(f'Assistant: {response["content"]}', 1, 'pink', username)
+        await send_debug(f'Assistant: {response}', 1, 'pink', username)
 
         # if settings.get('voice_output', True):
         #     audio_path, audio = generate_audio(response['content'])

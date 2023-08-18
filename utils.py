@@ -675,6 +675,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
 
 async def process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge=True, users_dir='users/'):
     await send_debug(f'processing function {function_call_name} response: {str(function_response)}', 1, 'pink', username)
+    await send_message(f'[function response: {str(function_response)}]', 'red', username)
     
     second_response = None
     function_dict, function_metadata = await load_addons(username, users_dir)

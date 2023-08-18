@@ -1,0 +1,17 @@
+server {
+    listen ${PORT} ssl;
+    server_name ${DOMAIN_NAME};
+
+    ssl_certificate /etc/nginx/ssl/server.crt;
+    ssl_certificate_key /etc/nginx/ssl/server.key;
+
+    location / {
+        root /app/web/live;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:8002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

@@ -161,7 +161,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('ws://localhost:8002/ws/' + username);
+            socket = new WebSocket('ws://127.0.0.1:8002/ws/' + username);
 
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);
@@ -177,6 +177,56 @@
                     msg.debug2 = event.data.replace('debug2:', '');
                     msg.color = msg.debug2.split(' ')[0].replace(':', '');
                     msg.debug2 = msg.debug2.replace(msg.color + ':', '');
+                }
+
+                else if (event.data.startsWith('[function response:')) {
+                    var content = event.data.replace(/\n/g, '');
+                    console.log('using addon');
+                    console.log('content:' + content);
+                    tempchild = document.getElementById('messages').lastChild;
+                    if (tempchild) {
+                        // check if the tempchild has a spinner, if so, remove it
+                        if (tempchild.querySelector('.spinner') != null) {
+                            tempchild.querySelector('.spinner').remove();
+                            document.getElementById('messages').lastChild.remove();
+                        }
+                    }
+                    var match = content.match(/\[function response: {.*?}\]/);
+                    if (!match) {
+                        match = content.match(/\[function response:{.*?}\]/);
+                    }
+                    if (match) {
+                        var args = match;
+
+                        var lastMessage = document.querySelector('.last-message');
+                        if (lastMessage) {
+                            lastMessage.classList.remove('last-message');
+                        }
+
+                        var chatMessage = `
+                            <div class="message system">
+                                <span class="timestamp">${timestamp}</span>
+                                <div class="bubble">
+                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                                        <div class="title">Function response:<div class="arrow"></div></div>
+                                        ${args}  <!-- Insert the args properties here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById('messages').innerHTML += chatMessage;
+                    }
+                    
+                    // create a bot message div with a loading spinner
+                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+                    var element = document.createElement('div');
+                    element.innerHTML = botMessage;
+                    document.getElementById('messages').innerHTML += botMessage;
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    content = '';
+                    tempReceived = '';
+                    tempFormatted = '';
                 }
 
                 else if (event.data.startsWith('[Executing')) {

@@ -48,6 +48,17 @@ async def send_debug(message, number, color, username):
     print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
     #socketio.sleep(0.01)
 
+async def send_message(message, color, username):
+    """Send a debug message to the user and print it to the console with a color, 1 is llm debug, 2 is system debug"""
+    new_message = ''
+    
+    new_message = f"{message}"
+    
+    await routes.send_debug_message(username, new_message)
+    # print the message to the console with the color
+    print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
+    #socketio.sleep(0.01)
+
 
 async def load_addons(username, users_dir):
     settings = {}
@@ -665,6 +676,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
 
 async def process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge=True, users_dir='users/'):
     await send_debug(f'processing function {function_call_name} response: {str(function_response)}', 1, 'pink', username)
+    await send_message(f'[function response: {str(function_response)}]', 'red', username)
     
     second_response = None
     function_dict, function_metadata = await load_addons(username, users_dir)

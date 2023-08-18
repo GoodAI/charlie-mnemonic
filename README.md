@@ -25,6 +25,19 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 - pip
 - Heroku Account (optional, for deployment)
 
+### Docker
+Local run:
+```
+docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8001 -p 8001:8001 -p 8002:8002 clang:v1
+```
+then go to http://127.0.0.1:8001
+
+Online:
+```
+docker run -v /path/to/server.crt:/etc/nginx/ssl/server.crt -v /path/to/server.key:/etc/nginx/ssl/server.key --env-file .env -e DEPLOY_ENV=cloud -e DOMAIN_NAME=mydomain.com -e PORT=443 -p 443:443 -p 8002:8002 clang:v1
+```
+then go to https://mydomain.com
+
 ### Setup
 1. It is recommended to run the application in a virtual environment. You can set it up and activate it using the following commands:
 ```bash
@@ -82,7 +95,7 @@ const url = 'https://' + domain;
 ```
 
 ## Usage
-Once the application is running, you can interact with it through the API endpoints. The application includes a FastAPI-generated interactive API documentation available at http://localhost:5000/docs.
+Once the application is running, you can interact with it through the API endpoints. The application includes a FastAPI-generated interactive API documentation available at http://127.0.0.1:8002/docs.
 
 ## API Endpoints
 CLANG provides several API endpoints for managing users, handling messages, and managing data. Here are a few key endpoints:
@@ -101,7 +114,7 @@ CLANG provides several API endpoints for managing users, handling messages, and 
 - `/delete_data/`: Delete a user’s data. (WIP)
 - `/upload_data/`: Upload a .zip file of a user’s data. (WIP)
 
-For more details on using these endpoints, refer to the FastAPI-generated API documentation at http://localhost:5000/docs when the application is running.
+For more details on using these endpoints, refer to the FastAPI-generated API documentation at http://127.0.0.1:8002/docs when the application is running.
 
 ## Contributing
 Contributions are welcome! Please fork this repository and create a pull request with your changes.

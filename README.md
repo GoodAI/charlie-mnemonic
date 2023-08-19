@@ -30,15 +30,27 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 ```
  docker build -t clang:v1 .
 ```
-2.a. Local run:
+2. Copy the .env_sample file to .env and fill in your API keys and other settings:
+```bash
+cp .env_sample .env
+nano .env
 ```
-docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8002 -p 8002:8002 clang:v1
+In the .env file, set the `PRODUCTION` variable to `false` for local development or `true` for a live setup.
+You will also need to set up a PostgreSQL database. The connection string for this database should be added to the .env file as follows:
+```bash
+# use host.docker.internal instead of localhost if its on the same host
+DATABASE_URL = "postgres://user:pwd@host:port/db"
+```
+
+3. a. Local run: (replace USERPATH with path for persistant data for example: '/home/userdata' for linux or 'G:\GoodAI\CLANG\userdata\' for windows)
+```
+docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8002 -p 8002:8002 -v USERPATH:/app/users clang:v1
 ```
 then go to http://127.0.0.1:8002
 
-2.b. Online:
+3. b. Online: (replace USERPATH with path for persistant data for example: '/home/userdata' for linux or 'G:\GoodAI\CLANG\userdata\' for windows)
 ```
-docker run --env-file .env -e DEPLOY_ENV=cloud -e ORIGINS="mydomain.com" -e PORT=8002 -p 8002:8002 clang:v1
+docker run --env-file .env -e DEPLOY_ENV=cloud -e ORIGINS="mydomain.com" -e PORT=8002 -p 8002:8002 -v USERPATH:/app/users clang:v1
 ```
 then go to https://mydomain.com
 

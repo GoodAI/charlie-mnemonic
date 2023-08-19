@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import json
 import os
-from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from utils import process_message, OpenAIResponser, upload_audio
@@ -278,27 +278,29 @@ async def handle_delete_data(request: Request, user: UserName):
 
 @router.post("/upload_data/",
     tags=["Data"])
-async def handle_upload_data(request: Request, user: UserName, data_file: UploadFile):
+async def handle_upload_data(request: Request, username: str = Form(...), data_file: UploadFile = File(...)):
+    print(username)
+    print(data_file.filename)
     session_token = request.cookies.get("session_token")
     with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+        success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
     # Delete the user's directory
-    shutil.rmtree(os.path.join(users_dir, user.username))
+    shutil.rmtree(os.path.join(users_dir, username))
     
     # Create the user's directory
-    os.makedirs(os.path.join(users_dir, user.username))
+    os.makedirs(os.path.join(users_dir, username))
     
     # Save the uploaded file to the user's directory
-    with open(os.path.join(users_dir, user.username, data_file.filename), "wb") as buffer:
+    with open(os.path.join(users_dir, username, data_file.filename), "wb") as buffer:
         shutil.copyfileobj(data_file.file, buffer)
     
     # Unzip the file
-    shutil.unpack_archive(os.path.join(users_dir, user.username, data_file.filename), os.path.join(users_dir, user.username))
+    shutil.unpack_archive(os.path.join(users_dir, username, data_file.filename), os.path.join(users_dir, username))
     
     # Delete the .zip file
-    os.remove(os.path.join(users_dir, user.username, data_file.filename))
+    os.remove(os.path.join(users_dir, username, data_file.filename))
     
     return {'message': 'User data uploaded successfully'}

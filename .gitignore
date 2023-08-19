@@ -118,3 +118,4 @@ dmypy.json
 users/
 data/brain_responses.jsonl
 audio/
+userdata/

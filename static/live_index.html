@@ -19,11 +19,10 @@
 
 </head>
     <script>
-        // const API_URL = 'https://' + document.domain + ':' + location.port;
-        const port = '';
-        const domain = 'clang.airobin.net';
-        const url = 'https://' + domain;
-        const API_URL = url + ':' + port;
+        const API_URL = 'https://' + document.domain;
+        //const port = 8002;
+        //const url = 'http://127.0.0.1';
+        //const API_URL = url + ':' + port;
         var chatHistory = [];
         var tempReceived = '';
         var tempFormatted = '';
@@ -94,7 +93,7 @@
             settingsMenu.innerHTML += '<a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>';
             settingsMenu.innerHTML += '<h2>Settings</h2><br>';
             settingsMenu.innerHTML += '<h3>Addons</h3><br>';
-            for (let addon in settings) { 
+            for (let addon in settings) {
                 // loop through the settings and create a menu item for each addon
                 if (settings.hasOwnProperty(addon)) {
                     var status = settings[addon] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
@@ -152,7 +151,22 @@
                 settings = newSettings;
                 populateSettingsMenu(settings);
                 if (newSettings.voice_input) {
-                $('#record').show();
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        $('#record').show();
+                    })
+                    .catch(function(err) {
+                        edit_addon_status('voice_input', false);
+                        $('#record').hide();
+                        if (err.name === 'NotAllowedError') {
+                            alert('Permission to access microphone was denied. Please allow access to the microphone and try again.');
+                        } else if (err.name === 'NotFoundError') {
+                            alert('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
+                        } else {
+                            alert('Error occurred : ' + err.name);
+                        }
+                    });
+                
                 } else {
                     $('#record').hide();
                 }
@@ -162,14 +176,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('wss://' + domain + '/ws/' + username);
-            
-            // Send a ping message every 10 seconds
-            setInterval(() => {
-                if (socket.readyState === WebSocket.OPEN) {
-                    socket.send('ping');
-                }
-            }, 10000);
+            socket = new WebSocket('wss://' + document.domain + '/ws/' + username);
 
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);
@@ -185,6 +192,56 @@
                     msg.debug2 = event.data.replace('debug2:', '');
                     msg.color = msg.debug2.split(' ')[0].replace(':', '');
                     msg.debug2 = msg.debug2.replace(msg.color + ':', '');
+                }
+
+                else if (event.data.startsWith('[function response:')) {
+                    var content = event.data.replace(/\n/g, '');
+                    console.log('using addon');
+                    console.log('content:' + content);
+                    tempchild = document.getElementById('messages').lastChild;
+                    if (tempchild) {
+                        // check if the tempchild has a spinner, if so, remove it
+                        if (tempchild.querySelector('.spinner') != null) {
+                            tempchild.querySelector('.spinner').remove();
+                            document.getElementById('messages').lastChild.remove();
+                        }
+                    }
+                    var match = content.match(/\[function response: {.*?}\]/);
+                    if (!match) {
+                        match = content.match(/\[function response:{.*?}\]/);
+                    }
+                    if (match) {
+                        var args = match;
+
+                        var lastMessage = document.querySelector('.last-message');
+                        if (lastMessage) {
+                            lastMessage.classList.remove('last-message');
+                        }
+
+                        var chatMessage = `
+                            <div class="message system">
+                                <span class="timestamp">${timestamp}</span>
+                                <div class="bubble">
+                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                                        <div class="title">Function response:<div class="arrow"></div></div>
+                                        ${args}  <!-- Insert the args properties here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById('messages').innerHTML += chatMessage;
+                    }
+                    
+                    // create a bot message div with a loading spinner
+                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+                    var element = document.createElement('div');
+                    element.innerHTML = botMessage;
+                    document.getElementById('messages').innerHTML += botMessage;
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    content = '';
+                    tempReceived = '';
+                    tempFormatted = '';
                 }
 
                 else if (event.data.startsWith('[Executing')) {
@@ -553,7 +610,7 @@
         // disable the send button
         document.getElementById('send').disabled = true;
     }
-    
+
     async function sendMessageToServer(message) {
         if (message === undefined) {
             message = document.getElementById('message').value;
@@ -603,7 +660,7 @@
             console.error('Failed to send message: ', error);
         }
     }
-    
+
     async function save_user_data() {
         try {
             const response = await fetch(API_URL + '/save_data/', {
@@ -681,7 +738,7 @@
         }
     }
 
-    
+
     document.getElementById('send').addEventListener('click', async function() {
         sendMessageToServer();
     });
@@ -816,14 +873,6 @@
         }
     }
 
-    // function to set a cookie with an expiration date (not used atm)
-    function setCookie(name, value, days) {
-        var date = new Date();
-        date.setTime(date.getTime() + (days*24*60*60*1000));
-        var expires = "; expires=" + date.toUTCString();
-        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
-    }
-
     // function to handle the login form submission
     document.getElementById('login-form').addEventListener('submit', async function(event) {
         event.preventDefault();
@@ -874,12 +923,11 @@
             }
         }
     });
-    
+
     // function to delete a cookie
     function deleteCookie(name) {
-        document.cookie = name + '=; Path=/; Domain=.airobin.net; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     }
-
 
     // function to logout a user
     async function logout() {
@@ -969,7 +1017,7 @@
     window.onload = function() {
         loadCookies();
     }
-    
+
     document.getElementById('saveDataBtn').addEventListener('click', save_user_data);
     document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
     document.getElementById('uploadDataBtn').addEventListener('click', function() {

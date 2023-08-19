@@ -28,13 +28,7 @@ WIP.
     version=0.03,
 )
 
-origins = [
-    "http://localhost",
-    "http://127.0.0.1",
-    "https://airobin.net",
-    "http://airobin.net",
-    "https://clang.airobin.net",
-]
+origins = os.getenv("ORIGINS").split(";")
 
 app.add_middleware(
     CORSMiddleware,

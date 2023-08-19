@@ -19,10 +19,10 @@
 
 </head>
     <script>
-        // const API_URL = 'https://' + document.domain + ':' + location.port;
-        const port = 8002;
-        const url = 'http://127.0.0.1';
-        const API_URL = url + ':' + port;
+        const API_URL = 'https://' + document.domain;
+        //const port = 8002;
+        //const url = 'http://127.0.0.1';
+        //const API_URL = url + ':' + port;
         var chatHistory = [];
         var tempReceived = '';
         var tempFormatted = '';
@@ -151,7 +151,22 @@
                 settings = newSettings;
                 populateSettingsMenu(settings);
                 if (newSettings.voice_input) {
-                $('#record').show();
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(function(stream) {
+                        $('#record').show();
+                    })
+                    .catch(function(err) {
+                        edit_addon_status('voice_input', false);
+                        $('#record').hide();
+                        if (err.name === 'NotAllowedError') {
+                            alert('Permission to access microphone was denied. Please allow access to the microphone and try again.');
+                        } else if (err.name === 'NotFoundError') {
+                            alert('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
+                        } else {
+                            alert('Error occurred : ' + err.name);
+                        }
+                    });
+                
                 } else {
                     $('#record').hide();
                 }
@@ -161,7 +176,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('ws://127.0.0.1:8002/ws/' + username);
+            socket = new WebSocket('wss://' + document.domain + '/ws/' + username);
 
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);

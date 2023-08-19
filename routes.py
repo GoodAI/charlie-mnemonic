@@ -4,6 +4,7 @@ import json
 import os
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi.staticfiles import StaticFiles
 from utils import process_message, OpenAIResponser, upload_audio
 from authentication import Authentication
 from pydantic import BaseModel
@@ -20,10 +21,31 @@ connections = {}
 PRODUCTION = os.environ['PRODUCTION']
 isOnHttps = PRODUCTION # False
 
-LIVE_DOMAIN = ".airobin.net"
+LIVE_DOMAIN = os.getenv("ORIGINS").split(";")[0]
 
 users_dir = 'users' # end with a slash
 
+router.mount("/static", StaticFiles(directory="static"), name="static")
+
+@router.get("/")
+async def read_root():
+    if PRODUCTION == 'true':
+        try:
+            return FileResponse('static/live_index.html')
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        try:
+            return FileResponse('static/local_index.html')
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
+    
+@router.get("/styles.css")
+async def read_root():
+    try:
+        return FileResponse('static/styles.css')
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 def get_token(request: Request):
     return request.cookies.get('session_token')

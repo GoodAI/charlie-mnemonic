@@ -25,20 +25,24 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 - pip
 - Heroku Account (optional, for deployment)
 
-### Docker
-Local run:
+### Docker Setup
+1. Build the docker container
 ```
-docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8001 -p 8001:8001 -p 8002:8002 clang:v1
+ docker build -t clang:v1 .
+```
+2.a. Local run:
+```
+docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8002 -p 8002:8002 clang:v1
 ```
 then go to http://127.0.0.1:8001
 
-Online:
+2.b. Online:
 ```
-docker run -v /path/to/server.crt:/etc/nginx/ssl/server.crt -v /path/to/server.key:/etc/nginx/ssl/server.key --env-file .env -e DEPLOY_ENV=cloud -e DOMAIN_NAME=mydomain.com -e PORT=443 -p 443:443 -p 8002:8002 clang:v1
+docker run --env-file .env -e DEPLOY_ENV=cloud -e ORIGINS="mydomain.com" -e PORT=8002 -p 8002:8002 clang:v1
 ```
 then go to https://mydomain.com
 
-### Setup
+### or do the Setup Manual
 1. It is recommended to run the application in a virtual environment. You can set it up and activate it using the following commands:
 ```bash
 python3 -m venv venv

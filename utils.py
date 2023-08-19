@@ -134,6 +134,18 @@ async def load_addons(username, users_dir):
     with open(settings_file, 'w') as f:
         json.dump(settings, f)
 
+    if not function_metadata:
+        # no functions activated, quick hacky fix -> add a default function
+        function_metadata.append({
+            "name": "none",
+            "description": "you have no available functions",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                },
+            },
+        })
+
     return function_dict, function_metadata
 
 class OpenAIResponser:

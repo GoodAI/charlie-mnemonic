@@ -34,7 +34,7 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 ```
 docker run --env-file .env -e DEPLOY_ENV=local -e PORT=8002 -p 8002:8002 clang:v1
 ```
-then go to http://127.0.0.1:8001
+then go to http://127.0.0.1:8002
 
 2.b. Online:
 ```

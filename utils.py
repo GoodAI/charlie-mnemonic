@@ -1,6 +1,8 @@
 import asyncio
 import importlib
+import inspect
 import json
+import ast
 import os
 import sys
 import time
@@ -12,6 +14,7 @@ from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 import chromadb
 from elevenlabs import generate, play, set_api_key
 import requests
+import urllib3
 from brain import BrainManager
 from classes import AsciiColors, config
 from werkzeug.utils import secure_filename
@@ -25,7 +28,7 @@ set_api_key(config.ELEVENLABS_API_KEY)
 # Parameters for OpenAI
 openai_model = config.CHATGPT_MODEL
 max_responses = 1
-temperature = 0.7
+temperature = 0.1
 max_tokens = 512
 
 
@@ -220,7 +223,7 @@ async def transcribe_audio(audio_file_path):
         transcription = await openai.Audio.atranscribe(
             model = "whisper-1",
             file =  audio_file,
-            language = "af", # for the demo
+            language = "en", # af for the drone demo?
             )
     return transcription['text']
 
@@ -470,8 +473,8 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await load_addons(username, users_dir)
     kw_brain_string = await load_brain(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, each step is a function call, each function call goes on a seperate line, nothing else!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details!'},
-        {"role": "user", "content": f'Nenories: {kw_brain_string}--\nLast message: {message}\nInstructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a detailed step plan, each step is a function call, each function call goes on a seperate line, nothing else!\nEither do nothing, PLAN, or SAY something but not both. Do not use function calls straight away, this plan will be executed step by step by another ai, so include all the details!'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. each step is a function calland it\'s instructions, nothing else!\nEither PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details!'},
+        {"role": "user", "content": f'Memories: {kw_brain_string}--\nLast message: {message}\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan: 1. this is step 1\n2. this is step 2'},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
@@ -520,16 +523,27 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         return final_response
     
     elif final_response.startswith('PLAN:'):
+        await send_message(f"[{final_response}]", 'green', username)
         # remove PLAN: from the final response
         final_response = final_response.replace('PLAN:', '')
         # remove leading and trailing whitespace
         final_response = final_response.strip()
         # split the final response into a list of steps
-        steps = final_response.split('\n')
+        steps = final_response.split('\n')  # Splitting the string at each newline
+        steps = [step.strip() for step in steps if step]  # Remove any empty strings from the list
+        
+        # If there's only 1 step, take each number as a step
+        if len(steps) == 1 and steps[0].isdigit():
+            steps = list(steps[0])
+
+        # If no different steps, take the whole text as a step
+        if len(set(steps)) == 1:
+            steps = [final_response]
+
         # create a string of the steps
         steps_list = []
         for i, step in enumerate(steps):
-            await send_debug(f"processing step: {step}", 2, 'green', username)
+            await send_debug(f"processing step: {step}", 1, 'green', username)
             # convert the list to a string before passing it to process_cot_messages
             steps_string = ''.join(steps_list)
             response = await process_cot_messages(step, steps_string, function_dict, function_metadata, og_message, username, users_dir)
@@ -543,7 +557,8 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         # convert the final list to a string
         steps_string = ''.join(steps_list)
         return await summarize_cot_responses(steps_string, message, og_message, username, users_dir)
-    
+
+
     else:
         await send_debug(f"Invalid response: {final_response}", 1, 'red', username)
         await send_debug(f"retrying CoT...", 1, 'red', username)
@@ -570,9 +585,38 @@ Remember, the goal is to mimic a human brain's ability to retain important infor
     return response['choices'][0]['message']['content']
 
 
+def convert_function_call_arguments(function_call_arguments):
+    # If function_call_arguments is a string representation of a dictionary
+    if isinstance(function_call_arguments, str):
+        try:
+            # Try to convert the string into a dictionary
+            converted_function_call_arguments = json.loads(function_call_arguments)
+        except json.JSONDecodeError:
+            print(f'Could not convert {function_call_arguments} to a dictionary using json.loads')
+            try:
+                converted_function_call_arguments = ast.literal_eval(function_call_arguments)
+            except:
+                print(f'Could not convert {function_call_arguments} to a dictionary using ast.literal_eval')
+                try:
+                    # decode the string into a dictionary
+                    converted_function_call_arguments = urllib3.parse.unquote(function_call_arguments)
+                except:
+                    print(f'Could not convert {function_call_arguments} to a dictionary using urllib3.parse.unquote')
+                    # If the conversion fails, return the original string
+                    converted_function_call_arguments = function_call_arguments
+    # If function_call_arguments is already a dictionary
+    elif isinstance(function_call_arguments, dict):
+        # Just return it as is
+        converted_function_call_arguments = function_call_arguments
+    else:
+        # If function_call_arguments is neither a string nor a dictionary, return it as is
+        converted_function_call_arguments = function_call_arguments
+
+    return converted_function_call_arguments
+
 async def process_function_call_fm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string=''):
     try:
-        converted_function_call_arguments = json.loads(function_call_arguments)
+        converted_function_call_arguments = convert_function_call_arguments(function_call_arguments)
     except:
         process_final_message(message, og_message, function_dict, function_metadata, username, users_dir)
         raise
@@ -580,12 +624,15 @@ async def process_function_call_fm(function_call_name, function_call_arguments, 
     await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
-    function_response = function(**converted_function_call_arguments)
+    if inspect.iscoroutinefunction(function):
+        function_response = await function(**converted_function_call_arguments)
+    else:
+        function_response = function(**converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_function_call_ct(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
     try:
-        converted_function_call_arguments = json.loads(function_call_arguments)
+        converted_function_call_arguments = convert_function_call_arguments(function_call_arguments)
     except:
         process_chain_thoughts(full_response, message, og_message, function_dict, function_metadata, username, users_dir)
         raise
@@ -593,12 +640,15 @@ async def process_function_call_ct(function_call_name, function_call_arguments, 
     await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
-    function_response = function(**converted_function_call_arguments)
+    if inspect.iscoroutinefunction(function):
+        function_response = await function(**converted_function_call_arguments)
+    else:
+        function_response = function(**converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_function_call_ctm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
     try:
-        converted_function_call_arguments = json.loads(function_call_arguments)
+        converted_function_call_arguments = convert_function_call_arguments(function_call_arguments)
     except:
         process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir)
         raise
@@ -606,13 +656,16 @@ async def process_function_call_ctm(function_call_name, function_call_arguments,
     await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
-    function_response = function(**converted_function_call_arguments)
+    if inspect.iscoroutinefunction(function):
+        function_response = await function(**converted_function_call_arguments)
+    else:
+        function_response = function(**converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 
 async def process_function_call_pm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', background_tasks: BackgroundTasks = None):
     try:
-        converted_function_call_arguments = json.loads(function_call_arguments)
+        converted_function_call_arguments = convert_function_call_arguments(function_call_arguments)
     except:
         process_message(og_message, username, background_tasks, users_dir)
         raise
@@ -620,7 +673,10 @@ async def process_function_call_pm(function_call_name, function_call_arguments, 
     await send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
 
     function = function_dict[function_call_name]
-    function_response = function(**converted_function_call_arguments)
+    if inspect.iscoroutinefunction(function):
+        function_response = await function(**converted_function_call_arguments)
+    else:
+        function_response = function(**converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir):

@@ -7,9 +7,9 @@ description = "This addon allows you to execute a python code in a new Interacti
 parameters = {
     "type": "object",
     "properties": {
-        "arg": {
+        "content": {
             "type": "string",
-            "description": "The python code to be executed, include prints or returns to get the output, write all code on 1 line. This is a temporary terminal, so you can't use input() or anything that requires user input.",
+            "description": "The python code to be executed in an InteractiveShell, include prints or returns to get the output, This is a temporary terminal, so you can't use input() or anything that requires user input.",
         },
         "start_new_terminal": {
             "type": "boolean",
@@ -17,19 +17,19 @@ parameters = {
             "description": "Start a new terminal for this execution? If True, all previous variables will be lost, only start a new terminal if absolutely necessary.",
         }
     },
-    "required": ['arg', 'start_new_terminal'],
+    "required": ['content', 'start_new_terminal'],
 }
 
 shell = InteractiveShell.instance()
 
-def run_python_code(arg, start_new_terminal):
+def run_python_code(content, start_new_terminal):
     try:
         global shell
         if start_new_terminal:
             shell = InteractiveShell.instance()
 
         with capture_output() as captured:
-            output = shell.run_cell(arg)
+            output = shell.run_cell(content)
 
         # remove color codes from standard output and standard error
         captured_stdout = re.sub(r'\x1b\[[0-9;]*m', '', captured.stdout)

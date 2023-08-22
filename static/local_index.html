@@ -196,7 +196,7 @@
 
                 else if (event.data.startsWith('[function response:')) {
                     var content = event.data.replace(/\n/g, '');
-                    console.log('using addon');
+                    console.log('function response');
                     console.log('content:' + content);
                     tempchild = document.getElementById('messages').lastChild;
                     if (tempchild) {
@@ -206,12 +206,12 @@
                             document.getElementById('messages').lastChild.remove();
                         }
                     }
-                    var match = content.match(/\[function response: {.*?}\]/);
+                    var match = content.match(/\[function response: [^]*\]/);
                     if (!match) {
-                        match = content.match(/\[function response:{.*?}\]/);
+                        match = content.match(/\[function response:[^]*\]/);
                     }
                     if (match) {
-                        var args = match;
+                    var args = match[0].replace(/\n/g, '<br>');
 
                         var lastMessage = document.querySelector('.last-message');
                         if (lastMessage) {
@@ -219,11 +219,63 @@
                         }
 
                         var chatMessage = `
-                            <div class="message system">
+                            <div class="message fr">
                                 <span class="timestamp">${timestamp}</span>
                                 <div class="bubble">
                                     <div class="expandable" onclick="this.classList.toggle('expanded')">
                                         <div class="title">Function response:<div class="arrow"></div></div>
+                                        ${args}  <!-- Insert the args properties here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById('messages').innerHTML += chatMessage;
+                    }
+                    
+                    // create a bot message div with a loading spinner
+                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+                    var element = document.createElement('div');
+                    element.innerHTML = botMessage;
+                    document.getElementById('messages').innerHTML += botMessage;
+                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+                    content = '';
+                    tempReceived = '';
+                    tempFormatted = '';
+                }
+
+                else if (event.data.startsWith('[PLAN:')) {
+                    //var content = event.data.replace(/\n/g, '');
+                    var content = event.data
+                    console.log('PLAN response');
+                    console.log('content:' + content);
+                    tempchild = document.getElementById('messages').lastChild;
+                    if (tempchild) {
+                        // check if the tempchild has a spinner, if so, remove it
+                        if (tempchild.querySelector('.spinner') != null) {
+                            tempchild.querySelector('.spinner').remove();
+                            document.getElementById('messages').lastChild.remove();
+                        }
+                    }
+                    var match = content.match(/\[PLAN:([\s\S]*?)\](?![\s\S]*\])/);
+                    if (!match) {
+                        match = content.match(/\[PLAN: ([\s\S]*?)\](?![\s\S]*\])/);
+
+                    }
+                    if (match) {
+                        var args = match[1].replace(/\r?\n/g, '<br>');
+
+                        var lastMessage = document.querySelector('.last-message');
+                        if (lastMessage) {
+                            lastMessage.classList.remove('last-message');
+                        }
+
+                        var chatMessage = `
+                            <div class="message plan">
+                                <span class="timestamp">${timestamp}</span>
+                                <div class="bubble">
+                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                                        <div class="title">PLAN:<div class="arrow"></div></div>
                                         ${args}  <!-- Insert the args properties here -->
                                     </div>
                                 </div>

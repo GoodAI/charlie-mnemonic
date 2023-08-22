@@ -1,0 +1,33 @@
+active_brain Data: 
+
+Subject:
+Person: demo
+-
+Favorite color: demo
+Favorite,...
+
+Preferences:
+user demo prefers x...
+
+-
+Subject: Important Dates and Numbers 
+-
+
+-
+Subject: Instructions to Remember
+-
+Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked.
+Live status: House status and drone status are obtained from another API, they do not need to be stored.
+-
+Subject: Locations
+-
+Home station (Oranzerie): 50.088489, 14.373452
+Pond location: 50.087912, 14.376437
+Triangle-shaped house location: 50.087616, 14.369402
+
+Subject: Drone Instruction
+-
+Use whole numbers for drone commands, except when specifying coordinates. Do not use 'move_to' command for shape movements as it uses coordinates and can send the drone too far. You can control both drones simultaneously by specifying both drone numbers. The second parameter of the 'move' command is for specifying the direction in degrees, with 0 being north, 90 east, 180 south, 270 west, and everything in between.
+Drones can be moved in specific shapes like squares, pyramids, houses, diamonds, spirals and any shape possible with the execute_instructions and move command.
+Ignore the battery levels of the drones, they are not accurate.
+-

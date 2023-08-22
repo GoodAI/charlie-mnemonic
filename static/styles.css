@@ -110,6 +110,26 @@ h3{
     word-wrap: break-word;
 }
 
+.message.fr .bubble {
+    background-color: #c0cfdc;
+    color: #333;
+    border-radius: 18px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.message.plan .bubble {
+    background-color: #dcd2c0;
+    color: #333;
+    border-radius: 18px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
 .message.external .bubble {
     background-color: #d4c1be;
     color: #333;

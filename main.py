@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
 from routes import router
-from utils import check_api_keys
 import logging
+from config import api_keys
+import openai
 
-# Check if the API keys are set
-check_api_keys()
+# Load environment variables
+openai.api_key = api_keys["openai"]
 
 # add more logging
 logging.basicConfig(

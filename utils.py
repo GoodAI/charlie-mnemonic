@@ -16,17 +16,18 @@ from elevenlabs import generate, play, set_api_key
 import requests
 import urllib3
 from brain import BrainManager
-from classes import AsciiColors, config
+from classes import AsciiColors
 from werkzeug.utils import secure_filename
 import routes
 from pathlib import Path
+from config import api_keys
 
 
 # Set ElevenLabs API key
-set_api_key(config.ELEVENLABS_API_KEY)
+set_api_key(api_keys['elevenlabs'])
 
 # Parameters for OpenAI
-openai_model = config.CHATGPT_MODEL
+openai_model = api_keys['chatgpt_model']
 max_responses = 1
 temperature = 0.1
 max_tokens = 512
@@ -224,6 +225,7 @@ async def transcribe_audio(audio_file_path):
             model = "whisper-1",
             file =  audio_file,
             language = "en", # af for the drone demo?
+            api_key=api_keys['openai']
             )
     return transcription['text']
 
@@ -375,7 +377,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         try:
             # call the house API for home info
             # todo: make this configurable in the frontend
-            home_info = requests.get(config.HOUSE_API_URL + 'home_info?key=' + config.HOUSE_API_KEY).text
+            home_info = requests.get(api_keys['house_api_url'] + 'home_info?key=' + api_keys['house_api_key']).text
         except requests.exceptions.ConnectionError as e:
             await send_debug(f"ConnectionError: {e}\nSkipping home info", 2, 'red', username)
         # check if the home info is empty
@@ -839,8 +841,7 @@ async def process_final_message(message, og_message, response, username, users_d
     
 
 def check_api_keys():
-    # Getting OpenAI API Key
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY = api_keys['openai']
     if not len(OPENAI_API_KEY):
         print("Please set OPENAI_API_KEY environment variable. Exiting.")
         sys.exit(1)

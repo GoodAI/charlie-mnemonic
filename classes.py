@@ -1,10 +1,5 @@
 
 from pydantic import BaseModel
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class User(BaseModel):
     username: str
@@ -42,15 +37,3 @@ class AsciiColors:
     WARNING = '\033[93m'
     UNDERLINE = '\033[4m'
     END = '\033[0m'
-
-class config:
-    OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
-    CHATGPT_MODEL = os.environ["CHATGPT_MODEL"]
-    OPENAI_EMBEDDING_MODEL = os.environ["OPENAI_EMBEDDING_MODEL"] # not used right now
-    OPENWEATHER_API_KEY = os.environ["OPENWEATHER_API_KEY"]
-    GOOGLE_API_KEY = os.environ["GOOGLE_API_KEY"]
-    GOOGLE_CX = os.environ["GOOGLE_CX"]
-    YOUTUBE_API_KEY = os.environ["YOUTUBE_API_KEY"]
-    HOUSE_API_URL = os.environ["HOUSE_API_URL"]
-    HOUSE_API_KEY = os.environ["HOUSE_API_KEY"]
-    ELEVENLABS_API_KEY = os.environ["ELEVENLABS_API_KEY"]

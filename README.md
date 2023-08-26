@@ -24,6 +24,7 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 - Python 3.10 or higher
 - pip
 - Heroku Account (optional, for deployment)
+- Uvicorn (sudo apt install uvicorn)
 
 ### Docker Setup
 1. Build the docker container

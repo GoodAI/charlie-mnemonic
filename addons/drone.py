@@ -3,7 +3,7 @@ import asyncio
 from geopy.distance import geodesic
 from aiohttp import ClientSession
 
-description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 90), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move_to(10,90), move_to(20,270)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state()"
+description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 90), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state()"
 parameters = {
     "type": "object",
     "properties": {
@@ -153,9 +153,11 @@ async def move(drone, distance, direction):
     # Extract the current lat and lon
     current_lat = state['position_geo'][0]
     current_lon = state['position_geo'][1]
+    current_heading = state['position_geo'][2]
 
-    # Calculate the new coordinates using geodesic distance
-    new_coords = geodesic(meters=distance).destination((current_lat, current_lon), direction)
+    # Calculate the new coordinates using the known distance and direction
+    new_direction = (current_heading + direction) % 360
+    new_coords = geodesic(meters=distance).destination((current_lat, current_lon), new_direction)
     new_lat, new_lon = new_coords.latitude, new_coords.longitude
 
     return new_lat, new_lon
@@ -170,83 +172,34 @@ async def fly_path_in_shape(drone, shape, size):
     # Extract the current lat and lon
     current_lat = state['position_geo'][0]
     current_lon = state['position_geo'][1]
+    current_heading = state['position_geo'][2]
 
-    if (shape == 'square'):
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((current_lat, current_lon), 0)
+    # if the shape is a square
+    if shape == "square":
+        # Calculate the new coordinates using the known distance and direction
+        new_direction = (current_heading + 90) % 360
+        new_coords = geodesic(meters=size).destination((current_lat, current_lon), new_direction)
         new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 90)
+
+        # Calculate the new coordinates using the known distance and direction
+        new_direction = (current_heading + 180) % 360
+        new_coords = geodesic(meters=size).destination((new_lat, new_lon), new_direction)
         new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 180)
+
+        # Calculate the new coordinates using the known distance and direction
+        new_direction = (current_heading + 270) % 360
+        new_coords = geodesic(meters=size).destination((new_lat, new_lon), new_direction)
         new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 270)
+
+        # Calculate the new coordinates using the known distance and direction
+        new_direction = (current_heading + 0) % 360
+        new_coords = geodesic(meters=size).destination((new_lat, new_lon), new_direction)
         new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        return f"Drone {drone} flew a square"
-    elif (shape == 'circle'):
-        # fly in a circle
-        for i in range(0, 360, 10):
-            # Calculate the new coordinates using geodesic distance
-            new_coords = geodesic(meters=size).destination((current_lat, current_lon), i)
-            new_lat, new_lon = new_coords.latitude, new_coords.longitude
-            # Move to the new coordinates
-            await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        return f"Drone {drone} flew a circle"
-    elif (shape == 'triangle'):
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((current_lat, current_lon), 0)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 120)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 240)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        return f"Drone {drone} flew a triangle"
-    elif (shape == 'pentagon'):
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((current_lat, current_lon), 0)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 72)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 144)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")      
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 216)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        # Move to the new coordinates
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")       
-        # Calculate the new coordinates using geodesic distance
-        new_coords = geodesic(meters=size).destination((new_lat, new_lon), 288)
-        new_lat, new_lon = new_coords.latitude, new_coords.longitude
-        await run_drone([drone], "move_to", f"{new_lat}, {new_lon}")
-        return f"Drone {drone} flew a pentagon"
+
+        return f"fly_path_in_shape(square, {size})"
+    
     else:
-        return "Invalid shape"
+        return "Invalid shape, only square is supported"
 
 import re
 
@@ -261,6 +214,8 @@ def parse_instructions(instructions_str):
 
 
 async def execute_instructions(drone, instructions_list):
+    full_result = ""
     for command, params in instructions_list:
         results = await run_drone([drone], command, params)
-    return f"Drone {drone} executed instructions: {instructions_list} with results: {results}"
+        full_result += f"Drone {drone} executed instructions: {instructions_list} with results: {results}\n"
+    return full_result

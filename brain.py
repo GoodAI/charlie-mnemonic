@@ -13,8 +13,6 @@ import traceback
 
 class Config:
     MAX_RETRY_ATTEMPTS = 10
-    openai.api_key = os.environ["OPENAI_API_KEY"]
-
 
 
 class DatabaseManager:

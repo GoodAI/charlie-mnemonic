@@ -1,9 +1,10 @@
 import json
 import asyncio
+import math
 from geopy.distance import geodesic
 from aiohttp import ClientSession
 
-description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 90), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state()"
+description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 90), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate_by(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long)"
 parameters = {
     "type": "object",
     "properties": {
@@ -76,6 +77,8 @@ async def run_drone(drones, instruction, parameters):
                 data = "pause_mission()"
             elif instruction == "take_off" or instruction == "takeoff":
                 data = f"take_off({parameters})"
+            elif instruction == "rotate":
+                data = f"rotate_by({parameters})"
             elif instruction == "rotate_by":
                 data = f"rotate_by({parameters})"
             elif instruction == "rotate_to":
@@ -103,6 +106,8 @@ async def run_drone(drones, instruction, parameters):
             elif instruction == "get_state":
                 response = await get_state(drones)
                 return response
+            elif instruction == "look_at":
+                data = f"look_at({parameters})"
 
             else:
                 return "Invalid instruction"
@@ -150,13 +155,14 @@ async def move(drone, distance, direction):
         print(state)
         return
 
-    # Extract the current lat and lon
+    # Extract the current lat and lon and heading
     current_lat = state['position_geo'][0]
     current_lon = state['position_geo'][1]
-    current_heading = state['position_geo'][2]
+    current_heading = state['attitude'][0] * 180 / math.pi
+
+    new_direction = (current_heading + direction) % 360
 
     # Calculate the new coordinates using the known distance and direction
-    new_direction = (current_heading + direction) % 360
     new_coords = geodesic(meters=distance).destination((current_lat, current_lon), new_direction)
     new_lat, new_lon = new_coords.latitude, new_coords.longitude
 
@@ -172,7 +178,7 @@ async def fly_path_in_shape(drone, shape, size):
     # Extract the current lat and lon
     current_lat = state['position_geo'][0]
     current_lon = state['position_geo'][1]
-    current_heading = state['position_geo'][2]
+    current_heading = state['attitude'][0] * 180 / math.pi
 
     # if the shape is a square
     if shape == "square":
@@ -214,8 +220,23 @@ def parse_instructions(instructions_str):
 
 
 async def execute_instructions(drone, instructions_list):
-    full_result = ""
+    full_result = f"Drone {drone} executed instructions:\n"
     for command, params in instructions_list:
-        results = await run_drone([drone], command, params)
-        full_result += f"Drone {drone} executed instructions: {instructions_list} with results: {results}\n"
+        results_list = await run_drone([drone], command, params)
+        results = json.loads(results_list[0])
+        print(results)
+        full_result += f"{results.get('command')}, {results.get('success')}, {results.get('message')}\n"
     return full_result
+
+
+# async def main():
+#     # get drone 3 state
+#     drone = 3
+#     instr_list = "move(10, 0), rotate_by(10), move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),"
+#     instructions_list = parse_instructions(instr_list)
+#     response = await execute_instructions(drone, instructions_list)
+#     print(response)
+
+# # Python 3.7+
+# if __name__ == "__main__":
+#     asyncio.run(main())

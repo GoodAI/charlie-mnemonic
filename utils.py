@@ -294,19 +294,44 @@ def extract_content(data):
             return extract_content(response['content'])
     return response
 
-async def get_drone_state(username):
+def parse_drone_state(drone_state):
+    vehicle_state = drone_state['vehicle_state']
+    mission_state = drone_state['mission_state']
+    position_geo = drone_state['position_geo']
+    attitude = drone_state['attitude']
+    battery = drone_state['battery']
+    airspeed = drone_state['airspeed']
+
+    output = f"Drone is currently in {vehicle_state} mode. Mission state is {mission_state}.\n"
+    output += f"Geographical position: {position_geo}.\n"
+    output += f"Attitude: {attitude}.\n"
+    output += f"Battery level: {battery}.\n"
+    output += f"Airspeed: {airspeed}.\n"
+
+    if 'last_detections' in drone_state:
+        output += f"Last detections:\n"
+        for detection in drone_state['last_detections']:
+            output += f"  Detected a {detection['class_label']} at location ({detection['latitude']}, {detection['longitude']}) with confidence {detection['mean_confidence']}.\n"
+
+    return output
+
+async def get_drone_state(username, drones):
     try:
-        # call the drone API for drone state
-        url = "http://localhost:8000/api/vehicle/3/llm/state"
-        response = requests.get(url)
-        if response.status_code == 200:
-            final_response = 'Drone state:\n' + json.dumps(response.json(), indent=4, sort_keys=True) + '\n'
-            return final_response
-        else:
-            return "Drone state: Failed to get state"
+        final_responses = []
+        for drone in drones:
+            # call the drone API for drone state
+            url = "http://localhost:8000/api/vehicle/{}/llm/state".format(drone)
+            response = requests.get(url)
+            if response.status_code == 200:
+                drone_state = response.json()
+                final_responses.append(f'Drone {drone} state:\n' + parse_drone_state(drone_state) + '\n')
+            else:
+                final_responses.append(f'Drone {drone} state: Failed to get state')
+        return final_responses
     except requests.exceptions.ConnectionError as e:
         await send_debug(f"ConnectionError: {e}\nSkipping drone state", 2, 'red', username)
         return "Drone state: Failed to get drone state"
+
 
 
 async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
@@ -385,12 +410,13 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
             home_info = "No home info available."
         else:
             await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
+        drone_info = ''
+        drone_info = await get_drone_state(username, [3, 4])
 
 # {await get_drone_state(username)}
         instruction_string = f"""
 Observations:
-{{"object":"house","coordinates":[45,65]}}
-{{"object":"car","coordinates":[12,43]}}
+{drone_info}
 
 Home info:
 {home_info}

@@ -1,25 +1,64 @@
 active_brain Data: 
 
 Subject:
-Person: demo
--
-Favorite color: demo
-Favorite,...
-
+Person: 
 Preferences:
-user demo prefers x...
-
 -
 Subject: Important Dates and Numbers 
 -
-
+Subject: Locations
+-
+Home station (Oranzerie): 50.088489, 14.373452
+Pond location: 50.087912, 14.376437
+Triangle-shaped house location: 50.087616, 14.369402
 -
 Subject: Instructions to Remember
 -
 Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked.
-Live status: House status and drone status are obtained from another API, they do not need to be stored.
-Web search results: First search for results, then visit a link from those results.
-Web search instruction: Only search the web for dynamic data, like the stock prices, but not for general knowledge such as recipes.
-Memory search instruction: Do not use the get_search_results addon to search my memory, rely on own capabilities to write recipes and other general knowledge.
-Planning: Each step in the plan should be independent and complete in itself.
+Live status: House status and drone status are obtained from another API, they do not need to be stored in the memory.
+Planning: Each step in the plan should be independent and complete in itself, only function calls go in a plan, nothing else, include all needed details
+
+Subject: Drone API Documentation
 -
+- API URL: http://localhost:8000/
+- Endpoints: PUT: api/vehicle/{drone}/llm/command for commands,
+GET: api/vehicle/{drone}/llm/state for the state
+- Commands:
+start_mission(mission_name): Example: start_mission("mission1").
+pause_mission(): Example: pause_mission().
+resume_mission(): Example: resume_mission().
+return_home(): Example: return_home().
+set_pause_on_detection(pause): Example: set_pause_on_detection(True).
+set_follow_on_detection(follow): Example: set_follow_on_detection(True).
+take_off(): Example: take_off().
+move_to(lat, lon, alt, speed): Example: move_to(37.7749, -122.4194, 100, 10).
+rotate_by(angle): Example: rotate_by(90).
+rotate_to(angle): Example: rotate_to(180).
+set_gimbal_to(angle): Example: set_gimbal_to(45).
+move_to_see(lat, lon, alt): Example: move_to_see(37.7749, -122.4194, 100).
+follow_object(object_id): Example: follow_object(123).
+reset_objects():  Example: reset_objects().
+
+example usage:
+from geopy.distance import geodesic
+def move(drone, distance, direction):
+  url = f"http://localhost:8000/api/vehicle/{drone}/llm/state"
+  state = requests.get(url)
+  current_lat = state['position_geo'][0]
+  current_lon = state['position_geo'][1]
+  current_heading = state['attitude'][0] * 180 / math.pi
+
+  new_direction = (current_heading + direction) % 360
+
+  # Calculate the new coordinates using the known distance and direction
+  new_coords = geodesic(meters=distance).destination((current_lat, current_lon), new_direction)
+  new_lat, new_lon = new_coords.latitude, new_coords.longitude
+
+  url = "http://localhost:8000/api/vehicle/{}/llm/command".format(drone)
+  headers = {'Content-Type': 'text/plain'}
+  data = 'move_to(new_lat, new_lon)'
+  response = requests.put(url, data=data, headers=headers)
+  return response.text
+
+# move drone 3 20 meters forward
+print(move(3, 20, 0))

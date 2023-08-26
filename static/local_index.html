@@ -211,7 +211,7 @@
                         match = content.match(/\[function response:[^]*\]/);
                     }
                     if (match) {
-                    var args = match[0].replace(/\n/g, '<br>');
+                        var args = match[0].replace(/\r?\n/g, '<br>');
 
                         var lastMessage = document.querySelector('.last-message');
                         if (lastMessage) {

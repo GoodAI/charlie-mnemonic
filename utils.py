@@ -302,16 +302,17 @@ def parse_drone_state(drone_state):
     battery = drone_state['battery']
     airspeed = drone_state['airspeed']
 
-    output = f"Drone is currently in {vehicle_state} mode. Mission state is {mission_state}.\n"
-    output += f"Geographical position: {position_geo}.\n"
-    output += f"Attitude: {attitude}.\n"
-    output += f"Battery level: {battery}.\n"
-    output += f"Airspeed: {airspeed}.\n"
+    output = f"The drone is currently in {vehicle_state} mode. The mission state is {mission_state}.\n"
+    output += f"Its geographical position is: {position_geo}.\n"
+    output += f"The drone's attitude is: {attitude}.\n"
+    output += f"The battery level is: {battery}.\n"
+    output += f"The airspeed is: {airspeed}.\n"
 
     if 'last_detections' in drone_state:
-        output += f"Last detections:\n"
+        output += "The last things detected were:\n"
+
         for detection in drone_state['last_detections']:
-            output += f"  Detected a {detection['class_label']} at location ({detection['latitude']}, {detection['longitude']}) with confidence {detection['mean_confidence']}.\n"
+            output += f"  A {detection['class_label']} was detected at location ({detection['latitude']}, {detection['longitude']}) with a confidence level of {detection['mean_confidence']}.\n"
 
     return output
 
@@ -320,17 +321,17 @@ async def get_drone_state(username, drones):
         final_responses = []
         for drone in drones:
             # call the drone API for drone state
-            url = "http://localhost:8000/api/vehicle/{}/llm/state".format(drone)
+            url = f"http://localhost:8000/api/vehicle/{drone}/llm/state"
             response = requests.get(url)
             if response.status_code == 200:
                 drone_state = response.json()
-                final_responses.append(f'Drone {drone} state:\n' + parse_drone_state(drone_state) + '\n')
+                final_responses.append(f'Drone {drone} info:\n' + parse_drone_state(drone_state) + '\n')
             else:
-                final_responses.append(f'Drone {drone} state: Failed to get state')
-        return final_responses
+                final_responses.append(f'Failed to get the info of Drone {drone}')
+        return '\n'.join(final_responses)
     except requests.exceptions.ConnectionError as e:
-        await send_debug(f"ConnectionError: {e}\nSkipping drone state", 2, 'red', username)
-        return "Drone state: Failed to get drone state"
+        await send_debug(f"ConnectionError: {e}\nSkipping drone info", 2, 'red', username)
+        return "Failed to get drone info"
 
 
 
@@ -410,7 +411,6 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
             home_info = "No home info available."
         else:
             await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
-        drone_info = ''
         drone_info = await get_drone_state(username, [3, 4])
 
 # {await get_drone_state(username)}
@@ -589,17 +589,18 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
 
     else:
         await send_debug(f"Invalid response: {final_response}", 1, 'red', username)
-        await send_debug(f"retrying CoT...", 1, 'red', username)
-        await start_chain_thoughts(message, og_message, username, users_dir)
+        await send_debug(f"start cot again? skipping for now...", 1, 'red', username)
+        return final_response
+        a#wait start_chain_thoughts(message, og_message, username, users_dir)
     
 
 async def generate_keywords(prompt, old_kw_brain, username):
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
-    system_message = f"""Your role is an AI Brain Emulation. You will receive two types of data: 'old active_brain data' and 'new messages'. Each new message will be associated with a specific user. Your task is to update the 'old active_brain data' for each individual user, based on the 'new messages' you receive.
-You should focus on retaining important keywords, instructions, numbers, dates, and events from each user. You can add or remove categories per user request. However, it's crucial that you retain and do not mix up information between users. Each user's data should be kept separate and not influence the data of others. New memories should be added instantly.
-Also, DO NOT include any recent or last messages, home info, settings or observations in the updated data. Any incoming data that falls into these categories must be discarded and not stored in the 'active_brain data'.
-The output must be in a structured plain text format, and the total word count of the updated data for each user should not exceed 300 words.  the current date is: '{current_date_time}'.
-Remember, the goal is to mimic a human brain's ability to retain important information while forgetting irrelevant details. Please follow these instructions carefully. If nothing changes, return the old active_brain data in a a structured plain text format with nothing in front or behind!"""
+    system_message = f"""Your role is an AI Brain Emulator. You will receive two types of data: 'old active_brain data' and 'new messages'.Your task is to update the 'old active_brain data' based on the 'new messages' you receive.
+You should focus on retaining important keywords, instructions, numbers, dates, and events from each user. You can add or remove categories per user request. New memories should be added instantly.
+Also, DO NOT include any recent or last messages, home info, settings or observations in the updated data. Any incoming data that falls into these categories must be discarded.
+The output must be in a structured plain text format, the current date is: '{current_date_time}'.
+Please follow these instructions carefully. If nothing changes, return a copy of the old active_brain data, nothing else!"""
 
     new_message = [
         {'role': 'system', 'content': system_message},
@@ -637,8 +638,8 @@ def convert_function_call_arguments(function_call_arguments):
         # Just return it as is
         converted_function_call_arguments = function_call_arguments
     else:
-        # If function_call_arguments is neither a string nor a dictionary, return it as is
-        converted_function_call_arguments = function_call_arguments
+        # If function_call_arguments is neither a string nor a dictionary, return it as None
+        converted_function_call_arguments = None
 
     return converted_function_call_arguments
 

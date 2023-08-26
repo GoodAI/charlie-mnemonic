@@ -433,6 +433,7 @@ Home info:
                 history_ids.append(str(uuid.uuid4()))
                 history_ids.append(str(uuid.uuid4()))
                 brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
+                background_tasks.add_task(keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
                 if settings.get('voice_output', True):
                     # audio_path, audio = await generate_audio(response['content'], username)
                     return response
@@ -446,7 +447,6 @@ Home info:
                     # socketio.sleep(0.01)
                     # socketio.send(json.dumps({'end': 'true'}), room=user_id)
                     # socketio.sleep(0.01)
-                    background_tasks.add_task(keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
                     return response
 
 async def keyword_generation(message, username, history_string, last_messages_string, old_kw_brain, users_dir):
@@ -473,8 +473,8 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await load_addons(username, users_dir)
     kw_brain_string = await load_brain(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. each step is a function calland it\'s instructions, nothing else!\nEither PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details!'},
-        {"role": "user", "content": f'Memories: {kw_brain_string}--\nLast message: {message}\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan: 1. this is step 1\n2. this is step 2'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. each step is a function call and its instructions, nothing else!\nEither PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible!'},
+        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan: 1. this is step 1\n2. this is step 2\n\n{message}'},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
@@ -546,7 +546,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
             await send_debug(f"processing step: {step}", 1, 'green', username)
             # convert the list to a string before passing it to process_cot_messages
             steps_string = ''.join(steps_list)
-            response = await process_cot_messages(step, steps_string, function_dict, function_metadata, og_message, username, users_dir)
+            response = await process_cot_messages(step, steps_string, function_dict, function_metadata, og_message, username, users_dir, message)
             # truncate the response string if it's not one of the last three steps
             response_str = str(response)
             if i < len(steps) - 3:
@@ -679,12 +679,12 @@ async def process_function_call_pm(function_call_name, function_call_arguments, 
         function_response = function(**converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
-async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir):
+async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir, full_message=''):
         function_dict, function_metadata = await load_addons(username, users_dir)
         kw_brain_string = await load_brain(username, users_dir)
         messages = [
             {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can.'},
-            {"role": "user", "content": f'Memory:{kw_brain_string}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
+            {"role": "user", "content": f'Memory:{full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
         ]
         await send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
 

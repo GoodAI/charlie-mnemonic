@@ -4,7 +4,7 @@ import math
 from geopy.distance import geodesic
 from aiohttp import ClientSession
 
-description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 20 (degrees based on current heading)), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate_by(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), square(), duet()"
+description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 20 (degrees based on current heading)), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate_by(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects()"
 parameters = {
     "type": "object",
     "properties": {
@@ -105,7 +105,21 @@ async def run_drone(drones, instruction, parameters):
             elif instruction == "square":
                 await square()
                 return "Finished square"
-
+            elif instruction == "move_to_see":
+                if isinstance(parameters, str):
+                    parameters_list = parameters.split(',')
+                else:
+                    parameters_list = parameters
+                if len(parameters_list) != 3:
+                    return "Invalid parameters, need 3 parameters, lat, lon and alt"
+                lat = float(parameters_list[0])
+                lon = float(parameters_list[1])
+                alt = float(parameters_list[2].strip())
+                data = f"move_to_see({lat}, {lon}, {alt})"
+            elif instruction == "follow_object":
+                data = f"follow_object({parameters})"
+            elif instruction == "reset_objects":
+                data = "reset_objects()"
             else:
                 return "Invalid instruction"
 

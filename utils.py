@@ -312,7 +312,7 @@ def parse_drone_state(drone_state):
         output += "The last things detected were:\n"
 
         for detection in drone_state['last_detections']:
-            output += f"  A {detection['class_label']} was detected at location ({detection['latitude']}, {detection['longitude']}) with a confidence level of {detection['mean_confidence']}.\n"
+            output += f"  A {detection['class_label']} was detected with id {detection['id']} at location ({detection['latitude']}, {detection['longitude']}) with a confidence level of {detection['mean_confidence']}.\n"
 
     return output
 

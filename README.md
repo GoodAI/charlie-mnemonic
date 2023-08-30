@@ -23,7 +23,7 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 ### Prerequisites
 - Python 3.10 or higher
 - pip
-- Heroku Account (optional, for deployment)
+- PostgreSQL database
 - Uvicorn (sudo apt install uvicorn)
 
 ### Docker Setup
@@ -103,16 +103,9 @@ uvicorn main:app --port 8002
 ```
 > Note: You can replace `8002` with the port of your choice. If you are deploying to Heroku, you will need to set up the appropriate buildpacks and environment variables as specified in the app.json file.
 
-## Frontend Setup
-The `web` directory contains `live` and `local` folders, which can be hosted on a web server. In the `live/index.html` file, change the following lines to the appropriate domains and ports:
-```javascript
-const port = '';
-const domain = 'clang.airobin.net';
-const url = 'https://' + domain;
-```
-
 ## Usage
 Once the application is running, you can interact with it through the API endpoints. The application includes a FastAPI-generated interactive API documentation available at http://127.0.0.1:8002/docs.
+The chatbot UI is at http://localhost:8002/
 
 ## API Endpoints
 CLANG provides several API endpoints for managing users, handling messages, and managing data. Here are a few key endpoints:

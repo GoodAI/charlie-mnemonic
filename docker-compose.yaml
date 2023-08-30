@@ -1,0 +1,16 @@
+version: '3'
+services:
+  clang:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: clang:v1
+    environment:
+      - DEPLOY_ENV=local
+      - PORT=8002
+    ports:
+      - 8002:8002
+    volumes:
+      - ./data/user:/app/users
+    env_file:
+      - .env

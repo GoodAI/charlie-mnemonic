@@ -40,9 +40,9 @@ def run_python_code(content, start_new_terminal):
 
         # Prepare the response
         response = {
-            'output': result, 
-            'stdout': captured_stdout, 
-            'stderr': captured_stderr, 
+            'output': result[:450], 
+            'stdout': captured_stdout[:450], 
+            'stderr': captured_stderr[:450], 
             'error': output.error_in_exec
         }
 

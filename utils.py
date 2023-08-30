@@ -4,6 +4,7 @@ import inspect
 import json
 import ast
 import os
+import re
 import sys
 import time
 import uuid
@@ -29,7 +30,7 @@ set_api_key(api_keys['elevenlabs'])
 # Parameters for OpenAI
 openai_model = api_keys['chatgpt_model']
 max_responses = 1
-temperature = 0.1
+temperature = 0.2
 max_tokens = 512
 
 
@@ -37,20 +38,18 @@ last_messages = {}
 
 COT_RETRIES = {}
 
+
 async def send_debug(message, number, color, username):
     """Send a debug message to the user and print it to the console with a color, 1 is llm debug, 2 is system debug"""
     new_message = ''
     if number <= 2:
-        # add a horizontal line in front and after the message
         message = f"{'-' * 50}\n{message}\n{'-' * 50}"  
-        #socketio.send(json.dumps({'debug' + str(number): message, 'color': color}))
         new_message = f"debug{number}:{color}: \n{message}"
     else:
         new_message = message
     await routes.send_debug_message(username, new_message)
     # print the message to the console with the color
     print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
-    #socketio.sleep(0.01)
 
 async def send_message(message, color, username):
     """Send a debug message to the user and print it to the console with a color, 1 is llm debug, 2 is system debug"""
@@ -61,7 +60,6 @@ async def send_message(message, color, username):
     await routes.send_debug_message(username, new_message)
     # print the message to the console with the color
     print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
-    #socketio.sleep(0.01)
 
 async def load_addons(username, users_dir):
     settings = {}
@@ -93,10 +91,12 @@ async def load_addons(username, users_dir):
         settings['voice_input'] = False
     if 'voice_output' not in settings:
         settings['voice_output'] = False
+    if 'cot_enabled' not in settings:
+        settings['cot_enabled'] = False
 
     # Check if addons in settings exist in addons folder
     for addon in list(settings.keys()):
-        if addon not in ['voice_input', 'voice_output'] and not os.path.exists(os.path.join('addons', f"{addon}.py")):
+        if addon not in ['voice_input', 'voice_output', 'cot_enabled'] and not os.path.exists(os.path.join('addons', f"{addon}.py")):
             # If addon doesn't exist, remove it from settings
             del settings[addon]
 
@@ -169,32 +169,39 @@ class OpenAIResponser:
                 "description": "you have no available functions",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                    },
+                    "properties": {},
                 },
             }]
-        try:
-            response = await openai.ChatCompletion.acreate(
-                model=self.openai_model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                n=self.max_responses,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0,
-                messages=messages,
-                stream=stream,
-                functions=function_metadata,
-                function_call=function_call,
-            )
-        except Exception as e:
-            print("Error from openAI:", str(e))
-            raise HTTPException(503, self.error503)
-        try:
-            return response
-        except Exception as e:
-            print(f"OpenAI Response ({'Streaming' if stream else 'Non-Streaming'}) Error: " + str(e))
-            raise HTTPException(503, self.error503)
+        
+        max_retries = 5
+        timeout = 120.0  # timeout in seconds
+        
+        for i in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    openai.ChatCompletion.acreate(
+                        model=self.openai_model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        n=self.max_responses,
+                        top_p=1,
+                        frequency_penalty=0,
+                        presence_penalty=0,
+                        messages=messages,
+                        stream=stream,
+                        functions=function_metadata,
+                        function_call=function_call,
+                    ),
+                    timeout=timeout
+                )
+                return response
+            except asyncio.TimeoutError:
+                print(f"Request timed out, retrying {i+1}/{max_retries}")
+            except Exception as e:
+                print(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+        
+        print("Max retries exceeded")
+        raise HTTPException(503, self.error503)
 
     async def get_response_stream(self, messages):
         response = await self.get_response(messages, stream=True)
@@ -399,27 +406,23 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
                 history_string += f"Assistant: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
         await send_debug(f"Fetching relevant past messages\nbased on the message:\n'{message}'\nResult length: {result_length}\n\nResults:\n{result_string}", 2, 'pink', username)
         
-        home_info = ''
-        try:
-            # call the house API for home info
-            # todo: make this configurable in the frontend
-            home_info = requests.get(api_keys['house_api_url'] + 'home_info?key=' + api_keys['house_api_key']).text
-        except requests.exceptions.ConnectionError as e:
-            await send_debug(f"ConnectionError: {e}\nSkipping home info", 2, 'red', username)
-        # check if the home info is empty
-        if home_info == '':
-            home_info = "No home info available."
-        else:
-            await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
+        # home_info = ''
+        # try:
+        #     # call the house API for home info
+        #     # todo: make this configurable in the frontend
+        #     home_info = requests.get(api_keys['house_api_url'] + 'home_info?key=' + api_keys['house_api_key']).text
+        # except requests.exceptions.ConnectionError as e:
+        #     await send_debug(f"ConnectionError: {e}\nSkipping home info", 2, 'red', username)
+        # # check if the home info is empty
+        # if home_info == '':
+        #     home_info = "No home info available."
+        # else:
+        #     await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
         drone_info = await get_drone_state(username, [3, 4])
 
-# {await get_drone_state(username)}
         instruction_string = f"""
 Observations:
 {drone_info}
-
-Home info:
-{home_info}
 """
 
         kw_brain_string = old_kw_brain
@@ -427,23 +430,23 @@ Home info:
         full_message = f"You are talking to {username}\nActive Brain Module (read this carefully as it contains important instructions):\n{kw_brain_string}\n\nMost relevant past messages (higher score = better relevancy):\n{history_string}\n\n10 most recent messages:\n{last_messages_string}\n\n{instruction_string}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {message}"
 
         await send_debug(f'Full prompt:\n{full_message}', 1, 'cyan', username)
-
-        #response = generate_response(messages, function_dict, function_metadata)
-        response = await start_chain_thoughts(full_message, og_message, username, users_dir)
-        await send_debug(f"Response after CoT: {response}", 1, 'green', username)
+        is_cot_enabled = settings.get('cot_enabled')
+        print(f"is_cot_enabled: {is_cot_enabled}")
+        if is_cot_enabled:
+            response = await start_chain_thoughts(full_message, og_message, username, users_dir)
+        else:
+            response = await generate_response(full_message, og_message, username, users_dir)
         
         response = extract_content(response)
         response = json.dumps({'content': response})
         response = json.loads(response)
 
-        await send_debug(f"Response after CoT json loads: {response}", 1, 'green', username)
+       # await send_debug(f"Response after CoT json loads: {response}", 1, 'green', username)
 
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
             await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
-            #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
-            #socketio.sleep(0.01)
             
             response = await process_function_call_pm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, background_tasks)
             return response
@@ -465,16 +468,8 @@ Home info:
                 if settings.get('voice_output', True):
                     # audio_path, audio = await generate_audio(response['content'], username)
                     return response
-                    # socketio.send(json.dumps({'content': response['content'], 'audio': audio_path}), room=user_id)
-                    # socketio.sleep(0.01)
-                    # socketio.send(json.dumps({'end': 'true'}), room=user_id)
-                    # socketio.sleep(0.01)
                     #play(audio)
                 else:
-                    # socketio.send(json.dumps({'content': response['content']}), room=user_id)
-                    # socketio.sleep(0.01)
-                    # socketio.send(json.dumps({'end': 'true'}), room=user_id)
-                    # socketio.sleep(0.01)
                     return response
 
 async def keyword_generation(message, username, history_string, last_messages_string, old_kw_brain, users_dir):
@@ -502,7 +497,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     kw_brain_string = await load_brain(username, users_dir)
     messages = [
         {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. Else, write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. each step is a function call and its instructions, nothing else!\nEither PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible!'},
-        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan: 1. this is step 1\n2. this is step 2\n\n{message}'},
+        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan:\n1. Using the api url http://localhost write a function named x that calls it and outputs data \n2. Use function y to parse the data of function x to var z\n3. put the data of var z through a new function to achieve our goal\n\n{message}'},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
@@ -525,17 +520,31 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 
     return cot_response
 
-async def process_chain_thoughts(full_response, message, og_message, function_dict, function_metadata, username, users_dir):
+async def generate_response(message, og_message, username, users_dir):
+    function_dict, function_metadata = await load_addons(username, users_dir)
     kw_brain_string = await load_brain(username, users_dir)
+    messages = [
+        {"role": "system", "content": f'You are a GoodAI chat Agent. Instructions or messages towards you memory or brain will be handled by a different module, just confirm those messages. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
+        {"role": "user", "content": f'{message}'},
+    ]
+
+    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    response = await openai_response.get_response(messages, function_metadata=function_metadata)
+    
+    await send_debug(f"response: {response}", 1, 'green', username)
+    final_response = await process_chain_thoughts(response, message, og_message, function_dict, function_metadata, username, users_dir)
+    return final_response
+
+async def process_chain_thoughts(full_response, message, og_message, function_dict, function_metadata, username, users_dir):
+    #kw_brain_string = await load_brain(username, users_dir)
     response = full_response['choices'][0]['message']
     # if its a function call anyway, process it
     if 'function_call' in response:
         function_call_name = response['function_call']['name']
         function_call_arguments = response['function_call']['arguments']
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
-        #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
-        #socketio.sleep(0.01)
         response = await process_function_call_ct(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir, full_response)
+
         return response
     
     # check if the final response starts with SAY: or PLAN:
@@ -546,8 +555,6 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         # remove leading and trailing whitespace
         final_response = final_response.strip()
         # send the final response to the user
-        #send(json.dumps({'content': final_response}))
-        #socketio.sleep(0.1)
         return final_response
     
     elif final_response.startswith('PLAN:'):
@@ -588,17 +595,15 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
 
 
     else:
-        await send_debug(f"Invalid response: {final_response}", 1, 'red', username)
-        await send_debug(f"start cot again? skipping for now...", 1, 'red', username)
         return final_response
-        a#wait start_chain_thoughts(message, og_message, username, users_dir)
+        #wait start_chain_thoughts(message, og_message, username, users_dir)
     
 
 async def generate_keywords(prompt, old_kw_brain, username):
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
     system_message = f"""Your role is an AI Brain Emulator. You will receive two types of data: 'old active_brain data' and 'new messages'.Your task is to update the 'old active_brain data' based on the 'new messages' you receive.
-You should focus on retaining important keywords, instructions, numbers, dates, and events from each user. You can add or remove categories per user request. New memories should be added instantly.
-Also, DO NOT include any recent or last messages, home info, settings or observations in the updated data. Any incoming data that falls into these categories must be discarded.
+You should focus on retaining important keywords, general instructions (not tasks!), numbers, dates, and events from each user. You can add or remove categories per user request. New memories should be added instantly.
+DO NOT include any recent or last messages, home info, tasks, settings or observations in the updated data. Any incoming data that falls into these categories must be discarded.
 The output must be in a structured plain text format, the current date is: '{current_date_time}'.
 Please follow these instructions carefully. If nothing changes, return a copy of the old active_brain data, nothing else!"""
 
@@ -607,41 +612,53 @@ Please follow these instructions carefully. If nothing changes, return a copy of
         {'role': 'user', 'content': f' If nothing changes, return the old active_brain data in a structured plain text format with nothing in front or behind!\nOld active_brain Data: {old_kw_brain}\n\nNew messages:\n{prompt}\n\n'},
     ]
     
-    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses)
     response = await openai_response.get_response(new_message)
 
     await send_debug(f"kw resp: {response}", 1, 'green', username)
     return response['choices'][0]['message']['content']
 
 
-def convert_function_call_arguments(function_call_arguments):
-    # If function_call_arguments is a string representation of a dictionary
-    if isinstance(function_call_arguments, str):
+def convert_function_call_arguments(arguments):
+    try:
+        # Handle string inputs, remove any ellipsis from the string
+        if isinstance(arguments, str):
+            arguments = json.loads(arguments)
+    # If JSON decoding fails, try using ast.literal_eval
+    except json.JSONDecodeError:
         try:
-            # Try to convert the string into a dictionary
-            converted_function_call_arguments = json.loads(function_call_arguments)
-        except json.JSONDecodeError:
-            print(f'Could not convert {function_call_arguments} to a dictionary using json.loads')
+            arguments = ast.literal_eval(arguments)
+        # If ast.literal_eval fails, remove line breaks and non-ASCII characters and try JSON decoding again
+        except (ValueError, SyntaxError):
             try:
-                converted_function_call_arguments = ast.literal_eval(function_call_arguments)
-            except:
-                print(f'Could not convert {function_call_arguments} to a dictionary using ast.literal_eval')
+                arguments = re.sub(r"\.\.\.|\…", "", arguments)
+                arguments = re.sub(r"[\r\n]+", "", arguments)
+                arguments = re.sub(r"[^\x00-\x7F]+", "", arguments)
+                arguments = json.loads(arguments)
+            # If everything fails, try Python's eval function
+            except Exception:
                 try:
-                    # decode the string into a dictionary
-                    converted_function_call_arguments = urllib3.parse.unquote(function_call_arguments)
-                except:
-                    print(f'Could not convert {function_call_arguments} to a dictionary using urllib3.parse.unquote')
-                    # If the conversion fails, return the original string
-                    converted_function_call_arguments = function_call_arguments
-    # If function_call_arguments is already a dictionary
-    elif isinstance(function_call_arguments, dict):
-        # Just return it as is
-        converted_function_call_arguments = function_call_arguments
-    else:
-        # If function_call_arguments is neither a string nor a dictionary, return it as None
-        converted_function_call_arguments = None
+                    arguments = eval(arguments)
+                except Exception:
+                    arguments = None
+    print(f"Arguments:\n{str(arguments)}")
+    return arguments
 
-    return converted_function_call_arguments
+def handle_function_response(function, args):
+    try:
+        function_response = function(**args)
+    except Exception as e:
+        print(f"Error: {e}")
+        function_response = {"content": "error: " + str(e)}
+    return function_response
+
+async def ahandle_function_response(function, args):
+    try:
+        function_response = await function(**args)
+    except Exception as e:
+        print(f"Error: {e}")
+        function_response = {"content": "error: " + str(e)}
+    return function_response
 
 async def process_function_call_fm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string=''):
     try:
@@ -654,9 +671,9 @@ async def process_function_call_fm(function_call_name, function_call_arguments, 
 
     function = function_dict[function_call_name]
     if inspect.iscoroutinefunction(function):
-        function_response = await function(**converted_function_call_arguments)
+        function_response = await ahandle_function_response(function, converted_function_call_arguments)
     else:
-        function_response = function(**converted_function_call_arguments)
+        function_response = handle_function_response(function, converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_function_call_ct(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
@@ -670,9 +687,9 @@ async def process_function_call_ct(function_call_name, function_call_arguments, 
 
     function = function_dict[function_call_name]
     if inspect.iscoroutinefunction(function):
-        function_response = await function(**converted_function_call_arguments)
+        function_response = await ahandle_function_response(function, converted_function_call_arguments)
     else:
-        function_response = function(**converted_function_call_arguments)
+        function_response = handle_function_response(function, converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_function_call_ctm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, merge=True, users_dir='users/', steps_string='', full_response=None):
@@ -686,9 +703,9 @@ async def process_function_call_ctm(function_call_name, function_call_arguments,
 
     function = function_dict[function_call_name]
     if inspect.iscoroutinefunction(function):
-        function_response = await function(**converted_function_call_arguments)
+        function_response = await ahandle_function_response(function, converted_function_call_arguments)
     else:
-        function_response = function(**converted_function_call_arguments)
+        function_response = handle_function_response(function, converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 
@@ -703,9 +720,9 @@ async def process_function_call_pm(function_call_name, function_call_arguments, 
 
     function = function_dict[function_call_name]
     if inspect.iscoroutinefunction(function):
-        function_response = await function(**converted_function_call_arguments)
+        function_response = await ahandle_function_response(function, converted_function_call_arguments)
     else:
-        function_response = function(**converted_function_call_arguments)
+        function_response = handle_function_response(function, converted_function_call_arguments)
     return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
 
 async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir, full_message=''):
@@ -713,7 +730,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
         kw_brain_string = await load_brain(username, users_dir)
         messages = [
             {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can.'},
-            {"role": "user", "content": f'Memory:{full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.  Don\'t say you can\'t do things or can\'t write complex code because you can. Just do it.'},
+            {"role": "user", "content": f'Memory:{full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
         ]
         await send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
 
@@ -727,8 +744,6 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
             await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
-            #socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}), room=user_id)
-            #socketio.sleep(0.01)
             response = await process_function_call_ctm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, False, users_dir, steps_string)
             return response
         else:
@@ -758,7 +773,6 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
     response = await openai_response.get_response(messages, function_metadata=function_metadata)
 
-    #print(f"process_cot_messages response: {response}")
     response = response['choices'][0]['message']['content']
     #return response
     if response.startswith('YES: '):
@@ -778,7 +792,7 @@ async def process_function_reply(function_call_name, function_response, message,
     function_dict, function_metadata = await load_addons(username, users_dir)
     
     messages=[
-                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. The user only needs a summary of the result, do not repeat the results literally, respond in human readable language only.'},
+                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only.'},
                 {"role": "user", "content": f'{message}'},
                 {
                     "role": "function",
@@ -789,7 +803,6 @@ async def process_function_reply(function_call_name, function_response, message,
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
     second_response = await openai_response.get_response(messages)
 
-    #print(f'{AsciiColors.YELLOW}second_response: {second_response}{AsciiColors.END}')
     final_response = second_response["choices"][0]["message"]["content"]
 
     final_message_string = f"Function {function_call_name} response: {str(function_response)}\n\n{final_response}"
@@ -844,8 +857,6 @@ async def process_final_message(message, og_message, response, username, users_d
         function_call_name = fc_check['function_call']['name']
         function_call_arguments = fc_check['function_call']['arguments']
         await send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
-        # socketio.send(json.dumps({'content': '[Executing ' + function_call_name + ' function with arguments: ' + str(function_call_arguments) + ']'}))
-        # socketio.sleep(0.01)
         new_fc_check = await process_function_call_fm(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username)
         return new_fc_check
     else:
@@ -854,16 +865,9 @@ async def process_final_message(message, og_message, response, username, users_d
 
         # if settings.get('voice_output', True):
         #     audio_path, audio = generate_audio(response['content'])
-        #     socketio.send(json.dumps({'content': response['content'], 'audio': audio_path}))
-        #     socketio.sleep(0.1)
-        #     socketio.send(json.dumps({'end': 'true'}))
         #     play(audio)
-        #     return response['content']
+        #     return response
         # else:
-        #     socketio.send(json.dumps({'content': response['content']}))
-        #     socketio.sleep(0.1)
-        #     socketio.send(json.dumps({'end': 'true'}))
-        #     return response['content']
         return response
     
 

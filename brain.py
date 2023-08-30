@@ -225,7 +225,7 @@ class BrainManager:
                 else:
                     result_string += f"{role.title()}: {result['documents'][i]} (score: {score})\n"
             
-            print(colored(result_string, 'yellow'))
+            #print(colored(result_string, 'yellow'))
             
             # return the list of results
             return result

@@ -3,8 +3,9 @@ import asyncio
 import math
 from geopy.distance import geodesic
 from aiohttp import ClientSession
+import requests
 
-description = "Control drones, move(distance(meter), direction(degrees)) example: move(5, 20 (degrees based on current heading)), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions([move(10,0), rotate_by(45) move(20,0)]), rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects()"
+description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up)"
 parameters = {
     "type": "object",
     "properties": {
@@ -19,7 +20,7 @@ parameters = {
         },
         "parameters": {
             "type": "string",
-            "description": "The parameters, comma separate, example: 5, 90",
+            "description": "The parameters, comma separate, example: 5, 90, no list or array needed",
         }
     },
     "required": ["drone", "instruction", "parameters"],
@@ -41,6 +42,10 @@ async def drone(drones, instruction, parameters):
 
 async def run_drone(drones, instruction, parameters):
     tasks = []
+    if not isinstance(drones, list):
+        drones_list = drones.split(',')
+        drones = [int(drone) for drone in drones_list]
+
     for drone in drones:
         try:
             url = f"http://localhost:8000/api/vehicle/{drone}/llm/command"
@@ -56,10 +61,10 @@ async def run_drone(drones, instruction, parameters):
                     parameters_list = parameters
                 if len(parameters_list) != 2:
                     return "Invalid parameters, need 2 parameters, distance and direction"
-                distance = int(parameters_list[0])
-                direction = int(parameters_list[1].strip())
+                distance = int(float(parameters_list[0]))
+                direction = int(float(parameters_list[1].strip()))
                 lat, long = await move(drone, distance, direction)
-                data = f"move_to({lat}, {long})"
+                data = f"move_to_blocking({lat}, {long})"
             elif instruction == "set_pause_on_detection":
                 pause = str_to_bool(parameters)
                 data = f"set_pause_on_detection({pause})"
@@ -78,33 +83,32 @@ async def run_drone(drones, instruction, parameters):
             elif instruction == "take_off" or instruction == "takeoff":
                 data = f"take_off({parameters})"
             elif instruction == "rotate":
-                data = f"rotate_by({parameters})"
+                data = f"rotate_by_blocking({parameters})"
             elif instruction == "rotate_by":
-                data = f"rotate_by({parameters})"
+                data = f"rotate_by_blocking({parameters})"
             elif instruction == "rotate_to":
-                data = f"rotate_to({parameters})"
+                data = f"rotate_to_blocking({parameters})"
             elif instruction == "rotate_gimbal_to":
-                data = f"rotate_gimbal_to({parameters})"
+                data = f"rotate_gimbal_to_blocking({parameters})"
             elif instruction == "move_to":
-                data = f"move_to({parameters})"
+                data = f"move_to_blocking({parameters})"
             elif instruction == "execute_instructions":
-                all_responses = ""
-                for drone in drones:
-                    instructions_list = parse_instructions(parameters)
-                    response = await execute_instructions(drone, instructions_list)
-                    all_responses += response + "\n"
-                return all_responses
+                instructions_list = parse_instructions(parameters)
+                response = await asyncio.gather(
+                    *(execute_instructions(drone, instructions_list) for drone in drones)
+                    )
+                return response
             elif instruction == "get_state":
                 response = await get_state(drones)
                 return response
             elif instruction == "look_at":
-                data = f"look_at({parameters})"
+                data = f"look_at_blocking({parameters})"
             elif instruction == "duet":
                 await duet()
                 return "Finished duet"
-            elif instruction == "square":
-                await square()
-                return "Finished square"
+            elif instruction == "parallel_square":
+                await parallel_square()
+                return "Finished paralell_square"
             elif instruction == "move_to_see":
                 if isinstance(parameters, str):
                     parameters_list = parameters.split(',')
@@ -112,14 +116,36 @@ async def run_drone(drones, instruction, parameters):
                     parameters_list = parameters
                 if len(parameters_list) != 3:
                     return "Invalid parameters, need 3 parameters, lat, lon and alt"
-                lat = float(parameters_list[0])
-                lon = float(parameters_list[1])
-                alt = float(parameters_list[2].strip())
-                data = f"move_to_see({lat}, {lon}, {alt})"
+                lat = int(float(parameters_list[0]))
+                lon = int(float(parameters_list[1]))
+                alt = int(float(parameters_list[2].strip()))
+                data = f"move_to_see_blocking({lat}, {lon}, {alt})"
             elif instruction == "follow_object":
                 data = f"follow_object({parameters})"
             elif instruction == "reset_objects":
                 data = "reset_objects()"
+            elif instruction == "arm_drones":
+                response = await asyncio.gather(
+                    *(arm_drones(drone) for drone in drones)
+                    )
+                return response
+            elif instruction == "wait":
+                await asyncio.sleep(int(parameters))
+                return f"Waited for {parameters} seconds"
+            # elif instruction == "goodai_shape":
+            #     response = await goodai_shape(drones)
+            #     return response
+            elif instruction == "move_by":
+                if isinstance(parameters, str):
+                    parameters_list = parameters.split(',')
+                else:
+                    parameters_list = parameters
+                if len(parameters_list) != 3:
+                    return "Invalid parameters, need 3 parameters, east, north and up"
+                east = int(float(parameters_list[0]))
+                north = int(float(parameters_list[1]))
+                up = int(float(parameters_list[2].strip()))
+                data = f"move_by_blocking(({east}, {north}, {up}))"
             else:
                 return "Invalid instruction"
 
@@ -176,6 +202,10 @@ async def move(drone, distance, direction):
     if isinstance(state, str):
         print(state)
         return
+    
+    # remove decimals from distance and direction
+    distance = int(distance)
+    direction = int(direction)
 
     # Extract the current lat and lon and heading
     current_lat = state['position_geo'][0]
@@ -206,12 +236,23 @@ async def execute_instructions(drone, instructions_list):
     full_result = f"Drone {drone} executed instructions:\n"
     for command, params in instructions_list:
         results_list = await run_drone([drone], command, params)
-        results = json.loads(results_list[0])
+        try:
+            results = json.loads(results_list[0])
+            full_result += f"{results.get('command')}, {results.get('success')}, {results.get('message')}\n"
+        except Exception as e:
+            results = results_list
+            full_result += f"{results}\n"
         print(results)
-        full_result += f"{results.get('command')}, {results.get('success')}, {results.get('message')}\n"
+        
     return full_result
 
-
+async def arm_drones(drone):
+    return_string = ""
+    instr_list = "start_mission(patrol), wait(10), pause_mission()"
+    instructions_list = parse_instructions(instr_list)
+    response = await execute_instructions(drone, instructions_list)
+    return_string += f"{response}\n"
+    return return_string
 
 # a function that makes both drones come together and fly in half a circle around each other
 async def dance():
@@ -258,7 +299,7 @@ async def dance():
 
         
 
-async def fly_paralell(degrees):
+async def fly_parallel(degrees):
     # Get the current state of the drones
     state_drone_3 = await get_state_i(3)
     state_drone_4 = await get_state_i(4)
@@ -313,29 +354,13 @@ async def fly_paralell(degrees):
 
 
 async def duet():
-    await fly_paralell(0)
+    await fly_parallel(0)
     await dance()
-    await fly_paralell(180)
+    await fly_parallel(180)
     await dance()
 
-async def square():
-    await fly_paralell(0)
-    await fly_paralell(90)
-    await fly_paralell(180)
-    await fly_paralell(270)
-
-# async def main():
-#     # # get drone 3 state
-#     # drone = 3
-#     # instr_list = "move(10, 0), rotate_by(10), move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),move(10, 0), rotate_by(10),"
-#     # instructions_list = parse_instructions(instr_list)
-#     # response = await execute_instructions(drone, instructions_list)
-#     # print(response)
-#     await fly_paralell(0)
-#     await dance()
-#     await fly_paralell(180)
-#     await dance()
-
-# # Python 3.7+
-# if __name__ == "__main__":
-#     asyncio.run(main())
+async def parallel_square():
+    await fly_parallel(0)
+    await fly_parallel(90)
+    await fly_parallel(180)
+    await fly_parallel(270)

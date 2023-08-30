@@ -84,7 +84,7 @@ In the .env file, set the `PRODUCTION` variable to `false` for local development
 # Set to true when deployed
 PRODUCTION = false
 ```
-Also, in `routes.py`, change the `LIVE_DOMAIN` to your correct domain:
+Not needed for local setup: in `routes.py`, change the `LIVE_DOMAIN` to your correct domain:
 ```python
 LIVE_DOMAIN = ".airobin.net"
 ```

@@ -84,11 +84,6 @@ In the .env file, set the `PRODUCTION` variable to `false` for local development
 # Set to true when deployed
 PRODUCTION = false
 ```
-Not needed for local setup: in `routes.py`, change the `LIVE_DOMAIN` to your correct domain:
-```python
-LIVE_DOMAIN = ".airobin.net"
-```
-> Note: If you are deploying to Heroku, you will need to set up the appropriate buildpacks and environment variables as specified in the app.json file.
 
 5. You will also need to set up a PostgreSQL database. The connection string for this database should be added to the .env file as follows:
 ```bash

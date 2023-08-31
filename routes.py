@@ -21,7 +21,12 @@ connections = {}
 PRODUCTION = os.environ['PRODUCTION']
 isOnHttps = PRODUCTION # False
 
-LIVE_DOMAIN = os.getenv("ORIGINS").split(";")[0]
+ORIGINS = os.getenv("ORIGINS")
+if ORIGINS:
+    LIVE_DOMAIN = ORIGINS.split(";")[0]
+else:
+    LIVE_DOMAIN = "localhost"
+
 
 users_dir = 'users' # end with a slash
 

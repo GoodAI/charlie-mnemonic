@@ -28,6 +28,7 @@
         var tempFormatted = '';
         var settings = {};
         let user_name = '';
+        let errorMessage = '';
 
         // set a temporary socket
         var socket = {
@@ -102,12 +103,7 @@
                     menuItem.innerHTML = addon + ": " + status;
                     menuItem.onclick = (function(addon) {
                         return function(e) {
-                            e.preventDefault(); // prevent the default action
-                            // socket.emit('change_addon_status', { 
-                            //     addon: addon, 
-                            //     enabled: !settings[addon],
-                            //     username: user_name 
-                            // });
+                            e.preventDefault();
                             edit_addon_status(addon, !settings[addon]);
                             console.log('change_addon_status: ', addon, !settings[addon]);
                         };
@@ -174,15 +170,57 @@
             }
         };
 
+        function try_reconnect(socket, username) {
+            // try to reconnect to the socket
+            if (socket.readyState == WebSocket.CLOSED) {
+                console.log('socket closed, trying to reconnect');
+                var connectionStatusElement = document.getElementById('connectionStatus');
+                connectionStatusElement.textContent = 'Reconnecting...';
+                connectionStatusElement.style.color = 'orange';
+                get_settings(username);
+            }
+        }
+
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
             socket = new WebSocket('ws://' + document.domain + ':8002/ws/' + username);
 
+            // Update the username in the widget
+            document.getElementById('username').textContent = 'Username: ' + username;
+
+            var reconnectInterval = null;
+
+            socket.onclose = function() {
+                // Update the connection status in the widget
+                var connectionStatusElement = document.getElementById('connectionStatus');
+                connectionStatusElement.textContent = 'Disconnected';
+                connectionStatusElement.style.color = 'red';
+                // wait 2 seconds
+                setTimeout(function() {
+                    // try to reconnect
+                    try_reconnect(socket, username);
+                }, 2000);
+            };
+
+            socket.onopen = function() {
+                // Update the connection status in the widget
+                var connectionStatusElement = document.getElementById('connectionStatus');
+                connectionStatusElement.textContent = 'Connected';
+                connectionStatusElement.style.color = 'green';
+            };
+
+            socket.onerror = function() {
+                // Update the connection status in the widget
+                var connectionStatusElement = document.getElementById('connectionStatus');
+                connectionStatusElement.textContent = 'Error';
+                connectionStatusElement.style.color = 'orange';
+            };
+
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);
-                
+                // TODO: proper parsing for all of the next messages
                 let msg = {};
-                // event data = f"debug{number}:{color}:\n{message}"
+                
                 if (event.data.startsWith('debug1:')){
                     msg.debug1 = event.data.replace('debug1:', '');
                     msg.color = msg.debug1.split(' ')[0].replace(':', '');
@@ -356,6 +394,47 @@
                     tempFormatted = '';
                 }
 
+                else if (event.data.startsWith('[Error:')) {
+                    // remove newlines from the content
+                    var content = event.data.replace(/\n/g, '');
+                    console.log('error');
+                    console.log('content:' + content);
+                    tempchild = document.getElementById('messages').lastChild;
+                    if (tempchild) {
+                        // check if the tempchild has a spinner, if so, remove it
+                        if (tempchild.querySelector('.spinner') != null) {
+                            tempchild.querySelector('.spinner').remove();
+                            document.getElementById('messages').lastChild.remove();
+                        }
+                    }
+                    var match = content.match(/\[Error:([\s\S]*?)\](?![\s\S]*\])/);
+                    if (!match) {
+                        match = content.match(/\[Error: ([\s\S]*?)\](?![\s\S]*\])/);
+                    }
+                    if (match) {
+                        var args = match[1].replace(/\r?\n/g, '<br>');
+
+                        var lastMessage = document.querySelector('.last-message');
+                        if (lastMessage) {
+                            lastMessage.classList.remove('last-message');
+                        }
+
+                        var chatMessage = `
+                            <div class="message error">
+                                <span class="timestamp">${timestamp}</span>
+                                <div class="bubble">
+                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                                        <div class="title">Error:<div class="arrow"></div></div>
+                                        ${args}  <!-- Insert the args properties here -->
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+                        document.getElementById('messages').innerHTML += chatMessage;
+                    }
+                }
+
                 
                 if (msg.debug1 !== undefined) {
                     var debug1 = msg.debug1.replace(/\n/g, '<br>');
@@ -378,6 +457,7 @@
                     }
                 }
             });
+
             // get the settings from the server
             fetch(API_URL + '/load_settings/', {
                 method: 'POST',
@@ -387,11 +467,37 @@
                 body: JSON.stringify({ username: username}),
                 credentials: 'include'
             })
-            .then(response => response.json())
+            .then(handleError)
             .then(data => {
                 setSettings(data);
             })
-            .catch(console.error);
+            .catch(error => {
+                console.error('There has been a problem with your fetch operation:', error);
+            });
+
+        }
+
+        async function handleError(response) {
+            if (!response.ok) { // or check for any specific status code
+                switch(response.status) {
+                    case 401:
+                        deleteCookies(); // assuming this function exists
+                        // show the login modal
+                        $('#login-modal').modal('show'); // assuming jQuery is available
+                        // show the error in the login modal errorMessage div
+                        errorMessage = "Invalid credentials. Please login again."
+                        var errorDiv = document.querySelector('.loginError');
+                        errorDiv.innerHTML = errorMessage;
+                        errorDiv.style.display = 'block';
+                        errorMessage = '';
+                        throw new Error('Unauthorized');
+                    case 500:
+                        throw new Error('Server Error');
+                    default:
+                        throw new Error('Network response was not ok');
+                }
+            }
+            return await response.json();
         }
 
         function externalMessage(msg) {
@@ -492,6 +598,10 @@
     </script>
 </head>
 <body>
+    <div id="socketStatus" style="position: fixed; top: 10px; left: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
+        <p id="username" style="margin: 0; font-weight: bold;"></p>
+        <p id="connectionStatus" style="margin: 0;"></p>
+    </div>
     <!-- Login Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="login-modal">
         <div class="modal-dialog" role="document">
@@ -502,6 +612,7 @@
                 <div class="modal-body">
                     <form id="login-form">
                         <div class="form-group">
+                            <div class="loginError"></div>
                             <label for="username-input">Username</label>
                             <input type="text" class="form-control" id="username-input" placeholder="Enter your username" maxlength="20" pattern="^[a-zA-Z0-9_]*$" required>
                             <small class="form-text text-muted">Max 20 characters, no special characters except underscore.</small>
@@ -678,10 +789,7 @@
                 credentials: 'include'
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
+            const data = await handleError(response);
             onResponse(data);
 
         } catch (error) {
@@ -700,15 +808,12 @@
                 credentials: 'include'
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            // response is an audio file
             const data = await response.blob();
             var audioSrc = URL.createObjectURL(data);
             return audioSrc;
 
         } catch (error) {
+            await handleError(error);
             console.error('Failed to send message: ', error);
         }
     }
@@ -724,10 +829,6 @@
                 credentials: 'include'
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            // response is a zip file
             const data = await response.blob();
             var downloadUrl = URL.createObjectURL(data);
             var a = document.createElement("a");
@@ -739,6 +840,7 @@
             window.URL.revokeObjectURL(downloadUrl);
 
         } catch (error) {
+            await handleError(error);
             console.error('Failed to save data: ', error);
         }
     }
@@ -754,14 +856,11 @@
                 credentials: 'include'
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             const data = await response.json();
             console.log(data.message);
 
         } catch (error) {
+            await handleError(error);
             console.error('Failed to delete data: ', error);
         }
     }
@@ -778,18 +877,14 @@
                 credentials: 'include'
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
             const data = await response.json();
             console.log(data.message);
 
         } catch (error) {
+            await handleError(error);
             console.error('Failed to upload data: ', error);
         }
     }
-
 
     document.getElementById('send').addEventListener('click', async function() {
         sendMessageToServer();
@@ -1064,6 +1159,11 @@
         }
     }
 
+    function deleteCookies() {
+        document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    }
+
 
     // check for session token when page loads
     window.onload = function() {
@@ -1071,13 +1171,13 @@
     }
 
     document.getElementById('saveDataBtn').addEventListener('click', save_user_data);
-    document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
-    document.getElementById('uploadDataBtn').addEventListener('click', function() {
-        const fileInput = document.getElementById('uploadDataInput');
-        if (fileInput.files.length > 0) {
-            upload_user_data(fileInput.files[0]);
-        }
-    });
+    // document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
+    // document.getElementById('uploadDataBtn').addEventListener('click', function() {
+    //     const fileInput = document.getElementById('uploadDataInput');
+    //     if (fileInput.files.length > 0) {
+    //         upload_user_data(fileInput.files[0]);
+    //     }
+    // });
     </script>
 </body>
 </html>

@@ -162,7 +162,7 @@ class OpenAIResponser:
         self.max_tokens = max_tokens
         self.max_responses = max_responses
 
-    async def get_response(self, messages, stream=False, function_metadata=None, function_call="auto"):
+    async def get_response(self, username, messages, stream=False, function_metadata=None, function_call="auto"):
         if function_metadata is None:
             function_metadata = [{
                 "name": "none",
@@ -196,11 +196,14 @@ class OpenAIResponser:
                 )
                 return response
             except asyncio.TimeoutError:
-                print(f"Request timed out, retrying {i+1}/{max_retries}")
+                #print(f"Request timed out, retrying {i+1}/{max_retries}")
+                send_message(f"[Error: Request timed out, retrying {i+1}/{max_retries}]", 'red', username)
             except Exception as e:
-                print(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                #print(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                send_message(f"[Error from openAI: {str(e)}, retrying {i+1}/{max_retries}]", 'red', username)
         
-        print("Max retries exceeded")
+        #print("Max retries exceeded")
+        send_message(f"[Error: Max retries exceeded]", 'red', username)
         raise HTTPException(503, self.error503)
 
     async def get_response_stream(self, messages):
@@ -501,7 +504,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
-    response = await openai_response.get_response(messages, function_metadata=function_metadata)
+    response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
 
     final_response = response
     
@@ -529,7 +532,7 @@ async def generate_response(message, og_message, username, users_dir):
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
-    response = await openai_response.get_response(messages, function_metadata=function_metadata)
+    response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
     
     await send_debug(f"response: {response}", 1, 'green', username)
     final_response = await process_chain_thoughts(response, message, og_message, function_dict, function_metadata, username, users_dir)
@@ -613,7 +616,7 @@ Please follow these instructions carefully. If nothing changes, return a copy of
     ]
     
     openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses)
-    response = await openai_response.get_response(new_message)
+    response = await openai_response.get_response(username, new_message)
 
     await send_debug(f"kw resp: {response}", 1, 'green', username)
     return response['choices'][0]['message']['content']
@@ -735,7 +738,7 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
         await send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
 
         openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
-        response = await openai_response.get_response(messages, function_metadata=function_metadata)
+        response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
 
         await send_debug(f"process_cot_messages response: {response}", 2, 'red', username)
         response = response['choices'][0]['message']
@@ -771,7 +774,7 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
         ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
-    response = await openai_response.get_response(messages, function_metadata=function_metadata)
+    response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
 
     response = response['choices'][0]['message']['content']
     #return response
@@ -801,7 +804,7 @@ async def process_function_reply(function_call_name, function_response, message,
                 },
             ]
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
-    second_response = await openai_response.get_response(messages)
+    second_response = await openai_response.get_response(username, messages)
 
     final_response = second_response["choices"][0]["message"]["content"]
 

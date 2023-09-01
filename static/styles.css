@@ -151,6 +151,17 @@ h3{
     align-self: flex-end;
 }
 
+.message.error .bubble {
+    background-color: #df6969;
+    color: white;
+    border-radius: 18px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+    align-self: flex-end;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;
@@ -528,4 +539,13 @@ pre {
    height: 100%;
    /* make contents scrollable if resizable parent gets to small: */
    overflow: auto;
+}
+
+.loginError { 
+    background-color: #ff0000;
+    color: #ffffff;
+    font-weight: bold;
+    padding: 10px;
+    border-radius: 5px;
+    display: none;
 }

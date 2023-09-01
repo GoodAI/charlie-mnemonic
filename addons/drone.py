@@ -5,7 +5,7 @@ from geopy.distance import geodesic
 from aiohttp import ClientSession
 import requests
 
-description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(meters), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up)"
+description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up), panic_button()"
 parameters = {
     "type": "object",
     "properties": {
@@ -146,6 +146,8 @@ async def run_drone(drones, instruction, parameters):
                 north = int(float(parameters_list[1]))
                 up = int(float(parameters_list[2].strip()))
                 data = f"move_by_blocking(({east}, {north}, {up}))"
+            elif instruction == "panic_button":
+                data = f"panic_button({parameters})"
             else:
                 return "Invalid instruction"
 

@@ -45,6 +45,7 @@
         renderer.link = function(href, title, text) {
         return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
         };
+
         // set the options for marked and a highlighter and copy button
         marked.setOptions({
             highlight: function(code, lang) {
@@ -54,15 +55,6 @@
             },
             renderer: renderer,
         });
-
-        // keep the last 10 messages in history
-        // need to update this to a better system
-        function updateHistory(msg) {
-            chatHistory.push(msg);
-            if (chatHistory.length > 10) {
-                chatHistory.shift();
-            }
-        }
 
         // parse a json with json5
         function parseComplexJson(jsonStr) {
@@ -298,7 +290,7 @@
                                 <div class="bubble">
                                     <div class="expandable" onclick="this.classList.toggle('expanded')">
                                         <div class="title">Function response:<div class="arrow"></div></div>
-                                        ${args}  <!-- Insert the args properties here -->
+                                        ${args}
                                     </div>
                                 </div>
                             </div>
@@ -350,7 +342,7 @@
                                 <div class="bubble">
                                     <div class="expandable" onclick="this.classList.toggle('expanded')">
                                         <div class="title">PLAN:<div class="arrow"></div></div>
-                                        ${args}  <!-- Insert the args properties here -->
+                                        ${args}
                                     </div>
                                 </div>
                             </div>
@@ -410,7 +402,7 @@
                                 <div class="bubble">
                                     <div class="expandable" onclick="this.classList.toggle('expanded')">
                                         <div class="title">Using: ${addon}<div class="arrow"></div></div>
-                                        ${argsString}  <!-- Insert the args properties here -->
+                                        ${argsString}
                                     </div>
                                 </div>
                             </div>
@@ -514,13 +506,12 @@
         }
 
         async function handleError(response) {
-            if (!response.ok) { // or check for any specific status code
+            if (!response.ok) {
                 switch(response.status) {
                     case 401:
-                        deleteCookies(); // assuming this function exists
+                        deleteCookies();
                         // show the login modal
-                        $('#login-modal').modal('show'); // assuming jQuery is available
-                        // show the error in the login modal errorMessage div
+                        $('#login-modal').modal('show');
                         errorMessage = "Invalid credentials. Please login again."
                         var errorDiv = document.querySelector('.loginError');
                         errorDiv.innerHTML = errorMessage;
@@ -616,7 +607,6 @@
                 tempFormatted = '';
                 var lastMessage = document.querySelector('.last-message');
                 if (lastMessage) {
-                    //lastMessage.querySelector('.bubble').innerHTML = marked(lastMessage.querySelector('.bubble').innerHTML);
                     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
                 }
                 content = '';
@@ -994,8 +984,6 @@
         })
         .then(response => response.json())
         .then(data => {
-            // Now you can send the transcription to your server
-            //socket.send(JSON.stringify({'message': data.transcription, 'history': message, 'username': user_name, 'session_token': session_token}));
             console.log('received transcription: ' + data.transcription);
             // send the transcription to the server as user message
             sendMessageToServer(data.transcription);
@@ -1008,7 +996,6 @@
             voice_input: $('#voice-input').prop('checked'),
             voice_output: $('#voice-output').prop('checked')
         };
-        //socket.emit('update_settings', settings, user_name); // Emit update_settings event
 
         // Show or hide the record button based on the voice input setting
         if (settings.voice_input) {
@@ -1153,7 +1140,6 @@
     function openDebugNav() {
         document.getElementById("debugNav").style.width = "60%";
         document.getElementById("debugNav").style.height = "100vh";
-        // add event listener to the document
         document.addEventListener('click', closeDebugNavOnClickOutside);
     }
 
@@ -1161,7 +1147,6 @@
     function closeDebugNav() {
         document.getElementById("debugNav").style.width = "0";
         document.getElementById("debugNav").style.height = "0";
-        // remove event listener from the document
         document.removeEventListener('click', closeDebugNavOnClickOutside);
     }
 

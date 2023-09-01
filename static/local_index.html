@@ -170,6 +170,42 @@
             }
         };
 
+        function showErrorMessage(message) {
+            var timestamp = new Date().toLocaleTimeString();
+            // remove newlines from the content
+            var content = message;
+            tempchild = document.getElementById('messages').lastChild;
+            if (tempchild) {
+                // check if the tempchild has a spinner, if so, remove it
+                if (tempchild.querySelector('.spinner') != null) {
+                    tempchild.querySelector('.spinner').remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message error">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Error:<div class="arrow"></div></div>
+                            ${message}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+            // enable the send button again
+            document.getElementById('send').disabled = false;
+
+        }
+
         function try_reconnect(socket, username) {
             // try to reconnect to the socket
             if (socket.readyState == WebSocket.CLOSED) {
@@ -490,9 +526,11 @@
                         errorDiv.innerHTML = errorMessage;
                         errorDiv.style.display = 'block';
                         errorMessage = '';
-                        throw new Error('Unauthorized');
+                        throw new Error('401: Unauthorized');
                     case 500:
-                        throw new Error('Server Error');
+                        throw new Error('500: Server Error');
+                    case 503:
+                        throw new Error('503: Service Unavailable');
                     default:
                         throw new Error('Network response was not ok');
                 }
@@ -794,6 +832,7 @@
 
         } catch (error) {
             console.error('Failed to send message: ', error);
+            showErrorMessage('Failed to send message: ' + error);
         }
     }
 

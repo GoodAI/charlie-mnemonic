@@ -62,26 +62,26 @@ class Authentication:
         self.cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
         result = self.cursor.fetchone()
 
-        if result is not None:
-            stored_password = result[0]
-            # Make sure stored_password is a string before encoding it to bytes
-            if isinstance(stored_password, bytes):
-                stored_password = stored_password.decode("utf-8")
-            stored_password_bytes = stored_password.encode("utf-8")
-            if bcrypt.checkpw(password.encode("utf-8"), stored_password_bytes):
-                # If password is correct, generate a session token
-                session_token = binascii.hexlify(os.urandom(24)).decode()
-                # Store the session token in the database
-                self.cursor.execute("UPDATE users SET session_token = %s WHERE username = %s", (session_token, username))
-                self.conn.commit()
-                self.close()
-                print(f'User: {username} - Session token: {session_token}')
-                # Return the session token
-                return session_token
-            else:
-                return False
-        else:
+        if result is None:
             return False
+
+        stored_password = result[0]
+        # Make sure stored_password is a string before encoding it to bytes
+        if isinstance(stored_password, bytes):
+            stored_password = stored_password.decode("utf-8")
+        stored_password_bytes = stored_password.encode("utf-8")
+        if not bcrypt.checkpw(password.encode("utf-8"), stored_password_bytes):
+            return False
+
+        # If password is correct, generate a session token
+        session_token = binascii.hexlify(os.urandom(24)).decode()
+        # Store the session token in the database
+        self.cursor.execute("UPDATE users SET session_token = %s WHERE username = %s", (session_token, username))
+        self.conn.commit()
+        self.close()
+        print(f'User: {username} - Session token: {session_token}')
+        # Return the session token
+        return session_token
         
     def logout(self, username, session_token):
         self.open()

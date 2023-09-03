@@ -1233,7 +1233,9 @@
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const responseBody = await response.json();
+            const errorMessage = responseBody.detail || `HTTP error! status: ${response.status}`;
+            throw new Error(errorMessage);
         }
         else {
             // set the session token
@@ -1256,6 +1258,9 @@
                 loadCookies();
             } catch (error) {
                 console.error('Login failed: ', error);
+                var errorDiv = document.querySelector('.loginError');
+                errorDiv.innerHTML = error.message;
+                errorDiv.style.display = 'block';
             }
         }
     });

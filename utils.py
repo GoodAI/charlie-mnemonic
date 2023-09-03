@@ -349,36 +349,43 @@ def extract_content(data):
     return response
 
 def parse_drone_state(drone_state):
-    vehicle_state = drone_state['vehicle_state']
-    mission_state = drone_state['mission_state']
-    position_geo = drone_state['position_geo']
-    attitude = drone_state['attitude']
-    battery = drone_state['battery']
-    airspeed = drone_state['airspeed']
+    try:
+        vehicle_state = drone_state['vehicle_state']
+        mission_state = drone_state['mission_state']
+        position_geo = drone_state['position_geo']
+        attitude = drone_state['attitude']
+        battery = drone_state['battery']
+        airspeed = drone_state['airspeed']
 
-    output = f"{vehicle_state} mode. Mission state: {mission_state}.\n"
-    output += f"Coords: {position_geo}.\n"
-    output += f"Attitude is: {attitude}.\n"
-    output += f"Airspeed is: {airspeed}.\n"
+        output = f"{vehicle_state} mode. Mission state: {mission_state}.\n"
+        output += f"Coords: {position_geo}.\n"
+        output += f"Attitude is: {attitude}.\n"
+        output += f"Airspeed is: {airspeed}.\n"
+    except KeyError:
+        output = f"Raw Drone State: {drone_state}\n"
 
     if 'last_detections' in drone_state:
-        detections = {}
-        for detection in drone_state['last_detections']:
-            class_label = detection['class_label']
-            id = detection['id']
-            latitude = detection['latitude']
-            longitude = detection['longitude']
-            if class_label in detections:
-                if id > detections[class_label]['id']:
+        try:
+            detections = {}
+            for detection in drone_state['last_detections']:
+                class_label = detection['class_label']
+                id = detection['id']
+                latitude = detection['latitude']
+                longitude = detection['longitude']
+                if class_label in detections:
+                    if id > detections[class_label]['id']:
+                        detections[class_label] = {'id': id, 'location': (latitude, longitude)}
+                else:
                     detections[class_label] = {'id': id, 'location': (latitude, longitude)}
-            else:
-                detections[class_label] = {'id': id, 'location': (latitude, longitude)}
 
-        output += "Last detections:\n"
-        for class_label, info in detections.items():
-            output += f" {class_label} with id {info['id']} at {info['location']}.\n"
+            output += "Last detections:\n"
+            for class_label, info in detections.items():
+                output += f" {class_label} with id {info['id']} at {info['location']}.\n"
+        except KeyError:
+            output += f"Raw Detections: {drone_state['last_detections']}\n"
 
     return output
+
 
 async def get_drone_state(username, drones):
     final_responses = []

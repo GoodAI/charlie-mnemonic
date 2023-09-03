@@ -1,5 +1,9 @@
 
+from typing import Union
 from pydantic import BaseModel
+
+class DroneStateError(Exception):
+    pass
 
 class User(BaseModel):
     username: str
@@ -18,8 +22,9 @@ class userMessage(BaseModel):
 
 class editSettings(BaseModel):
     username: str
-    addon: str
-    enabled: bool
+    category: str
+    setting: str
+    value: Union[str, int, bool]
 
 class AsciiColors:
     HEADER = '\033[95m'

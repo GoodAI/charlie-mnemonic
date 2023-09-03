@@ -16,7 +16,7 @@ Subject: Important Dates and Numbers
 -
 Subject: Instructions to Remember
 -
-Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked.
+Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked. Do not add recent or relative messages.
 Live status: House status and drone status are obtained from another API, they do not need to be stored.
 Web search results: First search for results, then visit a link from those results.
 Web search instruction: Only search the web for dynamic data, like the stock prices, but not for general knowledge such as recipes.

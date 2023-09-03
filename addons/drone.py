@@ -4,6 +4,7 @@ import math
 from geopy.distance import geodesic
 from aiohttp import ClientSession
 import requests
+from classes import DroneStateError
 
 description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up), panic_button(targetId)"
 parameters = {
@@ -42,6 +43,7 @@ async def drone(drones, instruction, parameters):
 
 async def run_drone(drones, instruction, parameters):
     tasks = []
+    errors = []
     if not isinstance(drones, list):
         drones_list = drones.split(',')
         drones = [int(drone) for drone in drones_list]
@@ -63,7 +65,11 @@ async def run_drone(drones, instruction, parameters):
                     return "Invalid parameters, need 2 parameters, distance and direction"
                 distance = int(float(parameters_list[0]))
                 direction = int(float(parameters_list[1].strip()))
-                lat, long = await move(drone, distance, direction)
+                result = await move(drone, distance, direction)
+                if isinstance(result, str):  # if result is a string, an error occurred
+                    errors.append(result)  # Add error to the list
+                    continue
+                lat, long = result  # if result is not a string, it should be a tuple of two values
                 data = f"move_to_blocking({lat}, {long})"
             elif instruction == "set_pause_on_detection":
                 pause = str_to_bool(parameters)
@@ -104,7 +110,7 @@ async def run_drone(drones, instruction, parameters):
             elif instruction == "look_at":
                 data = f"look_at_blocking({parameters})"
             elif instruction == "duet":
-                await duet()
+                await duet(drones)
                 return "Finished duet"
             elif instruction == "parallel_square":
                 await parallel_square()
@@ -157,6 +163,9 @@ async def run_drone(drones, instruction, parameters):
             return f"Error: {e}"
     
     responses = await asyncio.gather(*tasks)
+    if errors:
+        responses += errors
+        return responses
     return responses
 
 async def send_command(url, data, headers):
@@ -167,7 +176,7 @@ async def send_command(url, data, headers):
 async def get_state_i(drone):
     '''Get the current state of a drone'''
     url = f"http://127.0.0.1:8000/api/vehicle/{drone}/llm/state"
-    for i in range(10):  # retry up to 10 times
+    for i in range(10):
         try:
             async with ClientSession() as session:
                 async with session.get(url) as response:
@@ -175,35 +184,35 @@ async def get_state_i(drone):
                         return await response.json()
         except Exception as e:
             print(f"Error: {e}, retrying...")
-            await asyncio.sleep(1)  # wait for 1 second before retrying
-    return "Failed to get state"
+            await asyncio.sleep(1)
+    raise DroneStateError(f"Failed to get state of drone {drone}, are you sure it exists?")
 
 async def get_state(drones):
     '''Get the current state of the drones'''
     responses = ""
     for drone in drones:
-        for i in range(10):  # retry up to 10 times
+        for i in range(10):
             try:
                 url = f"http://127.0.0.1:8000/api/vehicle/{drone}/llm/state"
                 async with ClientSession() as session:
                     async with session.get(url) as response:
                         if response.status == 200:
                             responses += await response.text() + "\n"
-                            break  # break the retry loop if successful
+                            break
             except Exception as e:
                 print(f"Error: {e}, retrying...")
-                await asyncio.sleep(1)  # wait for 1 second before retrying
-        else:  # this else block is executed if the for loop completed normally (no break statement was encountered)
-            responses += f"Error: Failed to get state for drone {drone}\n"
+                await asyncio.sleep(1)
+        else:
+            raise DroneStateError(f"Failed to get state of drone {drone}, are you sure it exists?")
     return responses
 
 
 async def move(drone, distance, direction):
     # Get the current state
-    state = await get_state_i(drone)
-    if isinstance(state, str):
-        print(state)
-        return
+    try:
+        state = await get_state_i(drone)
+    except DroneStateError as e:
+        return f"Failed to get state of drone {drone}, are you sure it exists?"
     
     # remove decimals from distance and direction
     distance = int(distance)
@@ -257,10 +266,14 @@ async def arm_drones(drone):
     return return_string
 
 # a function that makes both drones come together and fly in half a circle around each other
-async def dance():
+async def dance(drones):
+    if not isinstance(drones, list):
+        drones_list = drones.split(',')
+        drones = [int(drone) for drone in drones_list]
+
     # Get the current state of the drones
-    state_drone_3 = await get_state_i(3)
-    state_drone_4 = await get_state_i(4)
+    state_drone_3 = await get_state_i(drones[0])
+    state_drone_4 = await get_state_i(drones[1])
     
     # Check if the states are valid
     if isinstance(state_drone_3, str) or isinstance(state_drone_4, str):
@@ -279,8 +292,8 @@ async def dance():
     middle_lon = (current_lon_3 + current_lon_4) / 2
     
     # Move both drones to the middle point
-    await run_drone([3], "move_to", f"{middle_lat}, {middle_lon}")
-    await run_drone([4], "move_to", f"{middle_lat}, {middle_lon}")
+    await run_drone([drones[0]], "move_to", f"{middle_lat}, {middle_lon}")
+    await run_drone([drones[1]], "move_to", f"{middle_lat}, {middle_lon}")
     
     # Determine the radius of the circle (half the distance between the drones)
     radius = geodesic((current_lat_3, current_lon_3), (current_lat_4, current_lon_4)).meters / 2
@@ -290,21 +303,25 @@ async def dance():
         # Calculate the new coordinates for drone 3 (left)
         new_coords_3 = geodesic(meters=radius).destination((middle_lat, middle_lon), angle)
         new_lat_3, new_lon_3 = new_coords_3.latitude, new_coords_3.longitude
-        await run_drone([3], "move_to", f"{new_lat_3}, {new_lon_3}")
+        await run_drone([drones[0]], "move_to", f"{new_lat_3}, {new_lon_3}")
         
         # Calculate the new coordinates for drone 4 (right half )
         new_coords_4 = geodesic(meters=radius).destination((middle_lat, middle_lon), 180 + angle)
         new_lat_4, new_lon_4 = new_coords_4.latitude, new_coords_4.longitude
-        await run_drone([4], "move_to", f"{new_lat_4}, {new_lon_4}")
+        await run_drone([drones[1]], "move_to", f"{new_lat_4}, {new_lon_4}")
     
     print("Finished dancing")
 
         
 
-async def fly_parallel(degrees):
+async def fly_parallel(degrees, drones):
+    if not isinstance(drones, list):
+        drones_list = drones.split(',')
+        drones = [int(drone) for drone in drones_list]
+
     # Get the current state of the drones
-    state_drone_3 = await get_state_i(3)
-    state_drone_4 = await get_state_i(4)
+    state_drone_3 = await get_state_i(drones[0])
+    state_drone_4 = await get_state_i(drones[1])
     
     # Check if the states are valid
     if isinstance(state_drone_3, str) or isinstance(state_drone_4, str):
@@ -323,46 +340,46 @@ async def fly_parallel(degrees):
     middle_lon = (current_lon_3 + current_lon_4) / 2
 
     await asyncio.gather(
-        run_drone([3], "move_to", f"{middle_lat}, {middle_lon}"),
-        run_drone([4], "move_to", f"{middle_lat}, {middle_lon}")
+        run_drone([drones[0]], "move_to", f"{middle_lat}, {middle_lon}"),
+        run_drone([drones[1]], "move_to", f"{middle_lat}, {middle_lon}")
     )
 
 
     # rotate both drones to face the same direction
     await asyncio.gather(
-        run_drone([3], "rotate_to", f"{degrees}, 0"),
-        run_drone([4], "rotate_to", f"{degrees}, 0")
+        run_drone([drones[0]], "rotate_to", f"{degrees}, 0"),
+        run_drone([drones[1]], "rotate_to", f"{degrees}, 0")
     )
 
     # Move drone 3 10 meters to the left and drone 4 10 meters to the right
     await asyncio.gather(
-        run_drone([3], "move", "10, 270"),
-        run_drone([4], "move", "10, 90")
+        run_drone([drones[0]], "move", "10, 270"),
+        run_drone([drones[1]], "move", "10, 90")
     )
 
     # rotate both drones to face the same direction
     await asyncio.gather(
-        run_drone([3], "rotate_to", f"{degrees}, 0"),
-        run_drone([4], "rotate_to", f"{degrees}, 0")
+        run_drone([drones[0]], "rotate_to", f"{degrees}, 0"),
+        run_drone([drones[1]], "rotate_to", f"{degrees}, 0")
     )
 
     # Fly both drones forward for 50 meters
     await asyncio.gather(
-        run_drone([3], "move", "50, 0"),
-        run_drone([4], "move", "50, 0")
+        run_drone([drones[0]], "move", "50, 0"),
+        run_drone([drones[1]], "move", "50, 0")
     )
 
     print("Finished flying parallel")
 
 
-async def duet():
-    await fly_parallel(0)
-    await dance()
-    await fly_parallel(180)
-    await dance()
+async def duet(drones):
+    await fly_parallel(0, drones)
+    await dance(drones)
+    await fly_parallel(180, drones)
+    await dance(drones)
 
-async def parallel_square():
-    await fly_parallel(0)
-    await fly_parallel(90)
-    await fly_parallel(180)
-    await fly_parallel(270)
+async def parallel_square(drones):
+    await fly_parallel(0, drones)
+    await fly_parallel(90, drones)
+    await fly_parallel(180, drones)
+    await fly_parallel(270, drones)

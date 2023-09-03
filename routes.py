@@ -2,9 +2,12 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import json
 import os
+import signal
+import sys
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
+import requests
 from utils import process_message, OpenAIResponser, upload_audio
 from authentication import Authentication
 from pydantic import BaseModel
@@ -171,6 +174,7 @@ async def handle_get_settings(request: Request, user: UserName):
 @router.post("/update_settings/",
     tags=["Settings"])
 async def handle_update_settings(request: Request, user: editSettings):
+    print(user)
     session_token = request.cookies.get("session_token")
     with Authentication() as auth:
         success = auth.check_token(user.username, session_token)
@@ -188,10 +192,24 @@ async def handle_update_settings(request: Request, user: editSettings):
             json.dump({}, f)
     with open(settings_file, 'r') as f:
         settings = json.load(f)
-    settings[user.addon] = user.enabled
+    if user.category in settings:
+        if user.setting in settings[user.category]:
+            if str(user.value).lower() == 'true':
+                settings[user.category][user.setting] = True
+            elif str(user.value).lower() == 'false':
+                settings[user.category][user.setting] = False
+            elif user.value.isdigit():
+                settings[user.category][user.setting] = int(user.value)
+            else:
+                settings[user.category][user.setting] = user.value
+        else:
+            raise HTTPException(status_code=400, detail="Setting not found")
+    else:
+        raise HTTPException(status_code=400, detail="Category not found")
     with open(settings_file, 'w') as f:
         json.dump(settings, f)
     return settings
+
 
 # openAI response route
 @router.post("/message/",
@@ -309,3 +327,28 @@ async def handle_upload_data(request: Request, username: str = Form(...), data_f
     os.remove(os.path.join(users_dir, username, data_file.filename))
     
     return {'message': 'User data uploaded successfully'}
+
+@router.post("/abort_button/",
+    tags=["Messaging"])
+async def handle_abort_button(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    with Authentication() as auth:
+        success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    # get the drone numbers from the user settings
+    with open(os.path.join(users_dir, user.username, 'settings.json'), 'r') as f:
+        settings = json.load(f)
+    drone_numbers = settings['drones']['drones']
+    # send the abort command to each drone
+    drones_list = drone_numbers.split(',')
+    drone_numbers = [int(drone) for drone in drones_list]
+    for drone_number in drone_numbers:
+        print(f'aborting drone {drone_number}')
+        url = f"http://localhost:8000/api/vehicle/{drone_number}/llm/command"
+        headers = {'Content-Type': 'text/plain'}
+        data = 'return_home()'
+        response = requests.put(url, data=data, headers=headers)
+        print(response.text)
+    # kill the process, this will need a manual restart or a cron job/supervisor/...
+    os.kill(os.getpid(), signal.SIGINT)

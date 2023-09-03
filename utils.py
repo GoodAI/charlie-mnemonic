@@ -62,7 +62,16 @@ async def send_message(message, color, username):
     print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
 
 async def load_addons(username, users_dir):
-    settings = {}
+    settings = {
+        "addons": {},
+        "audio": { "voice_input": True, "voice_output": True },
+        "language": { "language": "en" },
+        "system_prompt": { "system_prompt": "Not implemented yet" },
+        "cot_enabled": { "cot_enabled": False },
+        "drones": {
+            "drones": "3, 4"
+        }
+    }
 
     function_dict = {}
     function_metadata = []
@@ -80,35 +89,60 @@ async def load_addons(username, users_dir):
     # create the settings file if it doesn't exist
     if not os.path.exists(settings_file):
         with open(settings_file, 'w') as f:
-            json.dump({}, f)
+            json.dump(settings, f)
 
     # Load the settings
     with open(settings_file, 'r') as f:
         settings = json.load(f)
 
-    # Check if voice input and output settings exist in settings
-    if 'voice_input' not in settings:
-        settings['voice_input'] = False
-    if 'voice_output' not in settings:
-        settings['voice_output'] = False
-    if 'cot_enabled' not in settings:
-        settings['cot_enabled'] = False
+    # check if the new keys are in the settings, if not, rewrite the settings file
+    new_keys = ["audio", "language", "system_prompt", "drones"]
+    has_old_settings = False
+    for key in new_keys:
+        if key not in settings:
+            has_old_settings = True
+            break
+    # trying to add some backwards compatibility for old settings files
+    if has_old_settings:
+        settings = {
+            "addons": {
+                "drone": settings.get("drone", False),
+                "get_current_weather": settings.get("get_current_weather", False),
+                "get_search_results": settings.get("get_search_results", False),
+                "run_python_code": settings.get("run_python_code", False),
+                "visit_website": settings.get("visit_website", False)
+            },
+            "audio": {
+                "voice_input": settings.get("voice_input", False),
+                "voice_output": settings.get("voice_output", False)
+            },
+            "language": {"language": settings.get('language', {}).get('language', 'en')},
+            "system_prompt": {"system_prompt": settings.get('system_prompt', {}).get('system_prompt', 'Not implemented yet')},
+            "cot_enabled": {"cot_enabled": settings.get('cot_enabled', False)},
+            "drones": {
+                "drones": settings.get('drones', {}).get('drones', '3, 4')
+            }
+        }
+
+    # write the new settings back to the file
+    with open(settings_file, 'w') as f:
+        json.dump(settings, f)
 
     # Check if addons in settings exist in addons folder
-    for addon in list(settings.keys()):
-        if addon not in ['voice_input', 'voice_output', 'cot_enabled'] and not os.path.exists(os.path.join('addons', f"{addon}.py")):
+    for addon in list(settings["addons"].keys()):
+        if not os.path.exists(os.path.join('addons', f"{addon}.py")):
             # If addon doesn't exist, remove it from settings
-            del settings[addon]
+            del settings["addons"][addon]
 
     for filename in os.listdir('addons'):
         if filename.endswith('.py'):
             addon_name = filename[:-3]
             # Check if the addon is in the settings
-            if addon_name not in settings:
+            if addon_name not in settings["addons"]:
                 # If not, add it with a default value of False
-                settings[addon_name] = False
+                settings["addons"][addon_name] = False
 
-            if settings.get(addon_name, True):
+            if settings["addons"].get(addon_name, True):
                 file_path = os.path.join('addons', filename)
                 spec = importlib.util.spec_from_file_location(filename[:-3], file_path)
                 module = importlib.util.module_from_spec(spec)
@@ -224,17 +258,27 @@ async def upload_audio(user_dir, username, audio_file: UploadFile, background_ta
     with open(filepath, 'wb') as f:
         f.write(audio_file.file.read())
 
+    # get the user settings language
+    settings_file = os.path.join(userdir, 'settings.json')
+    with open(settings_file, 'r') as f:
+        settings = json.load(f)
+    language = settings.get('language', {}).get('language', 'en')
+
+    # if no language is set, default to english
+    if language is None:
+        language = 'en'
+
     # Now you can use the saved file path to transcribe the audio
-    transcription = await transcribe_audio(filepath)
+    transcription = await transcribe_audio(filepath, language)
     return {'transcription': transcription}
 
 
-async def transcribe_audio(audio_file_path):
+async def transcribe_audio(audio_file_path, language):
     with open(audio_file_path, 'rb') as audio_file:
         transcription = await openai.Audio.atranscribe(
             model = "whisper-1",
             file =  audio_file,
-            language = "en", # af for the drone demo?
+            language = language,
             api_key=api_keys['openai']
             )
     return transcription['text']
@@ -312,24 +356,34 @@ def parse_drone_state(drone_state):
     battery = drone_state['battery']
     airspeed = drone_state['airspeed']
 
-    output = f"The drone is currently in {vehicle_state} mode. The mission state is {mission_state}.\n"
-    output += f"Its geographical position is: {position_geo}.\n"
-    output += f"The drone's attitude is: {attitude}.\n"
-    output += f"The battery level is: {battery}.\n"
-    output += f"The airspeed is: {airspeed}.\n"
+    output = f"{vehicle_state} mode. Mission state: {mission_state}.\n"
+    output += f"Coords: {position_geo}.\n"
+    output += f"Attitude is: {attitude}.\n"
+    output += f"Airspeed is: {airspeed}.\n"
 
     if 'last_detections' in drone_state:
-        output += "The last things detected were:\n"
-
+        detections = {}
         for detection in drone_state['last_detections']:
-            output += f"  A {detection['class_label']} was detected with id {detection['id']} at location ({detection['latitude']}, {detection['longitude']}) with a confidence level of {detection['mean_confidence']}.\n"
+            class_label = detection['class_label']
+            id = detection['id']
+            latitude = detection['latitude']
+            longitude = detection['longitude']
+            if class_label in detections:
+                if id > detections[class_label]['id']:
+                    detections[class_label] = {'id': id, 'location': (latitude, longitude)}
+            else:
+                detections[class_label] = {'id': id, 'location': (latitude, longitude)}
+
+        output += "Last detections:\n"
+        for class_label, info in detections.items():
+            output += f" {class_label} with id {info['id']} at {info['location']}.\n"
 
     return output
 
 async def get_drone_state(username, drones):
-    try:
-        final_responses = []
-        for drone in drones:
+    final_responses = []
+    for drone in drones:
+        try:
             # call the drone API for drone state
             url = f"http://localhost:8000/api/vehicle/{drone}/llm/state"
             response = requests.get(url)
@@ -337,13 +391,11 @@ async def get_drone_state(username, drones):
                 drone_state = response.json()
                 final_responses.append(f'Drone {drone} info:\n' + parse_drone_state(drone_state) + '\n')
             else:
-                final_responses.append(f'Failed to get the info of Drone {drone}')
-        return '\n'.join(final_responses)
-    except requests.exceptions.ConnectionError as e:
-        await send_debug(f"ConnectionError: {e}\nSkipping drone info", 2, 'red', username)
-        return "Failed to get drone info"
-
-
+                final_responses.append(f'Failed to get the info of Drone {drone}. Status code: {response.status_code}, Response: {response.text}')
+        except requests.exceptions.RequestException as e:
+            await send_debug(f"RequestException for drone {drone}: {e}", 2, 'red', username)
+            final_responses.append(f'Failed to get the info of Drone {drone} due to a request exception')
+    return '\n'.join(final_responses)
 
 async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
         chat_history = []
@@ -421,7 +473,9 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         #     home_info = "No home info available."
         # else:
         #     await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
-        drone_info = await get_drone_state(username, [3, 4])
+        # get drone numbers from user settings
+        drone_numbers = settings.get('drones', {}).get('drones', '3, 4')
+        drone_info = await get_drone_state(username, drone_numbers.split(','))
 
         instruction_string = f"""
 Observations:
@@ -433,7 +487,7 @@ Observations:
         full_message = f"You are talking to {username}\nActive Brain Module (read this carefully as it contains important instructions):\n{kw_brain_string}\n\nMost relevant past messages (higher score = better relevancy):\n{history_string}\n\n10 most recent messages:\n{last_messages_string}\n\n{instruction_string}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {message}"
 
         await send_debug(f'Full prompt:\n{full_message}', 1, 'cyan', username)
-        is_cot_enabled = settings.get('cot_enabled')
+        is_cot_enabled = settings.get('cot_enabled', {}).get('cot_enabled', False)
         print(f"is_cot_enabled: {is_cot_enabled}")
         if is_cot_enabled:
             response = await start_chain_thoughts(full_message, og_message, username, users_dir)
@@ -468,7 +522,7 @@ Observations:
                 history_ids.append(str(uuid.uuid4()))
                 brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
                 background_tasks.add_task(keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
-                if settings.get('voice_output', True):
+                if settings.get('audio', {}).get('voice_output', True):
                     # audio_path, audio = await generate_audio(response['content'], username)
                     return response
                     #play(audio)

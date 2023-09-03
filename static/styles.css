@@ -325,10 +325,6 @@ pre {
   .sidenav a:hover {
     color: #f1f1f1;
   }
-
-  .sidenav .label {
-    color: #f1f1f1;
-  }
   
   .sidenav .closebtn {
     position: absolute;
@@ -337,6 +333,46 @@ pre {
     font-size: 36px;
     margin-left: 50px;
   }
+
+  .sidenav h2 {
+    font-size: 18px;
+    color: #f1f1f1;
+    margin-bottom: 20px;
+}
+
+.sidenav h3 {
+    font-size: 16px;
+    color: #f1f1f1;
+    margin-bottom: 10px;
+}
+
+.sidenav a {
+    padding: 5px 5px 5px 20px;
+    text-decoration: none;
+    font-size: 12px;
+    color: #c9c8c8;
+    display: block;
+    transition: 0.3s;
+}
+
+.sidenav input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.sidenav select, .sidenav textarea, .sidenav input[type="text"] {
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+    color: #c9c8c8;
+    background-color: #222;
+    border: none;
+}
+
+.sidenav label {
+    padding: 5px 5px 5px 20px;
+    font-size: 12px;
+    color: #c9c8c8;
+}
   
   .openbtn {
     font-size: 20px;

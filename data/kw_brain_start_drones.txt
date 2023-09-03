@@ -12,12 +12,12 @@ Subject: Locations
 -
 Subject: Instructions to Remember
 -
-Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked.
+Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if explicitly asked. Do not add recent or relative messages.
 Live status: House status and drone status are obtained from another API, they do not need to be stored in the memory.
 
 Subject: Drone API Documentation
 -
-Here are the drone API docs, we currently have drone 3 and 4 available
+Here are the drone API docs
 
 - API URL: http://localhost:8000/api/vehicle/
 - Endpoints: 

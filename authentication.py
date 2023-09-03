@@ -1,4 +1,5 @@
 import os
+from fastapi import HTTPException
 import psycopg2
 import bcrypt
 import binascii
@@ -46,14 +47,13 @@ class Authentication:
         self.open()
         try:
             hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
-            # Convert hashed_password to string
             hashed_password_str = hashed_password.decode("utf-8")
             session_token = binascii.hexlify(os.urandom(24)).decode()
             self.cursor.execute("INSERT INTO users (username, password, session_token) VALUES (%s, %s, %s)", (username, hashed_password_str, session_token))
             self.conn.commit()
             return session_token
         except psycopg2.IntegrityError:
-            return False
+            raise HTTPException(status_code=400, detail="Username already exists.")
         finally:
             self.close()
 

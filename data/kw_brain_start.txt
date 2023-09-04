@@ -21,6 +21,12 @@ You can use execute_instructions to execute multiple instructions in a row.
 Panic Button Instruction:
 panic_button(targetId) means the drone will immediately take off and follow the target, while the follow command only works when already flying.
 examples:
+fly 10m forward
+move(10, 0)
+
+fly 20m backwards
+move(20, 180)
+
 square shape
 execute_instructions(move(10,0), move(10,90), move(10,90), move(10,90))
 

@@ -2,9 +2,6 @@
 from typing import Union
 from pydantic import BaseModel
 
-class DroneStateError(Exception):
-    pass
-
 class User(BaseModel):
     username: str
     password: str

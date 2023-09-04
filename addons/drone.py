@@ -1,12 +1,15 @@
 import json
 import asyncio
 import math
+import os
 from geopy.distance import geodesic
 from aiohttp import ClientSession
 import requests
-from classes import DroneStateError
 
-description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up), panic_button(targetId)"
+class DroneStateError(Exception):
+    pass
+
+description = "Control drones, move(distance(meter), direction(degrees based on current heading)) example: move(5, 20), move_to(lat, long), set_pause_on_detection(True/False), set_follow_on_detection(True/False), start_mission(mission_name), return_home(), resume_mission()), pause_mission(), take_off(), execute_instructions(instructions_list) example: execute_instructions(move(10,0), rotate_by(45) move(20,0)) or execute_instructions(start_mission(patrol), wait(10) pause_mission(), set_follow_on_detection(True)) #use this to fly in shapes or a chain of instructions, rotate_by(heading, speed), rotate_to(heading, speed), rotate_gimbal_to(angle), get_state(), look_at(lat, long), parallel_square(), duet(), move_to_see(lat, lon, alt), follow_object(object_id), reset_objects(), arm_drones(drones), move_by(east, north, up), panic_button(targetId), save_coords(name), move_to_saved(name)"
 parameters = {
     "type": "object",
     "properties": {
@@ -154,6 +157,12 @@ async def run_drone(drones, instruction, parameters):
                 data = f"move_by_blocking(({east}, {north}, {up}))"
             elif instruction == "panic_button":
                 data = f"panic_button({parameters})"
+            elif instruction == "save_coords":
+                response = await save_coords(drone, parameters)
+                return response
+            elif instruction == "move_to_saved":
+                response = await move_to_saved(drone, parameters)
+                return response
             else:
                 return "Invalid instruction"
 
@@ -383,3 +392,60 @@ async def parallel_square(drones):
     await fly_parallel(90, drones)
     await fly_parallel(180, drones)
     await fly_parallel(270, drones)
+
+async def save_coords(drone, name):
+    # Get the current state of the drone
+    state_drone = await get_state_i(drone)
+    current_lat = state_drone['position_geo'][0]
+    current_lon = state_drone['position_geo'][1]
+    current_alt = state_drone['position_geo'][2]
+
+    data = {name: [current_lat, current_lon, current_alt]}
+
+    waypoints_dir = os.path.join("waypoints")
+    if not os.path.exists(waypoints_dir):
+        os.makedirs(waypoints_dir)
+
+    waypoints_file = os.path.join(waypoints_dir, "temp_file.json")
+    if not os.path.isfile(waypoints_file):
+        with open(waypoints_file, "w") as f:
+            json.dump([data], f)
+    else:
+        with open(waypoints_file, "r+") as f:
+            feeds = json.load(f)
+            # Check if name already exists in data
+            if not any(name in d for d in feeds):
+                feeds.append(data)
+                f.seek(0)
+                json.dump(feeds, f)
+
+    return f"Saved coordinates: {current_lat}, {current_lon}, {current_alt} as {name}"
+
+async def move_to_saved(drone, name):
+    # move the drone to a name from the waypoints json
+    waypoints_file = os.path.join("waypoints", "temp_file.json")
+    with open(waypoints_file, "r") as f:
+        waypoints = json.load(f)
+    if any(name in d for d in waypoints):
+        for d in waypoints:
+            if name in d:
+                lat, lon, alt = d[name]
+                await run_drone([drone], "move_to", f"{lat}, {lon}, {alt}")
+                return f"Moved drone {drone} to {name}"
+    else:
+        return f"Waypoint {name} not found"
+
+# async def main():
+#     drone = [3]
+#     instruction = "save_coords"
+#     parameters = "test"
+#     response = await run_drone(drone, instruction, parameters)
+#     print(response)
+#     instruction = "move_to_saved"
+#     parameters = "test"
+#     response = await run_drone(drone, instruction, parameters)
+#     print(response)
+#     return
+
+# if __name__ == "__main__":
+#     asyncio.run(main())

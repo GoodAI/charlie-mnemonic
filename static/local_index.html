@@ -697,7 +697,7 @@
                         deleteCookies();
                         // show the login modal
                         $('#login-modal').modal('show');
-                        errorMessage = "Invalid credentials. Please login again."
+                        errorMessage = "Invalid session data. Please login again."
                         var errorDiv = document.querySelector('.loginError');
                         errorDiv.innerHTML = errorMessage;
                         errorDiv.style.display = 'block';
@@ -768,7 +768,7 @@
                     tempFormatted = marked(tempReceived);
                 }
                 audioElement = '';
-                if(settings.voice_output) {
+                if(settings.audio.voice_output) {
                     var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
                     document.getElementById('messages').innerHTML += chatMessage;
 
@@ -1233,8 +1233,13 @@
         });
 
         if (!response.ok) {
-            const responseBody = await response.json();
-            const errorMessage = responseBody.detail || `HTTP error! status: ${response.status}`;
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const responseBody = await response.json();
+                errorMessage = responseBody.detail || errorMessage;
+            } catch (e) {
+                console.error('Failed to parse error response as JSON: ', e);
+            }
             throw new Error(errorMessage);
         }
         else {
@@ -1257,9 +1262,9 @@
                 user_name = username;
                 loadCookies();
             } catch (error) {
-                console.error('Login failed: ', error);
+                console.error('Login failed: ', error.message.toString());
                 var errorDiv = document.querySelector('.loginError');
-                errorDiv.innerHTML = error.message;
+                errorDiv.innerHTML = error.message.toString() || 'An error occurred';
                 errorDiv.style.display = 'block';
             }
         }

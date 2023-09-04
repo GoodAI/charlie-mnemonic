@@ -154,7 +154,7 @@ async def run_drone(drones, instruction, parameters):
                 east = int(float(parameters_list[0]))
                 north = int(float(parameters_list[1]))
                 up = int(float(parameters_list[2].strip()))
-                data = f"move_by_blocking(({east}, {north}, {up}))"
+                data = f"move_by_blocking({east}, {north}, {up})"
             elif instruction == "panic_button":
                 data = f"panic_button({parameters})"
             elif instruction == "save_coords":

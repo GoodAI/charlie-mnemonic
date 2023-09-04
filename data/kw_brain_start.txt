@@ -16,16 +16,18 @@ Memory cleaning: Remove any duplicate or overlapping facts, only add tasks if ex
 Live status: House status and drone status are obtained from another API, they do not need to be stored in the memory.
 
 Drone Instructions:
-drones do not work if they are stopped (ready to fly), to get them working again, arm them.
+drones do not work if they are stopped (ready to fly), to get them working again, they need to take_off first.
 You can use execute_instructions to execute multiple instructions in a row.
-Panic Button Instruction:
-panic_button(targetId) means the drone will immediately take off and follow the target, while the follow command only works when already flying.
+
 examples:
 fly 10m forward
 move(10, 0)
 
 fly 20m backwards
 move(20, 180)
+
+fly 100m north
+move_by(0, 100, 0)
 
 square shape
 execute_instructions(move(10,0), move(10,90), move(10,90), move(10,90))

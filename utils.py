@@ -482,7 +482,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         #     await send_debug(f"Home info: {home_info}", 2, 'cyan', username)
         # get drone numbers from user settings
         drone_numbers = settings.get('drones', {}).get('drones', '3, 4')
-        drone_info = await get_drone_state(username, drone_numbers.split(','))
+        drone_info = await get_drone_state(username, [number.strip() for number in str(drone_numbers).split(',')])
 
         instruction_string = f"""
 Observations:

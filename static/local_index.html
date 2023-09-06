@@ -178,25 +178,6 @@
             settingsMenu.appendChild(systemPromptItem);
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
-
-            // Populate the drones settings
-            h3 = document.createElement('h3');
-            h3.textContent = 'Drones';
-            settingsMenu.appendChild(h3);
-
-            // add a text input for a comma separated list of drones
-            var dronesItem = document.createElement('input');
-            dronesItem.id = 'drones';
-            dronesItem.name = 'drones';
-            dronesItem.value = settings.drones.drones;
-            dronesItem.onchange = function(e) {
-                edit_drones_status(e.target.value);
-                console.log('change_drones_status: ', e.target.value);
-            }
-            settingsMenu.appendChild(dronesItem);
-            var br = document.createElement('br');
-            settingsMenu.appendChild(br);
-
             
             h3 = document.createElement('h3');
             h3.textContent = 'Other settings';
@@ -224,22 +205,6 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({ category: 'cot_enabled', setting: 'cot_enabled', value: cot_enabled, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        function edit_drones_status(drones) {
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'drones', setting: 'drones', value: drones.toString(), username: user_name }),
                 credentials: 'include'
             })
             .then(response => response.json())
@@ -818,7 +783,7 @@
     </div>
     <!-- Big red Abort Button -->
     <div id="abortButton" style="position: fixed; top: 10px; right: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
-        <button id="abort" title="This will return the drones home and shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
+        <button id="abort" title="This will shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
     </div>
     <!-- Login Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="login-modal">
@@ -904,9 +869,9 @@
             <div id="messages"></div>
             <divclass="message-container">
                 <div class="preset-text-container">
-                    <button class="preset-text-button" onclick="insertPresetText('Arm Drones 3 and 4')">Arm Drones</button>
-                    <button class="preset-text-button" onclick="insertPresetText('Report the status of both drones')">Report Status</button>
-                    <button class="preset-text-button" onclick="insertPresetText('Start the duet on drone 3')">Drone Dance</button>
+                    <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
+                    <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
+                    <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
                     <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
                     <!-- Add more buttons as needed -->
                 </div>
@@ -1437,7 +1402,7 @@
 
     document.getElementById('abort').addEventListener('click', function() {
         if (!abortClicked) {
-            this.innerHTML = 'Are you sure? This will return the drones home and shut down the agent! Click again to confirm.';
+            this.innerHTML = 'Are you sure? This will shut down the agent! Click again to confirm.';
             abortClicked = true;
         } else {
             big_red_abort_button();

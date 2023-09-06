@@ -8,12 +8,11 @@ from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, Backgrou
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 import requests
-from utils import process_message, OpenAIResponser, upload_audio
+from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager
 from authentication import Authentication
 from pydantic import BaseModel
 from classes import User, UserCheckToken, UserName, editSettings, userMessage
 import openai
-from utils import load_addons, generate_audio
 import shutil
 from brain import DatabaseManager
 
@@ -164,7 +163,7 @@ async def handle_get_settings(request: Request, user: UserName):
         success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    await load_addons(user.username, users_dir)
+    await AddonManager.load_addons(user.username, users_dir)
     with open(os.path.join(users_dir, user.username, 'settings.json'), 'r') as f:
         settings = json.load(f)
     print(settings)
@@ -250,7 +249,7 @@ async def handle_message_audio(request: Request, audio_file: UploadFile, backgro
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
 
-    result = await upload_audio(users_dir, username, audio_file, background_tasks)
+    result = await AudioProcessor.upload_audio(users_dir, username, audio_file, background_tasks)
 
     return result 
 
@@ -264,7 +263,7 @@ async def handle_generate_audio(request: Request, message: userMessage, backgrou
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
-    audio_path, audio = await generate_audio(message.prompt, username, users_dir)
+    audio_path, audio = await AudioProcessor.generate_audio(message.prompt, username, users_dir)
     return FileResponse(audio_path, media_type="audio/wav")
 
 @router.post("/save_data/",

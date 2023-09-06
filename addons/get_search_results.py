@@ -1,7 +1,7 @@
 import fnmatch
 import os
 import requests
-from utils import config
+import config
 
 description = "Returns search results from google or YouTube, or local files on windows (Use exact matches or wildcards (*) or it will not work.). This does not display the content of the websites, only the url and a snippet. This is not your memory! Only use if explicitly asked!"
 
@@ -65,14 +65,14 @@ def process_google_results(response):
     return results
 
 def search_youtube(query):
-    youtube_api_key = config.YOUTUBE_API_KEY
+    youtube_api_key = config.api_keys['youtube']
     url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q={query}&key={youtube_api_key}"
     response = requests.get(url).json()
     return process_youtube_results(response)
 
 def search_google(query):
-    google_api_key = config.GOOGLE_API_KEY
-    google_cx = config.GOOGLE_CX
+    google_api_key = config.api_keys['google']
+    google_cx = config.api_keys['google_cx']
     url = f"https://www.googleapis.com/customsearch/v1?key={google_api_key}&cx={google_cx}&q={query}"
     response = requests.get(url).json()
     return process_google_results(response)

@@ -2,7 +2,7 @@ import re
 from IPython.core.interactiveshell import InteractiveShell
 from IPython.utils.capture import capture_output
 
-description = "This addon allows you to execute a python code in a new InteractiveShell. Include prints or returns to get the output. The shell comes preloaded with these drone commands send_command(drone, command, params=None), get_state(drone), arm_drone(drone), you will have to write any other functions yourself."
+description = "This addon allows you to execute a python code in a new InteractiveShell. Include prints or returns to get the output."
 
 parameters = {
     "type": "object",
@@ -22,32 +22,8 @@ parameters = {
 
 shell = InteractiveShell.instance()
 
-# Preload the functions
 preload_content = """
-import requests
-import time
-import re
-
-def send_command(drone, command, params=None):
-    url = "http://localhost:8000/api/vehicle/{}/llm/command".format(drone)
-    headers = {'Content-Type': 'text/plain'}
-    if params:
-        data = f'{command}({", ".join(str(i) for i in params)})'
-    else:
-        data = f'{command}()'
-    response = requests.put(url, data=data, headers=headers)
-    return response.text
-
-def get_state(drone):
-    url = "http://localhost:8000/api/vehicle/{}/llm/state".format(drone)
-    response = requests.get(url)
-    return response.text
-
-def arm_drone(drone):
-    response1 = send_command(drone, "start_mission", ["patrol"])
-    time.sleep(5)
-    response2 = send_command(drone, "pause_mission")
-    return response1, response2
+# add a way to preload content here
 """
 
 shell.run_cell(preload_content)

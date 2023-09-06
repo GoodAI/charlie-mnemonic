@@ -1,5 +1,5 @@
 import requests
-from utils import config
+import config
 
 description = "Get the current weather in a given location"
 

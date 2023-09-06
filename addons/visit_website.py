@@ -2,8 +2,6 @@ import os
 import requests
 from bs4 import BeautifulSoup
 
-PRODUCTION = os.environ['PRODUCTION']
-
 description = "Used to visit websites"
 
 parameters = {
@@ -41,12 +39,9 @@ def visit_website(url, include_links=True, include_images=True):
         options.add_argument("--disable-gpu")
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        if PRODUCTION:
-          service = Service(ChromeDriverManager().install())
-          driver = webdriver.Chrome(service=service, options=options)
-        else:
-          service = Service(ChromeDriverManager("114.0.5735.90").install())
-          driver = webdriver.Chrome(service, options=options)
+
+        service = Service(ChromeDriverManager("116.0.5845.180").install())
+        driver = webdriver.Chrome(service=service, options=options)
         driver.get(url)
 
         soup = BeautifulSoup(driver.page_source, 'html.parser')

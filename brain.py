@@ -19,7 +19,7 @@ class DatabaseManager:
     def __init__(self):
         self.current_retry_attempt = 0
 
-    @retry(stop=stop_after_attempt(Config.MAX_RETRY_ATTEMPTS), wait=wait_fixed(5))
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(5))
     def init_db(self, memory_name):
         #EMBEDDING_MODEL = config.OPENAI_EMBEDDING_MODEL
 

@@ -361,7 +361,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('ws://' + document.domain + '/ws/' + username);
+            socket = new WebSocket('wss://' + document.domain + '/ws/' + username);
 
             // Update the username in the widget
             document.getElementById('username').textContent = 'Username: ' + username;

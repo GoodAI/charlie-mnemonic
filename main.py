@@ -33,7 +33,7 @@ WIP.
     version=0.21,
 )
 
-origins = os.getenv("ORIGINS").split(";")
+origins = "https://clang.goodai.com"
 
 app.add_middleware(
     CORSMiddleware,

@@ -386,7 +386,7 @@
         }
 
         function handleFunctionResponse(msg) {
-            var content = JSON.parse(msg.message);
+            var content = msg.message;
             var timestamp = new Date().toLocaleTimeString();
             console.log('function response');
             console.log('content:', content);

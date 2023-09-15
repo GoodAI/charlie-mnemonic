@@ -10,7 +10,7 @@ class CrossEncoderEmbeddingFunction(EmbeddingFunction):
 
     def __init__(
         self,
-        model_name: str = 'cross-encoder/mmarco-mMiniLMv2-L12-H384-v1',
+        model_name: str = 'nreimers/mmarco-mMiniLMv2-L12-H384-v1',
         device: str = 'cpu',
         normalize_embeddings: bool = False,
     ):

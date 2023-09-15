@@ -22,6 +22,7 @@ from werkzeug.utils import secure_filename
 import routes
 from pathlib import Path
 from config import api_keys
+from database import Database
 
 
 # Set ElevenLabs API key
@@ -40,24 +41,23 @@ class MessageSender:
     """This class contains functions to send messages to the user"""
     @staticmethod
     async def send_debug(message, number, color, username):
-        """Send a debug message to the user and print it to the console with a color, 1 is llm debug, 2 is system debug"""
-        new_message = ''
+        """Send a debug message to the user and print it to the console with a color"""
         if number <= 2:
             message = f"{'-' * 50}\n{message}\n{'-' * 50}"  
-            new_message = f"debug{number}:{color}: \n{message}"
+            new_message = {"debug": number, "color": color, "message": message}
         else:
-            new_message = message
-        await routes.send_debug_message(username, new_message)
+            new_message = {"message": message}
+
+        await routes.send_debug_message(username, json.dumps(new_message))
         # print the message to the console with the color
         print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
 
     @staticmethod
     async def send_message(message, color, username):
         """Send a message to the user and print it to the console with a color"""
-        new_message = f"{message}"
-        await routes.send_debug_message(username, new_message)
+        await routes.send_debug_message(username, json.dumps(message))
         # print the message to the console with the color
-        print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
+        print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
 
 class AddonManager:
     """This class contains functions to load addons"""
@@ -222,16 +222,43 @@ class OpenAIResponser:
                     ),
                     timeout=timeout
                 )
+                print(f"Completion tokens: {response['usage']['completion_tokens']}, Prompt tokens: {response['usage']['prompt_tokens']}, Total tokens: {response['usage']['total_tokens']}")
+                db = Database()
+                try:
+                    db.open()
+                    
+                    update_usage = f"UPDATE users SET total_tokens_used = total_tokens_used + {response['usage']['total_tokens']}, prompt_tokens = prompt_tokens + {response['usage']['prompt_tokens']}, completion_tokens = completion_tokens + {response['usage']['completion_tokens']} WHERE username = '{username}'"
+                    db.cursor.execute(update_usage)
+
+                    db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM users WHERE username = '{username}'")
+                    result = db.cursor.fetchone()
+
+                    db.conn.commit()
+                except Exception as e:
+                    print(f"An error occurred: {e}")
+                    MessageSender.send_message({"error": "An error occurred: " + str(e)}, 'red', username)
+                finally:
+                    db.close()
+
+                if result is not None:
+                    #print(f"Total tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}")
+                    await MessageSender.send_debug(f"Total tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}", 2, 'red', username)
+                    # print cost based on these formulas prompt: $0.03 / 1K tokens completion: $0.06 / 1K tokens
+                    prompt_cost = round(result[1] * 0.03 / 1000, 3)
+                    completion_cost = round(result[2] * 0.06 / 1000, 3)
+                    total_cost = round(prompt_cost + completion_cost, 3)
+                    #print(f"Prompt cost: ${prompt_cost}, Completion cost: ${completion_cost}, Total cost: ${total_cost}")
+                    await MessageSender.send_message({"usage": {"total_tokens": result[0], "total_cost": total_cost}}, 'red', username)
                 return response
             except asyncio.TimeoutError:
                 #print(f"Request timed out, retrying {i+1}/{max_retries}")
-                MessageSender.send_message(f"[Error: Request timed out, retrying {i+1}/{max_retries}]", 'red', username)
+                await MessageSender.send_message( { "error": f"Request timed out, retrying {i+1}/{max_retries}" }, "red", username )
             except Exception as e:
                 #print(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
-                MessageSender.send_message(f"[Error from openAI: {str(e)}, retrying {i+1}/{max_retries}]", 'red', username)
+                await MessageSender.send_message( { "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}" }, "red", username )
         
         #print("Max retries exceeded")
-        MessageSender.send_message(f"[Error: Max retries exceeded]", 'red', username)
+        await MessageSender.send_message( { "error": "Max retries exceeded" }, "red", username )
         raise HTTPException(503, self.error503)
 
     # Todo: add a setting to enable/disable this feature and add the necessary code
@@ -442,8 +469,16 @@ class MessageParser:
         except:
             await exception_handler(message, og_message, function_dict, function_metadata, username, users_dir, steps_string, full_response, background_tasks)
             raise
-
-        await MessageSender.send_debug(f'function {function_call_name} call arguments: {str(function_call_arguments)}', 1, 'blue', username)
+        new_message = {
+            "functioncall": "yes", 
+            "color": "red", 
+            "message": {
+                "function": function_call_name, 
+                "arguments": function_call_arguments
+            }
+        }
+        print(new_message)
+        await MessageSender.send_message(new_message, 'red', username)
 
         function = function_dict[function_call_name]
         if inspect.iscoroutinefunction(function):
@@ -468,7 +503,6 @@ class MessageParser:
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
-            await MessageSender.send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
             response = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_message, False, 'users/', '', None, background_tasks)
         else:
             await MessageSender.send_debug(f"{message}", 1, 'green', username)
@@ -609,7 +643,6 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
     if 'function_call' in response:
         function_call_name = response['function_call']['name']
         function_call_arguments = response['function_call']['arguments']
-        await MessageSender.send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         response = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_chain_thoughts, False, users_dir, '', full_response)
 
         return response
@@ -625,7 +658,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         return final_response
     
     elif final_response.startswith('PLAN:'):
-        await MessageSender.send_message(f"[{final_response}]", 'green', username)
+        await MessageSender.send_message({"type": "plan", "content": response}, 'green', username)
         # remove PLAN: from the final response
         final_response = final_response.replace('PLAN:', '')
         # remove leading and trailing whitespace
@@ -705,7 +738,6 @@ async def process_cot_messages(message, steps_string, function_dict, function_me
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
-            await MessageSender.send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
             response = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_cot_messages, False, users_dir, steps_string)
             return response
         else:
@@ -748,7 +780,8 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
 
 async def process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge=True, users_dir='users/'):
     await MessageSender.send_debug(f'processing function {function_call_name} response: {str(function_response)}', 1, 'pink', username)
-    await MessageSender.send_message(f'[function response: {str(function_response)}]', 'red', username)
+    new_message = {"functionresponse": "yes", "color": "red", "message": function_response}
+    await MessageSender.send_message(new_message, 'red', username)
 
     second_response = None
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
@@ -818,7 +851,6 @@ async def process_final_message(message, og_message, response, username, users_d
     if 'function_call' in fc_check:
         function_call_name = fc_check['function_call']['name']
         function_call_arguments = fc_check['function_call']['arguments']
-        await MessageSender.send_debug(f"[Executing {function_call_name} function with arguments: {function_call_arguments}]", 3, 'green', username)
         new_fc_check = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_final_message, False, users_dir, '', None)
         return new_fc_check
     else:

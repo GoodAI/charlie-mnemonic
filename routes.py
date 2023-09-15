@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, Backgrou
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 import requests
-from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager
+from utils import MessageSender, process_message, OpenAIResponser, AudioProcessor, AddonManager
 from authentication import Authentication
 from pydantic import BaseModel
 from classes import User, UserCheckToken, UserName, editSettings, userMessage
 import openai
 import shutil
 from brain import DatabaseManager
+from database import Database
 
 router = APIRouter()
 
@@ -99,8 +100,8 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
 @router.post("/register/",
     tags=["Authentication"])
 async def register(user: User, response: Response):
-    with Authentication() as auth:
-        session_token = auth.register(user.username, user.password)
+    auth = Authentication()
+    session_token = auth.register(user.username, user.password)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
@@ -117,8 +118,8 @@ async def register(user: User, response: Response):
 @router.post("/login/",
     tags=["Authentication"])
 async def login(user: User, response: Response):
-    with Authentication() as auth:
-        session_token = auth.login(user.username, user.password)
+    auth = Authentication()
+    session_token = auth.login(user.username, user.password)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
@@ -135,8 +136,8 @@ async def login(user: User, response: Response):
 @router.post("/logout/",
     tags=["Authentication"])
 async def logout(user: UserCheckToken):
-    with Authentication() as auth:
-        success = auth.logout(user.username, user.session_token)
+    auth = Authentication()
+    success = auth.logout(user.username, user.session_token)
     if success:
         return {'message': 'User logged out successfully'}
     else:
@@ -146,28 +147,41 @@ async def logout(user: UserCheckToken):
 @router.post("/check_token/",
     tags=["Authentication"])
 async def check_token(user: UserCheckToken):
-    with Authentication() as auth:
-        success = auth.check_token(user.username, user.session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, user.session_token)
     if success:
         return {'message': 'Token is valid'}
     else:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    
+  
 # load settings route
 @router.post("/load_settings/",
     tags=["Settings"])
 async def handle_get_settings(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
     print('session_token: ' + str(session_token))
-    with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     await AddonManager.load_addons(user.username, users_dir)
     with open(os.path.join(users_dir, user.username, 'settings.json'), 'r') as f:
         settings = json.load(f)
     print(settings)
+    total_tokens_used, total_cost = get_token_usage(user.username)
+    settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     return settings
+
+def get_token_usage(username):
+    db = Database()
+    db.open()
+    db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM users WHERE username = '{username}'")
+    result = db.cursor.fetchone()
+    db.close()
+    prompt_cost = round(result[1] * 0.03 / 1000, 3)
+    completion_cost = round(result[2] * 0.06 / 1000, 3)
+    total_cost = round(prompt_cost + completion_cost, 3)
+    return result[0], total_cost
 
 # update settings route
 @router.post("/update_settings/",
@@ -175,8 +189,8 @@ async def handle_get_settings(request: Request, user: UserName):
 async def handle_update_settings(request: Request, user: editSettings):
     print(user)
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     # create the directory if it doesn't exist
@@ -207,6 +221,8 @@ async def handle_update_settings(request: Request, user: editSettings):
         raise HTTPException(status_code=400, detail="Category not found")
     with open(settings_file, 'w') as f:
         json.dump(settings, f)
+    total_tokens_used, total_cost = get_token_usage(user.username)
+    settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     return settings
 
 
@@ -215,8 +231,8 @@ async def handle_update_settings(request: Request, user: editSettings):
     tags=["Messaging"])
 async def handle_message(request: Request, message: userMessage, background_tasks: BackgroundTasks = None):
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(message.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     return await process_message(message.prompt, message.username, background_tasks, users_dir)
@@ -226,8 +242,8 @@ async def handle_message(request: Request, message: userMessage, background_task
     tags=["Messaging"])
 async def handle_message_no_modules(request: Request, message: userMessage, audio_path: str = None):
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(message.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1)
@@ -244,8 +260,8 @@ async def handle_message_no_modules(request: Request, message: userMessage, audi
 async def handle_message_audio(request: Request, audio_file: UploadFile, background_tasks: BackgroundTasks = None):
     session_token = request.cookies.get("session_token")
     username = request.cookies.get("username")
-    with Authentication() as auth:
-        success = auth.check_token(username, session_token)
+    auth = Authentication()
+    success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
 
@@ -258,8 +274,8 @@ async def handle_message_audio(request: Request, audio_file: UploadFile, backgro
 async def handle_generate_audio(request: Request, message: userMessage, background_tasks: BackgroundTasks = None):
     session_token = request.cookies.get("session_token")
     username = request.cookies.get("username")
-    with Authentication() as auth:
-        success = auth.check_token(username, session_token)
+    auth = Authentication()
+    success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
@@ -270,8 +286,8 @@ async def handle_generate_audio(request: Request, message: userMessage, backgrou
     tags=["Data"])
 async def handle_save_data(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
@@ -285,8 +301,8 @@ async def handle_save_data(request: Request, user: UserName):
     tags=["Data"])
 async def handle_delete_data(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     memory_file = os.path.join(users_dir, user.username)
@@ -304,8 +320,8 @@ async def handle_upload_data(request: Request, username: str = Form(...), data_f
     print(username)
     print(data_file.filename)
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(username, session_token)
+    auth = Authentication()
+    success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     
@@ -331,8 +347,8 @@ async def handle_upload_data(request: Request, username: str = Form(...), data_f
     tags=["Messaging"])
 async def handle_abort_button(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
-    with Authentication() as auth:
-        success = auth.check_token(user.username, session_token)
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     # get the drone numbers from the user settings

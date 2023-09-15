@@ -81,6 +81,11 @@
 
         // populate the settings menu
         function populateSettingsMenu(settings) {
+            // fill in the userStats
+            var userStats = document.getElementById('userStats');
+            userStats.innerHTML = '';
+            userStats.innerHTML += '<p>Total Usage: Tokens: ' + settings.usage.total_tokens + ' - Cost: $' + settings.usage.total_cost + '</p>';
+
             var settingsMenu = document.getElementById("SidenavAddons");
             settingsMenu.innerHTML = ''; // clear the menu
             settingsMenu.innerHTML += '<a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>';
@@ -316,11 +321,11 @@
             var timestamp = new Date().toLocaleTimeString();
             // remove newlines from the content
             var content = message;
-            tempchild = document.getElementById('messages').lastChild;
-            if (tempchild) {
-                // check if the tempchild has a spinner, if so, remove it
-                if (tempchild.querySelector('.spinner') != null) {
-                    tempchild.querySelector('.spinner').remove();
+            var tempchild = document.getElementById('messages').lastChild;
+            if (tempchild && tempchild.querySelector) {
+                var spinner = tempchild.querySelector('.spinner');
+                if (spinner != null) {
+                    spinner.remove();
                     document.getElementById('messages').lastChild.remove();
                 }
             }
@@ -358,6 +363,217 @@
                 get_settings(username);
             }
         };
+
+        function handleDebugMessage(msg) {
+            let debugNumber = msg.debug;
+            let color = msg.color ? msg.color : 'white';
+            let message = msg.message.replace(/\n/g, '<br>');
+
+            // Select the correct debug content element based on the debug number
+            let debugContentElementId = `debugContent${debugNumber}`;
+            let objDiv = document.getElementById(debugContentElementId);
+
+            // Check if the scroll is near the bottom
+            let isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+
+            // Add the debug message to the debug content
+            objDiv.innerHTML += `<p style="color:${color};">${message}</p>`;
+
+            // Scroll to the bottom if the scroll was near the bottom before adding the message
+            if (isNearBottom) {
+                objDiv.scrollTop = objDiv.scrollHeight;
+            }
+        }
+
+        function handleFunctionResponse(msg) {
+            var content = JSON.parse(msg.message);
+            var timestamp = new Date().toLocaleTimeString();
+            console.log('function response');
+            console.log('content:', content);
+            tempchild = document.getElementById('messages').lastChild;
+            if (tempchild) {
+                // check if the tempchild has a spinner, if so, remove it
+                if (tempchild.querySelector('.spinner') != null) {
+                    tempchild.querySelector('.spinner').remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message fr">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Function response:<div class="arrow"></div></div>
+                            ${JSON.stringify(content, null, 2)}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+
+            // create a bot message div with a loading spinner
+            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            var element = document.createElement('div');
+            element.innerHTML = botMessage;
+            document.getElementById('messages').innerHTML += botMessage;
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            content = '';
+            tempReceived = '';
+            tempFormatted = '';
+        }
+
+        function handlePlanMessage(msg) {
+            var content = msg.content && msg.content.content;
+            var timestamp = new Date().toLocaleTimeString();
+            console.log('PLAN response');
+            console.log('content:' + content);
+            tempchild = document.getElementById('messages').lastChild;
+            if (tempchild) {
+                // check if the tempchild has a spinner, if so, remove it
+                if (tempchild.querySelector('.spinner') != null) {
+                    tempchild.querySelector('.spinner').remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+
+            var args = content ? content.replace(/\r?\n/g, '<br>') : '';
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message plan">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">PLAN:<div class="arrow"></div></div>
+                            ${args}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+        
+            
+            // create a bot message div with a loading spinner
+            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            var element = document.createElement('div');
+            element.innerHTML = botMessage;
+            document.getElementById('messages').innerHTML += botMessage;
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            content = '';
+            tempReceived = '';
+            tempFormatted = '';
+        }
+
+        function handleUsage(msg) {
+            // update the userStats with the new usage
+            var userStats = document.getElementById('userStats');
+            userStats.innerHTML = '';
+            userStats.innerHTML += '<p>Total Usage: Tokens: ' + msg.usage.total_tokens + ' - Cost: $' + msg.usage.total_cost + '</p>';
+
+        }
+
+        function handleFunctionCall(msg) {
+            // remove newlines from the content
+            var timestamp = new Date().toLocaleTimeString();
+            var content = msg.message;
+            console.log('using addon');
+            console.log('content:', content);
+            tempchild = document.getElementById('messages').lastChild;
+            if (tempchild) {
+                // check if the tempchild has a spinner, if so, remove it
+                if (tempchild.querySelector('.spinner') != null) {
+                    tempchild.querySelector('.spinner').remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+            var addon = content.function;
+            var args = parseComplexJson(content.arguments);
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            // Create a string representation of args properties
+            var argsString = '';
+            for (var key in args) {
+                if (args.hasOwnProperty(key)) {
+                    argsString += `<div class="arg"><b>${key}:</b> ${escapeHTML(args[key])}</div>`;
+                }
+            }
+
+            var chatMessage = `
+                <div class="message system">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Using: ${addon}<div class="arrow"></div></div>
+                            ${argsString}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+            
+            
+            // create a bot message div with a loading spinner
+            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            var element = document.createElement('div');
+            element.innerHTML = botMessage;
+            document.getElementById('messages').innerHTML += botMessage;
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            content = '';
+            tempReceived = '';
+            tempFormatted = '';
+        }
+
+        function handleErrorMessage(msg){
+            var timestamp = new Date().toLocaleTimeString();
+            var content = msg;
+            console.log('error');
+            console.log('content:', content);
+            var tempchild = document.getElementById('messages').lastChild;
+            if (tempchild && tempchild.querySelector) {
+                var spinner = tempchild.querySelector('.spinner');
+                if (spinner != null) {
+                    spinner.remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+            var args = content.error ? content.error.replace(/\r?\n/g, '<br>') : '';
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message error">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Error:<div class="arrow"></div></div>
+                            ${args}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+        }
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
@@ -397,220 +613,28 @@
             socket.addEventListener('message', function (event) {
                 console.log('Message from server: ', event.data);
                 // TODO: proper parsing for all of the next messages
-                let msg = {};
+                let msg = JSON.parse(event.data);
                 
-                if (event.data.startsWith('debug1:')){
-                    msg.debug1 = event.data.replace('debug1:', '');
-                    msg.color = msg.debug1.split(' ')[0].replace(':', '');
-                    msg.debug1 = msg.debug1.replace(msg.color + ':', '');
+                if (msg.debug) {
+                    handleDebugMessage(msg);
                 }
-                else if (event.data.startsWith('debug2:')) {
-                    msg.debug2 = event.data.replace('debug2:', '');
-                    msg.color = msg.debug2.split(' ')[0].replace(':', '');
-                    msg.debug2 = msg.debug2.replace(msg.color + ':', '');
+                else if (msg.functionresponse)
+                {
+                    handleFunctionResponse(msg);
                 }
-
-                else if (event.data.startsWith('[function response:')) {
-                    var content = event.data.replace(/\n/g, '');
-                    console.log('function response');
-                    console.log('content:' + content);
-                    tempchild = document.getElementById('messages').lastChild;
-                    if (tempchild) {
-                        // check if the tempchild has a spinner, if so, remove it
-                        if (tempchild.querySelector('.spinner') != null) {
-                            tempchild.querySelector('.spinner').remove();
-                            document.getElementById('messages').lastChild.remove();
-                        }
+                else if (msg.type) {
+                    if (msg.type == 'plan') {
+                        handlePlanMessage(msg);
                     }
-                    var match = content.match(/\[function response: [^]*\]/);
-                    if (!match) {
-                        match = content.match(/\[function response:[^]*\]/);
-                    }
-                    if (match) {
-                        var args = match[0].replace(/\r?\n/g, '<br>');
-
-                        var lastMessage = document.querySelector('.last-message');
-                        if (lastMessage) {
-                            lastMessage.classList.remove('last-message');
-                        }
-
-                        var chatMessage = `
-                            <div class="message fr">
-                                <span class="timestamp">${timestamp}</span>
-                                <div class="bubble">
-                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                                        <div class="title">Function response:<div class="arrow"></div></div>
-                                        ${args}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-
-                        document.getElementById('messages').innerHTML += chatMessage;
-                    }
-                    
-                    // create a bot message div with a loading spinner
-                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-                    var element = document.createElement('div');
-                    element.innerHTML = botMessage;
-                    document.getElementById('messages').innerHTML += botMessage;
-                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                    content = '';
-                    tempReceived = '';
-                    tempFormatted = '';
                 }
-
-                else if (event.data.startsWith('[PLAN:')) {
-                    //var content = event.data.replace(/\n/g, '');
-                    var content = event.data
-                    console.log('PLAN response');
-                    console.log('content:' + content);
-                    tempchild = document.getElementById('messages').lastChild;
-                    if (tempchild) {
-                        // check if the tempchild has a spinner, if so, remove it
-                        if (tempchild.querySelector('.spinner') != null) {
-                            tempchild.querySelector('.spinner').remove();
-                            document.getElementById('messages').lastChild.remove();
-                        }
-                    }
-                    var match = content.match(/\[PLAN:([\s\S]*?)\](?![\s\S]*\])/);
-                    if (!match) {
-                        match = content.match(/\[PLAN: ([\s\S]*?)\](?![\s\S]*\])/);
-
-                    }
-                    if (match) {
-                        var args = match[1].replace(/\r?\n/g, '<br>');
-
-                        var lastMessage = document.querySelector('.last-message');
-                        if (lastMessage) {
-                            lastMessage.classList.remove('last-message');
-                        }
-
-                        var chatMessage = `
-                            <div class="message plan">
-                                <span class="timestamp">${timestamp}</span>
-                                <div class="bubble">
-                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                                        <div class="title">PLAN:<div class="arrow"></div></div>
-                                        ${args}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-
-                        document.getElementById('messages').innerHTML += chatMessage;
-                    }
-                    
-                    // create a bot message div with a loading spinner
-                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-                    var element = document.createElement('div');
-                    element.innerHTML = botMessage;
-                    document.getElementById('messages').innerHTML += botMessage;
-                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                    content = '';
-                    tempReceived = '';
-                    tempFormatted = '';
+                else if (msg.usage) {
+                    handleUsage(msg);
                 }
-
-                else if (event.data.startsWith('[Executing')) {
-                    // remove newlines from the content
-                    var content = event.data.replace(/\n/g, '');
-                    console.log('using addon');
-                    console.log('content:' + content);
-                    tempchild = document.getElementById('messages').lastChild;
-                    if (tempchild) {
-                        // check if the tempchild has a spinner, if so, remove it
-                        if (tempchild.querySelector('.spinner') != null) {
-                            tempchild.querySelector('.spinner').remove();
-                            document.getElementById('messages').lastChild.remove();
-                        }
-                    }
-                    var match = content.match(/\[Executing (\w+) function with arguments: ({.*?})\]/);
-                    if (!match) {
-                        match = content.match(/\[Executing (\w+) function with arguments:({.*?})\]/);
-                    }
-                    if (match) {
-                        var addon = match[1];
-                        var args = parseComplexJson(match[2]);
-
-                        var lastMessage = document.querySelector('.last-message');
-                        if (lastMessage) {
-                            lastMessage.classList.remove('last-message');
-                        }
-
-                        // Create a string representation of args properties
-                        var argsString = '';
-                        for (var key in args) {
-                            if (args.hasOwnProperty(key)) {
-                                argsString += `<div class="arg"><b>${key}:</b> ${escapeHTML(args[key])}</div>`;
-                            }
-                        }
-
-                        var chatMessage = `
-                            <div class="message system">
-                                <span class="timestamp">${timestamp}</span>
-                                <div class="bubble">
-                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                                        <div class="title">Using: ${addon}<div class="arrow"></div></div>
-                                        ${argsString}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-
-                        document.getElementById('messages').innerHTML += chatMessage;
-                    }
-                    
-                    // create a bot message div with a loading spinner
-                    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-                    var element = document.createElement('div');
-                    element.innerHTML = botMessage;
-                    document.getElementById('messages').innerHTML += botMessage;
-                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                    content = '';
-                    tempReceived = '';
-                    tempFormatted = '';
+                else if (msg.functioncall) {
+                    handleFunctionCall(msg);
                 }
-
-                else if (event.data.startsWith('[Error:')) {
-                    // remove newlines from the content
-                    var content = event.data.replace(/\n/g, '');
-                    console.log('error');
-                    console.log('content:' + content);
-                    tempchild = document.getElementById('messages').lastChild;
-                    if (tempchild) {
-                        // check if the tempchild has a spinner, if so, remove it
-                        if (tempchild.querySelector('.spinner') != null) {
-                            tempchild.querySelector('.spinner').remove();
-                            document.getElementById('messages').lastChild.remove();
-                        }
-                    }
-                    var match = content.match(/\[Error:([\s\S]*?)\](?![\s\S]*\])/);
-                    if (!match) {
-                        match = content.match(/\[Error: ([\s\S]*?)\](?![\s\S]*\])/);
-                    }
-                    if (match) {
-                        var args = match[1].replace(/\r?\n/g, '<br>');
-
-                        var lastMessage = document.querySelector('.last-message');
-                        if (lastMessage) {
-                            lastMessage.classList.remove('last-message');
-                        }
-
-                        var chatMessage = `
-                            <div class="message error">
-                                <span class="timestamp">${timestamp}</span>
-                                <div class="bubble">
-                                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                                        <div class="title">Error:<div class="arrow"></div></div>
-                                        ${args}  <!-- Insert the args properties here -->
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-
-                        document.getElementById('messages').innerHTML += chatMessage;
-                    }
+                else if (msg.error) {
+                    handleErrorMessage(msg);
                 }
 
                 
@@ -868,13 +892,13 @@
         <div id="chat-container" class="chat-container">
             <div id="messages"></div>
             <divclass="message-container">
-                <div class="preset-text-container">
+                <!-- <div class="preset-text-container">
                     <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
                     <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
                     <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
                     <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
-                    <!-- Add more buttons as needed -->
-                </div>
+                </div> -->
+                <p id="userStats" style="margin: 0;"></p>
                 <div class="input-field">
                     <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i><textarea id="message" placeholder="Type a message..."></textarea>
                     <button id="record" class="record-button">Record</button>

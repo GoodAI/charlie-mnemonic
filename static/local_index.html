@@ -697,7 +697,7 @@
                     case 503:
                         throw new Error('503: Service Unavailable');
                     default:
-                        throw new Error('Network response was not ok');
+                        throw new Error('Network response was not ok: ' + response.status);
                 }
             }
             return await response.json();

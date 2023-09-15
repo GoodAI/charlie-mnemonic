@@ -202,7 +202,7 @@ class OpenAIResponser:
             }]
         
         max_retries = 5
-        timeout = 120.0  # timeout in seconds
+        timeout = 180.0  # timeout in seconds
         
         for i in range(max_retries):
             try:

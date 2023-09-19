@@ -100,3 +100,7 @@ werkzeug==2.3.6
 python-multipart==0.0.6
 geopy==2.3.0
 pyproj==3.6.0
+rich
+termcolor
+pyfiglet
+pytest

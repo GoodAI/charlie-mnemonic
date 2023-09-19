@@ -30,7 +30,7 @@ app = FastAPI(
 Welcome to the `CLANG` API documentation,\n
 WIP.
 """,
-    version=0.30,
+    version=0.31,
 )
 
 origins = os.getenv("ORIGINS").split(";")

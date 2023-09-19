@@ -15,7 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
     
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=0.30">
 
 
 </head>
@@ -787,13 +787,19 @@
                 }
                 content = '';
                 document.getElementById('send').disabled = false;
-                document.getElementById('record').disabled = false;
+                record_button = document.getElementById('record');
+                if (record_button) {
+                    record_button.disabled = false;
+                }
                 document.getElementById('message').placeholder = 'Type a message...';
             }
             // enable the send button if the message received contains 'end': 'true'
             if (msg && msg.end && msg.end === 'true') {
                 document.getElementById('send').disabled = false;
-                document.getElementById('record').disabled = false;
+                record_button = document.getElementById('record');
+                if (record_button) {
+                    record_button.disabled = false;
+                }
                 document.getElementById('message').placeholder = 'Type a message...';
             }
         };
@@ -959,6 +965,8 @@
         document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         // remove input text
         document.getElementById('message').value = '';
+        // reset token count
+        document.getElementById('tokenCount').textContent = 'Characters: 0 - Tokens: 0 - Cost: $0.0000';
         // change placeholder text
         document.getElementById('message').placeholder = 'Please wait for the response...';
 
@@ -1136,6 +1144,8 @@
             chunks = [];
             document.getElementById('record').innerText = "Record";
             document.getElementById('recordingIndicator').style.display = "none";
+            document.getElementById('send').disabled = true;
+            document.getElementById('record').disabled = true;
         } else {
             // If we're not, start a new recording
             navigator.mediaDevices.getUserMedia({ audio: true })
@@ -1162,10 +1172,17 @@
             })
             .catch(function(err) {
                 console.log('The following error occurred: ' + err);
+                alert('Error occurred : ' + err + '.\nDid you try turning it off and on again?\nYour microphone permissions might be disabled.');
+                // Reset the UI
+                document.getElementById('record').innerText = "Record";
+                document.getElementById('recordingIndicator').style.display = "none";
+                document.getElementById('send').disabled = false;
+                document.getElementById('record').disabled = false;
             })
 
             document.getElementById('record').innerText = "Stop";
             document.getElementById('recordingIndicator').style.display = "block";
+            document.getElementById('send').disabled = true;
         }
     });
 
@@ -1188,6 +1205,11 @@
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
+                document.getElementById('send').disabled = false;
+                record_button = document.getElementById('record');
+                if (record_button) {
+                    record_button.disabled = false;
+                }
                 return;
             }
             sendMessageToServer(data.transcription);

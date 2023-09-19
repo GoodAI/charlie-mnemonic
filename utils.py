@@ -25,6 +25,7 @@ from pathlib import Path
 from config import api_keys
 from database import Database
 import tiktoken
+from pydub import AudioSegment
 
 
 # Set ElevenLabs API key
@@ -287,6 +288,10 @@ class AudioProcessor:
         with open(filepath, 'wb') as f:
             f.write(audio_file.file.read())
 
+        # check the audio for voice
+        if not AudioProcessor.check_voice(filepath):
+            return {'transcription': ''}
+
         # get the user settings language
         settings_file = os.path.join(userdir, 'settings.json')
         with open(settings_file, 'r') as f:
@@ -300,6 +305,14 @@ class AudioProcessor:
         # use the saved file path to transcribe the audio
         transcription = await AudioProcessor.transcribe_audio(filepath, language)
         return {'transcription': transcription}
+
+    @staticmethod
+    def check_voice(filepath):
+        audio = AudioSegment.from_file(filepath)
+        if audio.dBFS < -40:  #  Decrease for quieter voices (-50), increase for louder voices (-20)
+            print('No voice detected, dBFS: ' + str(audio.dBFS))
+            return False
+        return True
 
     @staticmethod
     async def transcribe_audio(audio_file_path, language):

@@ -72,7 +72,37 @@ h3{
     transition: background 0.3s;
 }
 
+.input-field button:disabled {
+    background: #e2c3c3;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: not-allowed !important;
+    transition: background 0.3s;
+}
+
 .input-field button:hover {
+    background: #a6c1ee;
+}
+
+.input-field .send-button {
+    background: #c3cfe2;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.input-field .send-button:disabled {
+    background: #e2c3c3;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: not-allowed !important;
+    transition: background 0.3s;
+}
+
+.input-field .send-button:hover {
     background: #a6c1ee;
 }
 
@@ -403,19 +433,6 @@ pre {
     cursor: pointer;
 }
 
-.input-field .send-button {
-    background: #c3cfe2;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    cursor: pointer;
-    transition: background 0.3s;
-}
-
-.input-field .send-button:hover {
-    background: #a6c1ee;
-}
-
 #fileInfo {
     display: flex;
     align-items: center;
@@ -586,9 +603,19 @@ pre {
     display: none;
 }
 
-#userStats {
-    background-color: #d4ddea;
+.statsWindow {
+    background-color: #d1d9e3;
+    overflow-y: auto;
+    max-height: 150px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.statsWindow p {
     color: #333;
-    margin-top: 0;
-    margin-bottom: 0;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+    padding-left: 5px;
+    padding-right: 5px;
 }

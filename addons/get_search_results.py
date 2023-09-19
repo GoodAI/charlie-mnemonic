@@ -3,7 +3,7 @@ import os
 import requests
 import config
 
-description = "Returns search results from google or YouTube, or local files on windows (Use exact matches or wildcards (*) or it will not work.). This does not display the content of the websites, only the url and a snippet. This is not your memory! Only use if explicitly asked!"
+description = "Returns search results from google or YouTube. This does not display the content of the websites, only the url and a snippet. This is not your memory! Only use if explicitly asked!"
 
 parameters = {
     "type": "object",
@@ -17,13 +17,8 @@ parameters = {
             "default": False,
             "description": "If true, search YouTube instead of Google",
         },
-        "local_search": {
-            "type": "boolean",
-            "default": False,
-            "description": "If true, search local files instead of Google or YouTube. Use exact matches or wildcards (*) or it will not work.",
-        },
     },
-    "required": ["query"],
+    "required": ["query", "youtube"],
 }
 
 def search_files(query, directory=os.path.expanduser("~")):
@@ -77,10 +72,8 @@ def search_google(query):
     response = requests.get(url).json()
     return process_google_results(response)
 
-def get_search_results(query, youtube=False, local_search=False):
-    if local_search:
-        return search_files(query)
-    elif youtube:
+def get_search_results(query, youtube=False):
+    if youtube:
         return search_youtube(query)
     else:
         return search_google(query)

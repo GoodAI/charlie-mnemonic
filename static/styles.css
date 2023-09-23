@@ -150,6 +150,16 @@ h3{
     word-wrap: break-word;
 }
 
+.message.debug .bubble {
+    background-color: #c0dcd1;
+    color: #333;
+    border-radius: 18px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
 .message.plan .bubble {
     background-color: #dcd2c0;
     color: #333;
@@ -310,6 +320,7 @@ pre {
 
 .expandable.expanded {
     max-height: 500px; /* maximum expanded height */
+    overflow-y: auto;
 }
 .expandable .title {
     font-size: 12px;
@@ -619,3 +630,38 @@ pre {
     padding-left: 5px;
     padding-right: 5px;
 }
+
+#overlay_msg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    color: #fff;
+}
+
+#overlay-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center
+}
+
+#overlay-loader {
+    border: 7px solid #c2d3c2;
+    border-top: 7px solid #34db86;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+

@@ -26,7 +26,52 @@ class Database:
                     ADD COLUMN IF NOT EXISTS prompt_tokens INTEGER DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS completion_tokens INTEGER DEFAULT 0
                 """
-            }
+            },
+            {
+                'name': 'Create statistics table',
+                'query': """
+                    CREATE TABLE IF NOT EXISTS statistics (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER REFERENCES users(id),
+                        amount_of_messages INTEGER DEFAULT 0,
+                        total_tokens_used INTEGER DEFAULT 0,
+                        prompt_tokens INTEGER DEFAULT 0,
+                        completion_tokens INTEGER DEFAULT 0,
+                        voice_usage INTEGER DEFAULT 0
+                    )
+                """
+            },
+            {
+                'name': 'Add roles to users table',
+                'query': """
+                    ALTER TABLE users 
+                    ADD COLUMN IF NOT EXISTS role VARCHAR(255) DEFAULT 'user'
+                """
+            },
+            {
+                'name': 'Move statistics to new table',
+                'query': """
+                    INSERT INTO statistics (user_id, amount_of_messages, total_tokens_used, prompt_tokens, completion_tokens)
+                    SELECT id, amount_of_messages, total_tokens_used, prompt_tokens, completion_tokens FROM users
+                """
+            },
+            {
+                'name': 'Remove statistics fields from users table',
+                'query': """
+                    ALTER TABLE users
+                    DROP COLUMN IF EXISTS amount_of_messages,
+                    DROP COLUMN IF EXISTS total_tokens_used,
+                    DROP COLUMN IF EXISTS prompt_tokens,
+                    DROP COLUMN IF EXISTS completion_tokens
+                """
+            },
+            {
+                'name': 'Add voice_usage to statistics table',
+                'query': """
+                    ALTER TABLE statistics 
+                    ADD COLUMN IF NOT EXISTS voice_usage INTEGER DEFAULT 0
+                """
+            },
             # future migrations go here
         ]
 
@@ -56,10 +101,7 @@ class Database:
             username VARCHAR(255) UNIQUE NOT NULL,
             password VARCHAR(255) NOT NULL,
             session_token VARCHAR(255) NOT NULL,
-            amount_of_messages INTEGER DEFAULT 0,
-            total_tokens_used INTEGER DEFAULT 0,
-            message_history TEXT,
-            has_access BOOLEAN DEFAULT FALSE
+            role VARCHAR(255) DEFAULT 'user'
         )
         """)
         self.conn.commit()

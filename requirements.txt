@@ -106,3 +106,4 @@ pyfiglet
 pytest
 tiktoken==0.5.1
 pydub==0.25.1
+docker==6.1.3

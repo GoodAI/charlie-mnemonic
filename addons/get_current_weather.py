@@ -15,7 +15,7 @@ parameters = {
     "required": ["location"],
 }
 
-def get_current_weather(location, unit="metric"):
+def get_current_weather(location, unit="metric", username=None):
     openweather_api_key = config.api_keys["openweather"]
     url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&units={unit}&appid={openweather_api_key}"
     response = requests.get(url).text

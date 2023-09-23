@@ -14,8 +14,8 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
-    
-    <link rel="stylesheet" href="styles.css?v=0.30">
+
+    <link rel="stylesheet" href="styles.css?v=0.34">
 
 
 </head>
@@ -189,6 +189,19 @@
             h3.textContent = 'Other settings';
             settingsMenu.appendChild(h3);
 
+            // Populate verbose settings
+            var verboseItem = document.createElement('a');
+            verboseItem.href = "#";
+            var status = settings.verbose.verbose ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+            verboseItem.innerHTML = 'See Memory Retrieval: ' + status;
+            verboseItem.onclick = function(e) {
+                e.preventDefault();
+                edit_verbose_status(!settings.verbose.verbose);
+                console.log('change_verbose_status: ', !settings.verbose.verbose);
+            }
+            settingsMenu.appendChild(verboseItem);
+
+            // Populate chain of thought settings
             var cotItem = document.createElement('a');
             cotItem.href = "#";
             var status = settings.cot_enabled.cot_enabled ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
@@ -202,6 +215,22 @@
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
 
+        };
+
+        function edit_verbose_status(verbose) {
+            fetch(API_URL + '/update_settings/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ category: 'verbose', setting: 'verbose', value: verbose, username: user_name }),
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                setSettings(data);
+            })
+            .catch(console.error);
         };
 
         function edit_cot_status(cot_enabled) {
@@ -290,6 +319,9 @@
 
         function setSettings(newSettings) {
             // import the settings and populate the settings menu
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlay.style.display = 'none';
             if (newSettings) {
                 console.log('received settings:', newSettings);
                 settings = newSettings;
@@ -577,6 +609,114 @@
             document.getElementById('messages').innerHTML += chatMessage;
         }
 
+        function handleRelations(msg) {
+            var timestamp = new Date().toLocaleTimeString();
+            console.log('relations response');
+            console.log('content:', msg);
+            var tempchild = document.getElementById('messages').lastChild;
+            if (tempchild && tempchild.querySelector) {
+                var spinner = tempchild.querySelector('.spinner');
+                if (spinner != null) {
+                    spinner.remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+            var content = `Input: ${msg.input} -> Stored in memory: ${msg.created_new_memory}<br/>`;
+
+            for (var category in msg) {
+                if (category != 'input' && category != 'created_new_memory' && category != 'result_string' && category != 'token_count' && category != 'similar_messages' && category != 'results_list_after_token_check' && category != 'results_list_before_token_check') {
+                    content += `<b>Category: ${category}</b><br/>`;
+                    for (var query in msg[category]['query_results']) {
+                        content += `<b>&nbsp;&nbsp;Query: ${query}</b> -> <br/>`;
+                        for (var result of msg[category]['query_results'][query]) {
+                            content += `&nbsp;&nbsp;&nbsp;&nbsp;(${result[0]}) ${result[1]} (score: ${result[2]})<br/>`;
+                        }
+                    }
+                }
+            }
+
+            content += `<b>Merged results:</b><br/>${msg.result_string.replace(/\n/g, '<br/>')}`;
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message debug">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Brain Logic:<div class="arrow"></div></div>
+                            <div class="description">${content}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+
+            // create a bot message div with a loading spinner
+            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            var element = document.createElement('div');
+            element.innerHTML = botMessage;
+            document.getElementById('messages').innerHTML += botMessage;
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
+        function handleNoteTaking(msg) {
+            var timestamp = new Date().toLocaleTimeString();
+            console.log('note taking response');
+            console.log('content:', msg);
+            var tempchild = document.getElementById('messages').lastChild;
+            if (tempchild && tempchild.querySelector) {
+                var spinner = tempchild.querySelector('.spinner');
+                if (spinner != null) {
+                    spinner.remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+
+            var content = `<b>Current notes:</b> ${msg.files_content_string.replace(/\n/g, '<br/>')}<br/>`;
+            if (Array.isArray(msg.actions)) {
+                msg.actions.forEach(function(action, index) {
+                    content += `<b>Action ${index + 1}:</b> ${action[0]}<br/><b>Category:</b> ${action[1]}<br/><b>Content:</b> ${action[2]}<br/>`;
+                });
+            } else {
+                content += `<b>Action:</b> ${msg.actions[0]}<br/><b>Category:</b> ${msg.actions[1]}<br/><b>Content:</b> ${msg.actions[2]}<br/>`;
+            }
+            if (msg.error) {
+                content += `<br/><b>OpenAI Response:</b> ${msg.note_taking_query}<br/><b>Error:</b> ${msg.error}<br/>`;
+            }
+
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+            }
+
+            var chatMessage = `
+                <div class="message debug">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Note Taking:<div class="arrow"></div></div>
+                            <div class="description">${content}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('messages').innerHTML += chatMessage;
+
+            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            var element = document.createElement('div');
+            element.innerHTML = botMessage;
+            document.getElementById('messages').innerHTML += botMessage;
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+
+
+
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
             socket = new WebSocket('ws://' + document.domain + ':8002/ws/' + username);
@@ -627,6 +767,12 @@
                 else if (msg.type) {
                     if (msg.type == 'plan') {
                         handlePlanMessage(msg);
+                    }
+                    else if (msg.type == 'note_taking') {
+                        handleNoteTaking(msg.content);
+                    }
+                    else if (msg.type == 'relations') {
+                        handleRelations(msg.content);
                     }
                 }
                 else if (msg.usage) {
@@ -876,9 +1022,9 @@
     <div id="mySidenav" class="sidenav">
         <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
         <button id="saveDataBtn">Save Data</button>
-        <!-- <button id="deleteDataBtn">Delete Data</button> -->
-        <!-- <input type="file" id="uploadDataInput"> -->
-        <!-- <button id="uploadDataBtn">Upload Data</button> -->
+        <button id="deleteDataBtn">Delete Data</button>
+        <input type="file" id="uploadDataInput">
+        <button id="uploadDataBtn">Upload Data</button>
         <button id="logout-button">Logout</button>
         <div id="SidenavAddons"></div>
     </div>
@@ -897,9 +1043,15 @@
             </div>
         </div>
     </div>
-    <h1>GoodAI Assistant</h1>
+    <h1>GoodAI Agent {{version}}</h1>
     <div id="overlay">
         <div class="text">Code copied to clipboard</div>
+    </div>
+    <div id="overlay_msg" style="display: none;">
+        <div id="overlay-content">
+            <div id="overlay-message">Uploading...</div>
+            <div id="overlay-loader"></div>
+        </div>
     </div>
         <div id="chat-container" class="chat-container">
             <div id="messages"></div>
@@ -1052,6 +1204,11 @@
 
     async function save_user_data() {
         try {
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlayMessage.textContent = "Downloading Data...";
+            overlay.style.display = 'flex';
+
             const response = await fetch(API_URL + '/save_data/', {
                 method: 'POST',
                 headers: {
@@ -1066,19 +1223,36 @@
             var a = document.createElement("a");
             document.body.appendChild(a);
             a.style = "display: none";
-            a.href = downloadUrl;
-            a.download = user_name + ".json";
+            a.href = downloadUrl;        
+            // get the filename from the Content-Disposition header
+            var contentDisposition = response.headers.get('Content-Disposition');
+            var filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+            a.download = filename;
             a.click();
             window.URL.revokeObjectURL(downloadUrl);
+            overlayMessage.textContent = "Download started...";
+
+            // Hide the overlay after a delay to let the user see the message
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
 
         } catch (error) {
             await handleError(error);
             console.error('Failed to save data: ', error);
+            
+            // Hide the overlay in case of error
+            overlay.style.display = 'none';
         }
     }
 
     async function delete_user_data() {
         try {
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlayMessage.textContent = "Deleting Data...";
+            overlay.style.display = 'flex';
+
             const response = await fetch(API_URL + '/delete_data/', {
                 method: 'POST',
                 headers: {
@@ -1090,15 +1264,30 @@
 
             const data = await response.json();
             console.log(data.message);
+            overlayMessage.textContent = data.message;
+
+            // Hide the overlay after a delay to let the user see the message
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
+            get_settings(user_name);
 
         } catch (error) {
             await handleError(error);
             console.error('Failed to delete data: ', error);
+            
+            // Hide the overlay in case of error
+            overlay.style.display = 'none';
         }
     }
 
     async function upload_user_data(file) {
         try {
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlayMessage.textContent = "Uploading Data...";
+            overlay.style.display = 'flex';
+
             const formData = new FormData();
             formData.append('username', user_name);
             formData.append('data_file', file);
@@ -1111,10 +1300,20 @@
 
             const data = await response.json();
             console.log(data.message);
+            overlayMessage.textContent = data.message;
+
+            // Hide the overlay after a delay to let the user see the message
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
+            get_settings(user_name);
 
         } catch (error) {
             await handleError(error);
             console.error('Failed to upload data: ', error);
+
+            // Hide the overlay in case of error
+            overlay.style.display = 'none';
         }
     }
 
@@ -1241,7 +1440,7 @@
         keyboard: false
     });
     registerModal.hide();
-    loginModal.show();
+    loginModal.hide();
 
     // Show the register modal
     document.getElementById('register-link').addEventListener('click', function (event) {
@@ -1416,15 +1615,20 @@
 
     function loadCookies(){
         var sessionToken = getCookie('session_token');
+        const overlay = document.getElementById('overlay_msg');
+        const overlayMessage = document.getElementById('overlay-message');
         if(sessionToken) {
             // session token exists, no need to login
             user_name = getCookie('username');
             console.log('session token found, logging in as ' + user_name);
+            overlayMessage.textContent = "Logging in...";
+            overlay.style.display = 'flex';
             loginModal.hide();
             get_settings(user_name);
         } else {
             // no session token, show the login modal
             loginModal.show();
+            overlay.style.display = 'none';
         }
     }
 
@@ -1436,17 +1640,21 @@
 
     // check for session token when page loads
     window.onload = function() {
+        const overlay = document.getElementById('overlay_msg');
+        const overlayMessage = document.getElementById('overlay-message');
+        overlayMessage.textContent = "Loading...";
+        overlay.style.display = 'flex';
         loadCookies();
     }
 
     document.getElementById('saveDataBtn').addEventListener('click', save_user_data);
-    // document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
-    // document.getElementById('uploadDataBtn').addEventListener('click', function() {
-    //     const fileInput = document.getElementById('uploadDataInput');
-    //     if (fileInput.files.length > 0) {
-    //         upload_user_data(fileInput.files[0]);
-    //     }
-    // });
+    document.getElementById('deleteDataBtn').addEventListener('click', delete_user_data);
+    document.getElementById('uploadDataBtn').addEventListener('click', function() {
+        const fileInput = document.getElementById('uploadDataInput');
+        if (fileInput.files.length > 0) {
+            upload_user_data(fileInput.files[0]);
+        }
+    });
 
     async function big_red_abort_button() {
         try {
@@ -1478,8 +1686,30 @@
             big_red_abort_button();
         }
     });
+
+    function setupCollapsible() {
+        var coll = document.getElementsByClassName("collapsible");
+
+        for (var i = 0; i < coll.length; i++) {
+            var old_element = coll[i];
+            var new_element = old_element.cloneNode(true);
+            old_element.parentNode.replaceChild(new_element, old_element);
+
+            new_element.addEventListener("click", function() {
+                this.classList.toggle("active");
+                var content = this.nextElementSibling;
+                if (content.style.display === "block") {
+                    content.style.display = "none";
+                } else {
+                    content.style.display = "block";
+                }
+            });
+        }
+    }
+
+
     </script>
-    <script type="module" src="https://unpkg.com/gpt-tokenizer"></script>
+    <script type="module" src="cl100k_base.js"></script>
     <script>
         // Get the textarea and count div
         const message = document.getElementById("message");

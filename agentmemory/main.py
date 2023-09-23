@@ -559,3 +559,13 @@ def wipe_all_memories(username=None):
         client.delete_collection(collection.name)
 
     debug_log("Wiped all memories", type="system")
+
+def stop_database(username=None):
+    """
+    Stop the database.
+
+    Example:
+        >>> stop_database()
+    """
+    client = get_client(username=username)
+    client.reset()

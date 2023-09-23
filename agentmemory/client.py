@@ -13,13 +13,14 @@ CLIENT_TYPE = os.environ.get("CLIENT_TYPE", DEFAULT_CLIENT_TYPE)
 STORAGE_PATH = os.environ.get("STORAGE_PATH", "./memory")
 POSTGRES_CONNECTION_STRING = os.environ.get("POSTGRES_CONNECTION_STRING")
 POSTGRES_MODEL_NAME = os.environ.get("POSTGRES_MODEL_NAME", "all-MiniLM-L6-v2")
-client = None
+# client = None
 
 
 def get_client(client_type=None, username=None, *args, **kwargs):
-    global client
+    # global client
     # if client is not None:
     #     return client
+    client = None
 
     if client_type is None:
         client_type = CLIENT_TYPE
@@ -32,6 +33,6 @@ def get_client(client_type=None, username=None, *args, **kwargs):
         client = PostgresClient(POSTGRES_CONNECTION_STRING, model_name=POSTGRES_MODEL_NAME)
     else:
         user_memory_path = os.path.join('users', username)
-        client = chromadb.PersistentClient(settings=Settings(anonymized_telemetry=False), path=user_memory_path, *args, **kwargs)
+        client = chromadb.PersistentClient(settings=Settings(anonymized_telemetry=False, allow_reset=True), path=user_memory_path, *args, **kwargs)
 
     return client

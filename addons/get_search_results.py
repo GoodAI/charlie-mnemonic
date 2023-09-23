@@ -72,7 +72,7 @@ def search_google(query):
     response = requests.get(url).json()
     return process_google_results(response)
 
-def get_search_results(query, youtube=False):
+def get_search_results(query, youtube=False, username=None):
     if youtube:
         return search_youtube(query)
     else:

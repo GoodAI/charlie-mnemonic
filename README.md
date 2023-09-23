@@ -29,16 +29,20 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 
 
 ### Setup
-1. It is recommended to run the application in a virtual environment. You can set it up and activate it using the following commands:
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-2. Clone this repository:
+
+1. Clone this repository:
 ```bash
 git clone https://github.com/airobinnet/CLANG.git
 cd CLANG
 ```
+1. 1. Checkout the correct branch 
+
+2. It is recommended to run the application in a virtual environment. You can set it up and activate it using the following commands:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
 3. Install the required Python packages.
 ```bash
 pip install -r requirements.txt

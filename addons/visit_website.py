@@ -32,7 +32,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 
-def visit_website(url, include_links=True, include_images=True):
+def visit_website(url, include_links=True, include_images=True, username=None):
     try:
         options = Options()
         options.add_argument('--headless')

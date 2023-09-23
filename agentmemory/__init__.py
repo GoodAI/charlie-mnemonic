@@ -11,6 +11,7 @@ from .main import (
     count_memories,
     wipe_category,
     wipe_all_memories,
+    stop_database,
 )
 
 from .events import (

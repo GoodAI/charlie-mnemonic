@@ -17,6 +17,11 @@ class userMessage(BaseModel):
     prompt: str
     username: str
 
+class noTokenMessage(BaseModel):
+    prompt: str
+    username: str
+    password: str
+
 class editSettings(BaseModel):
     username: str
     category: str

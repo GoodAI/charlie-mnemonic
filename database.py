@@ -72,6 +72,13 @@ class Database:
                     ADD COLUMN IF NOT EXISTS voice_usage INTEGER DEFAULT 0
                 """
             },
+            {
+                'name': 'Add unique constraint to user_id in statistics table',
+                'query': """
+                    ALTER TABLE statistics 
+                    ADD CONSTRAINT statistics_user_id_key UNIQUE (user_id)
+                """
+            },
             # future migrations go here
         ]
 

@@ -30,6 +30,7 @@
         var settings = {};
         let user_name = '';
         let errorMessage = '';
+        let max_message_tokens = 1000;
 
         // set a temporary socket
         var socket = {
@@ -829,7 +830,17 @@
 
         async function handleError(response) {
             if (!response.ok) {
+                let errorMessage = '';
+                const overlay = document.getElementById('overlay_msg');
+                const overlayMessage = document.getElementById('overlay-message');
+                overlayMessage.textContent = "Error!";
+                overlay.style.display = 'none';
                 switch(response.status) {
+                    case 400:
+                        const data = await response.json();
+                        errorMessage = data.detail;
+                        alert(errorMessage);
+                        throw new Error(`400: Bad Request - ${errorMessage}`);
                     case 401:
                         deleteCookies();
                         // show the login modal
@@ -1064,7 +1075,7 @@
                 </div> -->
                 <div id="statsWindow" class="statsWindow">
                     <p id="userStats"></p>
-                    <p id="tokenCount">Characters: 0 - Tokens: 0 - Cost: $0.0000</p>
+                    <p id="tokenCount">Characters: 0 - Tokens: 0/1000 - Cost: $0.0000</p>
                 </div>
                 <div class="input-field">
                     <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i>
@@ -1118,7 +1129,7 @@
         // remove input text
         document.getElementById('message').value = '';
         // reset token count
-        document.getElementById('tokenCount').textContent = 'Characters: 0 - Tokens: 0 - Cost: $0.0000';
+        document.getElementById('tokenCount').textContent = 'Characters: 0 - Tokens: 0/' + max_message_tokens.toString() + ' - Cost: $0.0000';
         // change placeholder text
         document.getElementById('message').placeholder = 'Please wait for the response...';
 
@@ -1298,6 +1309,7 @@
                 credentials: 'include'
             });
 
+            handleError(response);
             const data = await response.json();
             console.log(data.message);
             overlayMessage.textContent = data.message;
@@ -1714,6 +1726,7 @@
         // Get the textarea and count div
         const message = document.getElementById("message");
         const countDiv = document.getElementById("tokenCount");
+        let lastValidMessage = '';
 
         // Add an input event listener to the textarea
         message.addEventListener("input", function () {
@@ -1723,7 +1736,13 @@
             message_lenght = message.value.length;
             // $0.03 / 1K tokens
             cost = tokens_used * 0.03 / 1000;
-            countDiv.textContent = `Characters: ${message_lenght} - Tokens: ${tokens_used} - Cost: $${cost.toFixed(4)}`;
+            countDiv.textContent = `Characters: ${message_lenght} - Tokens: ${tokens_used}/${max_message_tokens} - Cost: $${cost.toFixed(4)}`;
+            // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
+            if (tokens_used > max_message_tokens) {
+                message.value = lastValidMessage;
+            } else {
+                lastValidMessage = message.value;
+            }
         });
     </script>
 </body>

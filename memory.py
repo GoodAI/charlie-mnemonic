@@ -18,6 +18,7 @@ from agentmemory import (
     import_file_to_memory,
     export_memory_to_file,
     stop_database,
+    search_memory_by_date,
 )
 import utils
 
@@ -39,10 +40,14 @@ class MemoryManager:
         """Return all memories in the category."""
         return get_memories(category, username=username)
 
-    async def search_memory(self, category, search_term, username=None, min_distance=0.0, max_distance=1.0, contains_text=None, n_results=5):
+    async def search_memory(self, category, search_term, username=None, min_distance=0.0, max_distance=1.0, contains_text=None, n_results=5, filter_metadata=None):
         """Search the memory and return the results."""
-        return search_memory(category, search_term, username=username, min_distance=min_distance, max_distance=max_distance, contains_text=contains_text, n_results=n_results)
+        return search_memory(category, search_term, username=username, min_distance=min_distance, max_distance=max_distance, contains_text=contains_text, n_results=n_results, filter_metadata=filter_metadata)
 
+    async def search_memory_by_date(self, category, search_term, username=None, min_distance=0.0, max_distance=1.0, contains_text=None, n_results=5, filter_date=None):
+        """Search the memory by date and return the results."""
+        return search_memory_by_date(category, search_term, username=username, min_distance=min_distance, max_distance=max_distance, contains_text=contains_text, n_results=n_results, filter_date=filter_date)
+    
     async def get_memory(self, category, id, username=None):
         """Return the memory with the given ID."""
         # id format is 0000000000000019, add the leading zeros back so its 16 characters long
@@ -304,6 +309,7 @@ class MemoryManager:
     
     
     async def note_taking(self, content, message, user_dir, username, show=True, verbose=False):
+        max_tokens = 1000
         process_dict = {
             'actions': [],
             'content': content,
@@ -385,6 +391,20 @@ class MemoryManager:
                     pass
                 else:
                     process_dict['error'] = "Error: Invalid action"
+
+        token_count = utils.MessageParser.num_tokens_from_string(files_content_string)
+        if token_count > max_tokens:
+            # take each file, ask gpt to summarize it, and overwrite the original file with the summary
+            for file in dir_list:
+                # calculate tokens based on max tokens divided by the number of files
+                max_tokens_per_file = max_tokens / len(dir_list)
+                current_file = f"{filedir}/{file}"
+                with open(current_file, "r") as f:
+                    file_content = f.read()
+                    summary = await self.openai_manager.ask_openai(file_content, 'summary_memory', 'gpt-4-0613', int(max_tokens_per_file), 0.1, username=username)
+                    with open(current_file, "w") as f:
+                        new_content = summary['choices'][0]['message']['content']
+                        f.write(new_content)
 
         if verbose:
             await utils.MessageSender.send_message({"type": "note_taking", "content": process_dict}, "blue", username)
@@ -492,4 +512,6 @@ class OpenAIManager:
             role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a cross-encoder. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == 'notetaker':
             role_content = "You are a note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added, updated or deleted, how and where it should be stored. Only store memories worth remembering and if explicitly asked, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in an escaped json format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.), comma separeted, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {\"action\": \"create\", \"file\": \"shoppinglist\", \"content\": \"cookies\"}, {\"action\": \"update\", \"file\": \"shoppinglist\", \"content\": \"cookies\napples\nbananas\npotatoes\"} ]"
+        if role == 'summary_memory':
+            role_content = "You are a memory summarizer. You get a list of the current notes, your task is to summarize the current notes as short as possible while maintaining all details. Only keep memories worth remembering, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in a plain text format with only the notes, nothing else."
         return role_content

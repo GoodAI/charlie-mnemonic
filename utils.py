@@ -65,13 +65,15 @@ class MessageSender:
             db.cursor.execute(f"SELECT id FROM users WHERE username = '{username}'")
             user_id = db.cursor.fetchone()[0]
 
-            # update the token usage in the statistics table
-            update_usage = f"""UPDATE statistics SET 
-                            total_tokens_used = total_tokens_used + {response['usage']['total_tokens']}, 
-                            prompt_tokens = prompt_tokens + {response['usage']['prompt_tokens']}, 
-                            completion_tokens = completion_tokens + {response['usage']['completion_tokens']} 
-                            WHERE user_id = {user_id}"""
-            db.cursor.execute(update_usage)
+            # update or insert the token usage in the statistics table
+            update_or_insert_usage = f"""
+            INSERT INTO statistics (user_id, total_tokens_used, prompt_tokens, completion_tokens) 
+            VALUES ({user_id}, {response['usage']['total_tokens']}, {response['usage']['prompt_tokens']}, {response['usage']['completion_tokens']}) 
+            ON CONFLICT (user_id) DO UPDATE SET 
+            total_tokens_used = statistics.total_tokens_used + {response['usage']['total_tokens']}, 
+            prompt_tokens = statistics.prompt_tokens + {response['usage']['prompt_tokens']}, 
+            completion_tokens = statistics.completion_tokens + {response['usage']['completion_tokens']}"""
+            db.cursor.execute(update_or_insert_usage)
 
             # get the token usage
             db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = {user_id}")
@@ -635,7 +637,9 @@ class SettingsManager:
         return settings
 
 async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
-    max_token_usage = 7000
+    """Process the message and generate a response"""
+    # 1k tokens for the prompt, 1k tokens for the completion, 1k tokens for the permanent memory/notes, 100 tokens for preset prompts
+    max_token_usage = 4900
     token_usage = 0
 
     chat_history, chat_metadata, history_ids = [], [], []

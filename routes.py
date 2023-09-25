@@ -1,24 +1,22 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 import json
 import os
 import signal
-import sys
-from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form
-from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi import APIRouter, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form, Request
+from fastapi.responses import FileResponse, HTMLResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
-import requests
-from utils import MessageSender, process_message, OpenAIResponser, AudioProcessor, AddonManager
+from fastapi.templating import Jinja2Templates
+from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager, SettingsManager, BrainProcessor, MessageParser
 from authentication import Authentication
-from pydantic import BaseModel
-from classes import User, UserCheckToken, UserName, editSettings, userMessage
-import openai
+from classes import User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage
 import shutil
-from brain import DatabaseManager
 from database import Database
-from memory import export_memory_to_file
+from memory import export_memory_to_file, import_file_to_memory, wipe_all_memories, stop_database
+import tempfile
+import zipfile
 
 router = APIRouter()
+templates = Jinja2Templates(directory="static")
 
 connections = {}
 
@@ -26,30 +24,23 @@ PRODUCTION = os.environ['PRODUCTION']
 
 ORIGINS = "https://clang.goodai.com"
 
-
 users_dir = 'users' # end with a slash
 
 router.mount("/static", StaticFiles(directory="static"), name="static")
 
-@router.get("/")
-async def read_root():
+@router.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    version = SettingsManager.get_version()
     if PRODUCTION == 'true':
         try:
-            return FileResponse('static/live_index.html')
+            return templates.TemplateResponse("live_index.html", {"request": request, "version": version})
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
     else:
         try:
-            return FileResponse('static/local_index.html')
+            return templates.TemplateResponse("local_index.html", {"request": request, "version": version})
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
-    
-@router.get("/styles.css")
-async def read_root():
-    try:
-        return FileResponse('static/styles.css')
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Item not found")
 
 def get_token(request: Request):
     return request.cookies.get('session_token')
@@ -286,13 +277,31 @@ async def handle_get_settings(request: Request, user: UserName):
 def get_token_usage(username):
     db = Database()
     db.open()
-    db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM users WHERE username = '{username}'")
+    # get the user_id for the given username
+    db.cursor.execute(f"SELECT id FROM users WHERE username = '{username}'")
+    user_id = db.cursor.fetchone()
+    if user_id is None:
+        db.close()
+        return 0, 0
+
+    user_id = user_id[0]
+
+    # get the token usage from the statistics table
+    db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = {user_id}")
     result = db.cursor.fetchone()
     db.close()
-    prompt_cost = round(result[1] * 0.03 / 1000, 3)
-    completion_cost = round(result[2] * 0.06 / 1000, 3)
+    if result is None:
+        return 0, 0 
+
+    prompt_tokens_used = result[1] if result[1] is not None else 0
+    completion_tokens_used = result[2] if result[2] is not None else 0
+    prompt_cost = round(prompt_tokens_used * 0.03 / 1000, 3)
+    completion_cost = round(completion_tokens_used * 0.06 / 1000, 3)
     total_cost = round(prompt_cost + completion_cost, 3)
     return result[0], total_cost
+
+def count_tokens(message):
+    return MessageParser.num_tokens_from_string(message)
 
 # update settings route
 @router.post("/update_settings/",
@@ -403,6 +412,8 @@ async def handle_message(request: Request, message: userMessage, background_task
     success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
+    if count_tokens(message.prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
     return await process_message(message.prompt, message.username, background_tasks, users_dir)
 
 # openAI response route without modules
@@ -510,7 +521,8 @@ async def handle_generate_audio(request: Request, message: userMessage, backgrou
     success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    
+    if count_tokens(message.prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long")    
     audio_path, audio = await AudioProcessor.generate_audio(message.prompt, username, users_dir)
     return FileResponse(audio_path, media_type="audio/wav")
 
@@ -547,8 +559,32 @@ async def handle_save_data(request: Request, user: UserName):
     json_file_path = os.path.join(users_dir, user.username, "memory.json")
     export_memory_to_file(path=json_file_path, username=user.username)
 
-    # Serve the JSON file
-    return FileResponse(json_file_path, media_type="application/json", filename="memory.json")
+    # get the user's notes directory and settings file
+    user_notes_dir = os.path.join(users_dir, user.username, 'notes')
+    settings_file = os.path.join(users_dir, user.username, 'settings.json')
+
+    # create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+
+        # copy the user's notes directory, settings file and memory file to the temporary directory
+        shutil.copytree(user_notes_dir, os.path.join(temp_dir, 'notes'))
+        shutil.copy2(settings_file, os.path.join(temp_dir, 'settings.json'))
+        shutil.copy2(json_file_path, os.path.join(temp_dir, 'memory.json'))
+
+        # get current date
+        current_date = datetime.now().strftime("%Y%m%d")
+
+        # create zip filename
+        zip_filename = f"{user.username}_{current_date}_clang_data.zip"
+
+        # zip the temporary directory
+        shutil.make_archive(os.path.join(users_dir, user.username, 'data'), 'zip', temp_dir)
+
+        # rename the zip file
+        shutil.move(os.path.join(users_dir, user.username, 'data.zip'), os.path.join(users_dir, user.username, zip_filename))
+
+    # serve the zip file
+    return FileResponse(os.path.join(users_dir, user.username, zip_filename), media_type="application/zip", filename=zip_filename)
 
 
 @router.post("/delete_data/",
@@ -580,13 +616,12 @@ async def handle_delete_data(request: Request, user: UserName):
     success = auth.check_token(user.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    memory_file = os.path.join(users_dir, user.username)
-    dbmanager = DatabaseManager()
-    dbmanager.delete_db(memory_file)
-    await asyncio.sleep(1)
-    # Delete the user's directory
-    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True, onerror=None)
-    
+    wipe_all_memories(user.username)
+    stop_database(user.username)
+    # remove all users recent messages
+    await BrainProcessor.delete_recent_messages(user.username)
+    # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
+    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
     return {'message': 'User data deleted successfully'}
 
 @router.post("/upload_data/",
@@ -613,31 +648,51 @@ async def handle_delete_data(request: Request, user: UserName):
             },
             },)
 async def handle_upload_data(request: Request, username: str = Form(...), data_file: UploadFile = File(...)):
-    print(username)
-    print(data_file.filename)
     session_token = request.cookies.get("session_token")
     auth = Authentication()
     success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    
-    # Delete the user's directory
-    shutil.rmtree(os.path.join(users_dir, username))
-    
-    # Create the user's directory
-    os.makedirs(os.path.join(users_dir, username))
-    
+
     # Save the uploaded file to the user's directory
-    with open(os.path.join(users_dir, username, data_file.filename), "wb") as buffer:
+    file_path = os.path.join(users_dir, username, data_file.filename)
+    with open(file_path, "wb") as buffer:
         shutil.copyfileobj(data_file.file, buffer)
-    
-    # Unzip the file
-    shutil.unpack_archive(os.path.join(users_dir, username, data_file.filename), os.path.join(users_dir, username))
-    
-    # Delete the .zip file
-    os.remove(os.path.join(users_dir, username, data_file.filename))
-    
-    return {'message': 'User data uploaded successfully'}
+
+    # Check if the file is a zip file
+    if zipfile.is_zipfile(file_path):
+        # Extract the zip file
+        with zipfile.ZipFile(file_path, 'r') as zip_ref:
+            zip_ref.extractall(os.path.join(users_dir, username))
+        
+        # Check for 'memory.json', and 'settings.json'
+        if 'memory.json' not in os.listdir(os.path.join(users_dir, username)) or \
+        'settings.json' not in os.listdir(os.path.join(users_dir, username)):
+            raise HTTPException(status_code=400, detail="Zip file is missing required files")
+
+        # Verify 'memory.json' is a valid JSON file
+        try:
+            with open(os.path.join(users_dir, username, 'memory.json')) as f:
+                json.load(f)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="'memory.json' is not a valid JSON file")
+
+        # Verify 'settings.json' is a valid JSON file
+        try:
+            with open(os.path.join(users_dir, username, 'settings.json')) as f:
+                json.load(f)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="'settings.json' is not a valid JSON file")
+
+        # Import the data into memory
+        import_file_to_memory(path=os.path.join(users_dir, username, 'memory.json'), replace=True, username=username)
+
+        # Delete the zip file
+        os.remove(file_path)
+    else:
+        raise HTTPException(status_code=400, detail="Wrong file format!")
+
+    return JSONResponse(content={'message': 'User data uploaded successfully'})
 
 @router.post("/abort_button/",
     tags=["Messaging"],
@@ -670,3 +725,116 @@ async def handle_abort_button(request: Request, user: UserName):
         raise HTTPException(status_code=401, detail="Token is invalid")
     # kill the process, this will need a manual restart or a cron job/supervisor/...
     os.kill(os.getpid(), signal.SIGINT)
+
+# no token message route
+@router.post("/notoken_message/",
+    tags=["Messaging"],
+    summary="Send a message without token",
+    description="This endpoint allows the user to send a message to the AI by providing a prompt, username and password. The AI will respond to the prompt.",
+    response_description="Returns the AI's response.",
+    responses={
+        200: {
+            "description": "AI responded successfully",
+            "content": {
+                "application/json": {
+                    "example": {"message": "AI responded successfully"}
+                }
+            },
+        },
+    },
+)
+
+async def handle_notoken_message(message: noTokenMessage):
+    auth = Authentication()
+    session_token = auth.login(message.username, message.password)
+    if not session_token:
+        raise HTTPException(status_code=401, detail="User login failed")
+    if count_tokens(message.prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+    return await process_message(message.prompt, message.username, None, users_dir)
+
+@router.get("/admin/statistics", tags=["Admin"],
+            summary="Get statistics",
+    description="This endpoint allows you to get statistics about the users.",
+    response_description="Returns statistics about the users.",
+    responses={
+        200: {
+            "description": "Statistics retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "total_users": 1,
+                        "total_messages": 1,
+                        "total_tokens_used": 1,
+                        "total_voice_usage": 1,
+                        "user_statistics": [
+                            {
+                                "username": "user",
+                                "amount_of_messages": 1,
+                                "total_tokens_used": 1,
+                                "voice_usage": 1
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+    },)
+async def get_statistics():
+    db = Database()
+    db.open()
+    db.cursor.execute("SELECT * FROM users INNER JOIN statistics ON users.id = statistics.user_id")
+    user_data = db.cursor.fetchall()
+    db.close()
+    
+    # Calculate overall statistics
+    total_users = len(user_data)
+    # user[0] = id:
+    # user[1] = username:
+    # user[2] = password:
+    # user[3] = session_token:
+    # user[4] = message_history:
+    # user[5] = has_access:
+    # user[6] = role:
+    # user[7] = id:
+    # statistics
+    # user[8] = user_id:
+    # user[9] = amount_of_messages:
+    # user[10] = total_tokens_used:
+    # user[11] = prompt_tokens:
+    # user[12] = completion_tokens:
+    # user[13] = voice_usage:
+    total_messages = sum([user[9] for user in user_data])
+    total_tokens_used = sum([user[10] for user in user_data])
+    total_voice_usage = sum([user[13] for user in user_data])
+
+    # Prepare user statistics
+    user_statistics = []
+    for user in user_data:
+        user_statistics.append({
+            "username": user[1],
+            "role": user[6],
+            "amount_of_messages": user[9],
+            "total_tokens_used": user[10],
+            "voice_usage": user[13]
+        })
+
+    return {
+        "total_users": total_users,
+        "total_messages": total_messages,
+        "total_tokens_used": total_tokens_used,
+        "total_voice_usage": total_voice_usage,
+        "user_statistics": user_statistics
+    }
+
+@router.get("/{file_path:path}")
+async def read_file(file_path: str):
+    try:
+        if os.path.exists(f'static/{file_path}'):
+            response = FileResponse(f'static/{file_path}')
+            response.headers["Cache-Control"] = "public, max-age=86400"
+            return response
+        else:
+            raise HTTPException(status_code=404, detail="Item not found")
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Item not found")

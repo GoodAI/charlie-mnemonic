@@ -1,12 +1,14 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import sys
 from routes import router
 import logging
 from config import api_keys
 import openai
 from database import Database
+import utils
+
+version = utils.SettingsManager.get_version()
 
 # Load environment variables
 openai.api_key = api_keys["openai"]
@@ -30,7 +32,7 @@ app = FastAPI(
 Welcome to the `CLANG` API documentation,\n
 WIP.
 """,
-    version=0.31,
+    version=version,
 )
 
 origins = "https://clang.goodai.com"

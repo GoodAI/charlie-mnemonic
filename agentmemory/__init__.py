@@ -11,6 +11,8 @@ from .main import (
     count_memories,
     wipe_category,
     wipe_all_memories,
+    stop_database,
+    search_memory_by_date
 )
 
 from .events import (

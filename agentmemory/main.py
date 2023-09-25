@@ -1,5 +1,6 @@
 import datetime
 import os
+import time
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -99,6 +100,47 @@ def create_unique_memory(category, content, metadata={}, similarity=0.95, userna
     create_memory(category, content, metadata=metadata, username=username)
     return id
 
+def search_memory_by_date(
+    category,
+    search_text,
+    n_results=5,
+    filter_date=None,
+    contains_text=None,
+    include_embeddings=True,
+    include_distances=True,
+    max_distance=None,  # 0.0 - 1.0
+    min_distance=None,  # 0.0 - 1.0
+    novel=False,
+    username=None,
+):
+    if filter_date is not None:
+        # Convert filter_date to datetime object
+        filter_date = datetime.strptime(filter_date, '%Y-%m-%d')
+        
+        # Calculate the timestamps for the start and end of filter_date
+        start_of_date = datetime(filter_date.year, filter_date.month, filter_date.day)
+        end_of_date = start_of_date + datetime.timedelta(1)
+        start_timestamp = time.mktime(start_of_date.timetuple())
+        end_timestamp = time.mktime(end_of_date.timetuple())
+        
+        # Add these timestamps to your filter_metadata
+        filter_metadata = {'metadata.created_at': {'$gte': start_timestamp, '$lt': end_timestamp}}
+    else:
+        filter_metadata = None
+
+    return search_memory(
+        category=category,
+        search_text=search_text,
+        n_results=n_results,
+        filter_metadata=filter_metadata,
+        contains_text=contains_text,
+        include_embeddings=include_embeddings,
+        include_distances=include_distances,
+        max_distance=max_distance,
+        min_distance=min_distance,
+        novel=novel,
+        username=username
+    )
 
 def search_memory(
     category,
@@ -559,3 +601,13 @@ def wipe_all_memories(username=None):
         client.delete_collection(collection.name)
 
     debug_log("Wiped all memories", type="system")
+
+def stop_database(username=None):
+    """
+    Stop the database.
+
+    Example:
+        >>> stop_database()
+    """
+    client = get_client(username=username)
+    client.reset()

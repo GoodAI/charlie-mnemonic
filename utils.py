@@ -9,16 +9,9 @@ import sys
 import time
 import uuid
 from memory import MemoryManager
-from fastapi.responses import JSONResponse, PlainTextResponse
 import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
-from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
-import chromadb
 from elevenlabs import generate, play, set_api_key
-import requests
-import urllib3
-from brain import BrainManager
-from classes import AsciiColors
 from werkzeug.utils import secure_filename
 import routes
 from pathlib import Path
@@ -53,26 +46,37 @@ class MessageSender:
 
         await routes.send_debug_message(username, json.dumps(new_message))
         # print the message to the console with the color
-        print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
+        # print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
 
     @staticmethod
     async def send_message(message, color, username):
         """Send a message to the user and print it to the console with a color"""
         await routes.send_debug_message(username, json.dumps(message))
         # print the message to the console with the color
-        print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
+        # print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
 
     @staticmethod
     async def update_token_usage(response, username):
+        """Update the token usage in the database"""
         db = Database()
         try:
             db.open()
-            # update the token usage
-            update_usage = f"UPDATE users SET total_tokens_used = total_tokens_used + {response['usage']['total_tokens']}, prompt_tokens = prompt_tokens + {response['usage']['prompt_tokens']}, completion_tokens = completion_tokens + {response['usage']['completion_tokens']} WHERE username = '{username}'"
-            db.cursor.execute(update_usage)
+            # get the user_id for the given username
+            db.cursor.execute(f"SELECT id FROM users WHERE username = '{username}'")
+            user_id = db.cursor.fetchone()[0]
+
+            # update or insert the token usage in the statistics table
+            update_or_insert_usage = f"""
+            INSERT INTO statistics (user_id, total_tokens_used, prompt_tokens, completion_tokens) 
+            VALUES ({user_id}, {response['usage']['total_tokens']}, {response['usage']['prompt_tokens']}, {response['usage']['completion_tokens']}) 
+            ON CONFLICT (user_id) DO UPDATE SET 
+            total_tokens_used = statistics.total_tokens_used + {response['usage']['total_tokens']}, 
+            prompt_tokens = statistics.prompt_tokens + {response['usage']['prompt_tokens']}, 
+            completion_tokens = statistics.completion_tokens + {response['usage']['completion_tokens']}"""
+            db.cursor.execute(update_or_insert_usage)
 
             # get the token usage
-            db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM users WHERE username = '{username}'")
+            db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = {user_id}")
             result = db.cursor.fetchone()
 
             db.conn.commit()
@@ -90,6 +94,7 @@ class MessageSender:
             total_cost = round(prompt_cost + completion_cost, 3)
             await MessageSender.send_message({"usage": {"total_tokens": result[0], "total_cost": total_cost}}, 'red', username)
 
+
 class AddonManager:
     """This class contains functions to load addons"""
     @staticmethod
@@ -100,6 +105,7 @@ class AddonManager:
             "language": { "language": "en" },
             "system_prompt": { "system_prompt": "Not implemented yet" },
             "cot_enabled": { "cot_enabled": False },
+            "verbose": { "verbose": False },
         }
 
         function_dict = {}
@@ -125,7 +131,7 @@ class AddonManager:
             settings = json.load(f)
 
         # check if the new keys are in the settings, if not, rewrite the settings file
-        new_keys = ["audio", "language", "system_prompt"]
+        new_keys = ["audio", "language", "system_prompt", "verbose"]
         has_old_settings = False
         for key in new_keys:
             if key not in settings:
@@ -147,6 +153,7 @@ class AddonManager:
                 "language": {"language": settings.get('language', {}).get('language', 'en')},
                 "system_prompt": {"system_prompt": settings.get('system_prompt', {}).get('system_prompt', 'Not implemented yet')},
                 "cot_enabled": {"cot_enabled": settings.get('cot_enabled', False)},
+                "verbose": {"verbose": settings.get('verbose', False)},
             }
 
         # write the new settings back to the file
@@ -428,6 +435,10 @@ class BrainProcessor:
                 result_string += f"Result {i}: {results['metadatas'][i]['role']}: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
                 history_string += f"Assistant: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
         return result_string, history_string
+    
+    @staticmethod
+    async def delete_recent_messages(user):
+        last_messages[user] = []
 
 class MessageParser:
     """This class contains functions to parse messages and generate responses"""
@@ -435,9 +446,9 @@ class MessageParser:
     def get_message(type, parameters):
         """Parse the message based on the type and parameters"""
         if (type == 'start_message'):
-            return f"You are talking to {parameters['username']}\nActive Brain Module:\n{parameters['kw_brain_string']}\n\nMost relevant past messages (low score = better relevancy):\n{parameters['history_string']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\n{parameters['instruction_string']}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {parameters['message']}"
+            return f"You are talking to {parameters['username']}\nMemory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\n{parameters['instruction_string']}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {parameters['message']}"
         elif (type == 'keyword_generation'):
-            return f"Most relevant past messages (higher score = better relevancy):\n{parameters['history_string']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\nLast message: {parameters['message']}"
+            return f"Memory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\nLast message: {parameters['message']}"
         
     @staticmethod
     def convert_function_call_arguments(arguments):
@@ -458,7 +469,7 @@ class MessageParser:
                         arguments = eval(arguments)
                     except Exception:
                         arguments = None
-        print(f"Arguments:\n{str(arguments)}")
+        # print(f"Arguments:\n{str(arguments)}")
         return arguments
 
     @staticmethod
@@ -483,6 +494,8 @@ class MessageParser:
     async def process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, exception_handler, merge=True, users_dir='users/', steps_string='', full_response=None, background_tasks: BackgroundTasks = None):
         try:
             converted_function_call_arguments = MessageParser.convert_function_call_arguments(function_call_arguments)
+            # add the username to the arguments
+            converted_function_call_arguments['username'] = username
         except:
             await exception_handler(message, og_message, function_dict, function_metadata, username, users_dir, steps_string, full_response, background_tasks)
             raise
@@ -494,7 +507,7 @@ class MessageParser:
                 "arguments": function_call_arguments
             }
         }
-        print(new_message)
+        # print(new_message)
         await MessageSender.send_message(new_message, 'red', username)
 
         function = function_dict[function_call_name]
@@ -535,7 +548,7 @@ class MessageParser:
                 # history_ids.append(str(uuid.uuid4()))
                 # brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
                 memory = MemoryManager()
-                await memory.process_incoming_memory_assistant(None, f"Assistant: {response['content']}", username)
+                await memory.process_incoming_memory_assistant('responses', f"Assistant: {response['content']}", username)
                 #background_tasks.add_task(BrainProcessor.keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
         return response
     
@@ -594,11 +607,10 @@ class MessageParser:
         num_tokens += 12 
         return num_tokens
 
-    async def generate_full_message(username, kw_brain_string, history_string, last_messages_string, instruction_string, message):
+    async def generate_full_message(username, merged_result_string, last_messages_string, instruction_string, message):
         full_message = MessageParser.get_message('start_message', {
             'username': username,
-            'kw_brain_string': kw_brain_string,
-            'history_string': history_string,
+            'memory': merged_result_string,
             'last_messages_string': last_messages_string,
             'instruction_string': instruction_string,
             'message': message,
@@ -606,6 +618,16 @@ class MessageParser:
         return full_message
 
 class SettingsManager:
+    """This class contains functions to load settings"""
+    @staticmethod
+    def get_version():
+        version = "0.0"
+        with open("version.txt", "r") as f:
+            new_version = f.read().strip()
+            if new_version:
+                version = new_version
+        return version
+    
     @staticmethod
     async def load_settings(users_dir, username):
         settings = {}
@@ -615,7 +637,9 @@ class SettingsManager:
         return settings
 
 async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
-    max_token_usage = 7000
+    """Process the message and generate a response"""
+    # 1k tokens for the prompt, 1k tokens for the completion, 1k tokens for the permanent memory/notes, 100 tokens for preset prompts
+    max_token_usage = 4900
     token_usage = 0
 
     chat_history, chat_metadata, history_ids = [], [], []
@@ -649,23 +673,31 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     all_messages = last_messages_string + '\n' + message
 
     message_tokens = MessageParser.num_tokens_from_string(all_messages, "gpt-4")
-    print(f"message_tokens: {message_tokens}")
+    #print(f"message_tokens: {message_tokens}")
     token_usage += message_tokens
     remaining_tokens = max_token_usage - token_usage
-    print(f"remaining_tokens: {remaining_tokens}")
-
+    #print(f"remaining_tokens: {remaining_tokens}")
+    verbose = settings.get('verbose', {}).get('verbose', False)
     memory = MemoryManager()
-    kw_brain_string, token_usage_active_brain = await memory.process_active_brain(f'{message}', username, all_messages, remaining_tokens)
+    kw_brain_string, token_usage_active_brain, unique_results1 = await memory.process_active_brain(f'{message}', username, all_messages, remaining_tokens, verbose)
 
     token_usage += token_usage_active_brain
     remaining_tokens = max_token_usage - token_usage
-    print(f"remaining_tokens: {remaining_tokens}")
+    #print(f"remaining_tokens: {remaining_tokens}")
     
-    results, token_usage_relevant_memory = await memory.process_incoming_memory(None, f'{message}', username, remaining_tokens)
+    results, token_usage_relevant_memory, unique_results2 = await memory.process_incoming_memory(None, f'{message}', username, remaining_tokens, verbose)
 
+    merged_results_dict = {id: (document, distance) for id, document, distance in unique_results1.union(unique_results2)}
+
+    merged_results_list = [(id, document, distance) for id, (document, distance) in merged_results_dict.items()]
+
+    merged_results_list.sort(key=lambda x: int(x[0]))
+
+    # Create the result string
+    merged_result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in merged_results_list)
     token_usage += token_usage_relevant_memory
     remaining_tokens = max_token_usage - token_usage
-    print(f"remaining_tokens: {remaining_tokens}")
+    #print(f"remaining_tokens: {remaining_tokens}")
 
     # process the results
     history_string = results
@@ -673,14 +705,14 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     observations = 'No observations available.'
     instruction_string = f"""\nObservations:\n{observations}\n"""
 
-    notes = await memory.note_taking(all_messages, message, users_dir, username, False)
+    notes = await memory.note_taking(all_messages, message, users_dir, username, False, verbose)
 
     instruction_string += f"""\n\nDiscard anything from the above messages if it conflicts with these notes!\n{notes}\n"""
 
     #kw_brain_string = old_kw_brain
 
     # generate the full message
-    full_message = await MessageParser.generate_full_message(username, kw_brain_string, history_string, last_messages_string, instruction_string, message)
+    full_message = await MessageParser.generate_full_message(username, merged_result_string, last_messages_string, instruction_string, message)
 
     await MessageSender.send_message(f"[{full_message}]", 'blue', username)
 
@@ -703,8 +735,8 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and can automatically read/write/edit/delete notes and tasks. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. each step is a function call and its instructions, nothing else!\nEither PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible!'},
-        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Example: Plan:\n1. Using the api url http://localhost write a function named x that calls it and outputs data \n2. Use function y to parse the data of function x to var z\n3. put the data of var z through a new function to achieve our goal\n\n{message}'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
+        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example: Plan:\n1. step 1 \n2. step 2\n3. step 3\n\n{message}'},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
@@ -730,7 +762,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and can automatically read/write/edit/delete notes and tasks. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
         {"role": "user", "content": f'{message}'},
     ]
 
@@ -827,15 +859,15 @@ Please follow these instructions carefully. If nothing changes, return a copy of
 
 async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir, full_message=''):
         function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
+
         messages = [
             {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can.'},
-            {"role": "user", "content": f'Memory:{full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
+            {"role": "user", "content": f'Memory: {full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
         ]
         await MessageSender.send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
-
+        
         openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
         response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
-
         await MessageSender.send_debug(f"process_cot_messages response: {response}", 2, 'red', username)
         response = response['choices'][0]['message']
 
@@ -853,15 +885,14 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
     # add user to COT_RETRIES if they don't exist
     if username not in COT_RETRIES:
-        COT_RETRIES[username] = 0
+        COT_RETRIES[username] = 1
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
-    if COT_RETRIES[username] > 1:
+    if COT_RETRIES[username] >= 1:
         await MessageSender.send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
         messages = [
             {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Respond with YES: <your summary>'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Respond with YES: <your summary>'},
+            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Respond with YES: <your summary>'},
         ]
-        COT_RETRIES[username] = 0
     else:
         messages = [
             {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},

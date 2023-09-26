@@ -17,8 +17,6 @@
     
     <link rel="stylesheet" href="styles.css?v=0.30">
 
-
-</head>
     <script>
         const API_URL = 'http://' + document.domain + ':8002';
         //const port = 8002;
@@ -710,7 +708,7 @@
             addExternalMessage(msg);
         };
 
-        function onResponse(msg){
+        async function onResponse(msg){
             var timestamp = new Date().toLocaleTimeString();
             
             // be sure the msg is converted to json
@@ -758,6 +756,16 @@
                 else {
                     tempFormatted = marked(tempReceived);
                 }
+
+
+                // D-ID avatar
+                var textToSay = tempReceived.replace(/\n/g, "");
+                await import('./d-id/streaming-client-api.js').then(
+                    did => { did.generateVideoStream(textToSay).then(console.log("called generateVideoStream")); });
+
+                // Sleep for 3s until the video is ready
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
                 audioElement = '';
                 if(settings.audio.voice_output) {
                     var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
@@ -810,6 +818,136 @@
             return div.innerHTML;
         };
     </script>
+
+    <style>
+    .peerConnectionState-new {
+      color: cornflowerblue;
+    }
+    .peerConnectionState-connecting {
+      color: orange;
+    }
+    .peerConnectionState-connected {
+      color: green;
+    }
+    .peerConnectionState-disconnected,
+    .peerConnectionState-closed,
+    .peerConnectionState-failed {
+      color: red;
+    }
+
+    .iceConnectionState-new {
+      color: cornflowerblue;
+    }
+    .iceConnectionState-checking {
+      color: orange;
+    }
+    .iceConnectionState-connected,
+    .iceConnectionState-completed {
+      color: green;
+    }
+    .peerConnectionState-disconnected,
+    .peerConnectionState-closed,
+    .peerConnectionState-failed {
+      color: red;
+    }
+
+    .iceGatheringState-new {
+      color: cornflowerblue;
+    }
+    .iceGatheringState-gathering {
+      color: orange;
+    }
+    .iceGatheringState-complete {
+      color: black;
+    }
+
+    .signalingState-stable {
+      color: green;
+    }
+    .signalingState-have-local-offer,
+    .signalingState-have-remote-offer,
+    .signalingState-have-local-pranswer,
+    .signalingState-have-remote-pranswer {
+      color: cornflowerblue;
+    }
+    .signalingState-closed {
+      color: red;
+    }
+
+    .streamingState-streaming {
+      color: green;
+    }
+
+    .streamingState-empty {
+      color: grey;
+    }
+
+    /* added css from here */
+
+    body * {
+      font-family: 'Mulish', sans-serif;
+      text-align: center;
+    }
+
+    #content {
+      width: 820px;
+      position: relative;
+      margin: 0 auto;
+    }
+
+    #buttons {
+      clear: both;
+      padding: 0 0 0 0;
+      text-align: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      border-radius: 5px;
+      border: none;
+      font-size: 16px;
+      margin: 0 5px;
+      background-color: #7459fe;
+      color: #fff;
+    }
+
+    button:hover {
+      background-color: #9480ff;
+      cursor: pointer;
+      transition: all 0.2s ease-out;
+    }
+
+    #status {
+      clear: both;
+      padding: 20px 0 0 0;
+      text-align: left;
+      display: inline-block;
+      zoom: 1;
+      line-height: 140%;
+      font-size: 15px;
+    }
+
+    #status div {
+      padding-bottom: 10px;
+    }
+
+    #video-wrapper {
+      background-position: top;
+    }
+
+    #video-wrapper div {
+      width: 400px;
+      margin: 0 auto;
+      /*padding: 50px 0 0 0;*/
+    }
+    video {
+      display: block;
+      /*border:1px solid;*/
+      border-radius: 50%;
+      background-color: #fff;
+    }
+  </style>
+
 </head>
 <body>
     <!-- Socket Info -->
@@ -901,6 +1039,7 @@
     <div id="overlay">
         <div class="text">Code copied to clipboard</div>
     </div>
+    <div style="display: flex;">
         <div id="chat-container" class="chat-container">
             <div id="messages"></div>
             <div class="message-container">
@@ -923,6 +1062,34 @@
                 </div>
             </div>
         </div>
+
+        <!-- D-ID -->
+        <div id="content" min-width="400" min-height="400" style="flex: 10%; margin-left: 40px">
+            <div id="video-wrapper">
+            <div>
+                <video id="talk-video" width="400" height="400" autoplay></video>
+            </div>
+            </div>
+            <br />
+    
+            <div id="buttons">
+            <button id="connect-button" type="button">Connect</button>
+            <button id="destroy-button" type="button">Destroy</button>
+            </div>
+    
+            <!-- d-id connection status:
+            <div id="status">
+            ICE gathering status: <label id="ice-gathering-status-label"></label
+            >
+            ICE status: <label id="ice-status-label"></label>
+            Peer connection status: <label id="peer-status-label"></label>
+            Signaling status: <label id="signaling-status-label"></label>
+            Streaming status: <label id="streaming-status-label"></label>
+            </div>
+            !-->
+        </div>
+    </div>
+        <script type="module" src="./d-id/index.js"></script>
     </body>
     <script>
     let session_token = '';
@@ -1021,7 +1188,7 @@
             });
 
             const data = await handleError(response);
-            onResponse(data);
+            await onResponse(data);
 
         } catch (error) {
             console.error('Failed to send message: ', error);

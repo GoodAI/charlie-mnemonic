@@ -35,6 +35,7 @@ else:
 users_dir = 'users' # end with a slash
 
 router.mount("/static", StaticFiles(directory="static"), name="static")
+router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
 
 @router.get("/")
 async def read_root():
@@ -48,7 +49,18 @@ async def read_root():
             return FileResponse('static/local_index.html')
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
-    
+
+
+@router.get("/d-id/{file}")
+async def read_did(file: str):
+    if PRODUCTION == 'true':
+        raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        try:
+            return FileResponse(f'd-id/{file}')
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
+
 @router.get("/styles.css")
 async def read_root():
     try:

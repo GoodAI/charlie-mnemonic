@@ -141,6 +141,24 @@
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
 
+            // Populate avatar settings
+            h3 = document.createElement('h3');
+            h3.textContent = 'Avatar';
+            settingsMenu.appendChild(h3);
+
+            var avatarItem = document.createElement('a');
+            avatarItem.href = "#";
+            var status = settings.avatar.avatar ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+            avatarItem.innerHTML = status;
+            avatarItem.onclick = function(e) {
+                e.preventDefault();
+                edit_avatar_status(!settings.avatar.avatar);
+                console.log('change_avatar_status: ', !settings.avatar.avatar);
+            };
+            settingsMenu.appendChild(avatarItem);
+            var br = document.createElement('br');
+            settingsMenu.appendChild(br);
+
             // Populate language settings
             h3 = document.createElement('h3');
             h3.textContent = 'Language';
@@ -252,6 +270,23 @@
             .catch(console.error);
         };
 
+        // function for handling avatar
+        function edit_avatar_status(enabled) {
+            fetch(API_URL + '/update_settings/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ category: 'avatar', setting: 'avatar', value: enabled, username: user_name }),
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                setSettings(data);
+            })
+            .catch(console.error);
+        };
+
         // function for handling language status
         function edit_language_status(language) {
             fetch(API_URL + '/update_settings/', {
@@ -311,6 +346,15 @@
                 
                 } else {
                     $('#record').hide();
+                }
+
+                if (newSettings.avatar.avatar)
+                {
+                    $('#d-id-content').show();
+                }
+                else
+                {
+                    $('#d-id-content').hide();
                 }
                 return;
             }
@@ -1064,7 +1108,7 @@
         </div>
 
         <!-- D-ID -->
-        <div id="content" min-width="400" min-height="400" style="flex: 10%; margin-left: 40px">
+        <div id="d-id-content" min-width="400" min-height="400" style="flex: 10%; margin-left: 40px">
             <div id="video-wrapper">
             <div>
                 <video id="talk-video" width="400" height="400" autoplay></video>
@@ -1395,6 +1439,19 @@
             $('#record').show();
         } else {
             $('#record').hide();
+        }
+    });
+
+    $('#avatar-checkbox').change(function() {
+        var settings = {
+            avatar: $('#avatar-checkbox').prop('checked')
+        };
+
+        // Show or hide D-ID content based on the setting
+        if (settings.avatar) {
+            $('#d-id-content').show();
+        } else {
+            $('#d-id-content').hide();
         }
     });
 

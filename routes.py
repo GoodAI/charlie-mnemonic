@@ -5,7 +5,7 @@ import os
 import signal
 import sys
 from fastapi import APIRouter, Depends, Query,  FastAPI, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form
-from fastapi.responses import FileResponse, StreamingResponse, Response
+from fastapi.responses import FileResponse, StreamingResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import requests
 from utils import MessageSender, process_message, OpenAIResponser, AudioProcessor, AddonManager
@@ -17,6 +17,7 @@ import shutil
 from brain import DatabaseManager
 from database import Database
 from memory import export_memory_to_file
+from config import api_keys
 
 router = APIRouter()
 
@@ -50,6 +51,13 @@ async def read_root():
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
 
+@router.get("/d-id/api.json")
+async def read_did_api_json():
+    if PRODUCTION == 'true':
+        raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        data = { "key" : api_keys['d-id'], "url" : "https://api.d-id.com" }
+        return JSONResponse(content=data)
 
 @router.get("/d-id/{file}")
 async def read_did(file: str):

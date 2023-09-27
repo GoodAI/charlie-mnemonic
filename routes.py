@@ -61,15 +61,15 @@ async def read_did(file: str):
 async def read_root(request: Request):
     version = SettingsManager.get_version()
     if PRODUCTION == 'true':
-            try:
-                return templates.TemplateResponse("live_index.html", {"request": request, "version": version})
-            except FileNotFoundError:
-                raise HTTPException(status_code=404, detail="Item not found")
-        else:
-            try:
-                return templates.TemplateResponse("local_index.html", {"request": request, "version": version})
-            except FileNotFoundError:
-                raise HTTPException(status_code=404, detail="Item not found")
+        try:
+            return templates.TemplateResponse("live_index.html", {"request": request, "version": version})
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        try:
+            return templates.TemplateResponse("local_index.html", {"request": request, "version": version})
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
     
 @router.get("/styles.css")
 async def read_root():

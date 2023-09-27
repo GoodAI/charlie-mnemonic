@@ -136,7 +136,7 @@ class AddonManager:
             settings = json.load(f)
 
         # check if the new keys are in the settings, if not, rewrite the settings file
-        new_keys = ["audio", "language", "system_prompt", "verbose"]
+        new_keys = ["audio", "language", "system_prompt", "verbose", "avatar"]
         has_old_settings = False
         for key in new_keys:
             if key not in settings:

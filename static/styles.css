@@ -31,8 +31,8 @@ h3{
 }
 
 .chat-container {
-    flex: 90%;
-    max-width: 90%;
+    max-width: 80vw;
+    min-width: 80vw;
     max-height: 80%;
     height: 800px;
     background: #fff;
@@ -41,6 +41,15 @@ h3{
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+table tr {
+    height: 100%;
+    align-items: center;
+}
+
+table tr td {
+    vertical-align: top;
 }
 
 #messages {
@@ -673,3 +682,131 @@ pre {
     100% { transform: rotate(360deg); }
 }
 
+
+/* D-ID specific styles */
+.peerConnectionState-new {
+    color: cornflowerblue;
+  }
+  .peerConnectionState-connecting {
+    color: orange;
+  }
+  .peerConnectionState-connected {
+    color: green;
+  }
+  .peerConnectionState-disconnected,
+  .peerConnectionState-closed,
+  .peerConnectionState-failed {
+    color: red;
+  }
+
+  .iceConnectionState-new {
+    color: cornflowerblue;
+  }
+  .iceConnectionState-checking {
+    color: orange;
+  }
+  .iceConnectionState-connected,
+  .iceConnectionState-completed {
+    color: green;
+  }
+  .peerConnectionState-disconnected,
+  .peerConnectionState-closed,
+  .peerConnectionState-failed {
+    color: red;
+  }
+
+  .iceGatheringState-new {
+    color: cornflowerblue;
+  }
+  .iceGatheringState-gathering {
+    color: orange;
+  }
+  .iceGatheringState-complete {
+    color: black;
+  }
+
+  .signalingState-stable {
+    color: green;
+  }
+  .signalingState-have-local-offer,
+  .signalingState-have-remote-offer,
+  .signalingState-have-local-pranswer,
+  .signalingState-have-remote-pranswer {
+    color: cornflowerblue;
+  }
+  .signalingState-closed {
+    color: red;
+  }
+
+  .streamingState-streaming {
+    color: green;
+  }
+
+  .streamingState-empty {
+    color: grey;
+  }
+
+  /* added css from here */
+
+  body * {
+    font-family: 'Mulish', sans-serif;
+  }
+
+  #content {
+    width: 820px;
+    position: relative;
+    margin: 0 auto;
+  }
+
+  #buttons {
+    clear: both;
+    padding: 0 0 0 0;
+    text-align: center;
+  }
+
+  #connect-button {
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: none;
+    font-size: 16px;
+    margin: 0 5px;
+    background-color: #7459fe;
+    color: #fff;
+  }
+
+  #connect-button:hover {
+    background-color: #9480ff;
+    cursor: pointer;
+    transition: all 0.2s ease-out;
+  }
+
+  #status {
+    clear: both;
+    padding: 20px 0 0 0;
+    text-align: left;
+    display: inline-block;
+    zoom: 1;
+    line-height: 140%;
+    font-size: 15px;
+  }
+
+  #status div {
+    padding-bottom: 10px;
+  }
+
+  #video-wrapper {
+    background-position: top;
+  }
+
+  #video-wrapper div {
+    width: 400px;
+    margin: 0 auto;
+    /*padding: 50px 0 0 0;*/
+  }
+  video {
+    display: block;
+    /*border:1px solid;*/
+    border-radius: 50%;
+    background-color: #fff;
+  }
+  /* END D-ID specific styles */

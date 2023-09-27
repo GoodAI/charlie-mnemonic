@@ -28,11 +28,17 @@ const signalingStatusLabel = document.getElementById('signaling-status-label');
 const streamingStatusLabel = document.getElementById('streaming-status-label');
 */
 const connectButton = document.getElementById('connect-button');
+const connectText = document.getElementById('avatar-button-text');
+const loadingIcon = document.getElementById('loading-icon');
+
 connectButton.onclick = async () => {
   if (peerConnection && peerConnection.connectionState === 'connected') {
     return;
   }
-
+  // Show the loading icon
+  loadingIcon.style.display = 'inline';
+  connectText.style.display = 'none';
+  connectButton.disabled = true;
   stopAllStreams();
   closePC();
 
@@ -56,10 +62,18 @@ connectButton.onclick = async () => {
 
   try {
     sessionClientAnswer = await createPeerConnection(offer, iceServers);
+    // Hide the loading icon
+    loadingIcon.style.display = 'none';
+    connectText.style.display = 'inline';
+    connectButton.disabled = false;
   } catch (e) {
     console.log('error during streaming setup', e);
     stopAllStreams();
     closePC();
+    // Hide the loading icon
+    loadingIcon.style.display = 'none';
+    connectText.style.display = 'inline';
+    connectButton.disabled = false;
     return;
   }
 

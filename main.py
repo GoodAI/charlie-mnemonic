@@ -28,7 +28,11 @@ WIP.
     version=version,
 )
 
-origins = os.getenv("ORIGINS").split(";")
+origins = os.getenv("ORIGINS")
+if origins:
+    origins = origins.split(";")
+else:
+    origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

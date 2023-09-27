@@ -106,6 +106,7 @@ class AddonManager:
         settings = {
             "addons": {},
             "audio": { "voice_input": True, "voice_output": True },
+            "avatar": { "avatar": False },
             "language": { "language": "en" },
             "system_prompt": { "system_prompt": "Not implemented yet" },
             "cot_enabled": { "cot_enabled": False },
@@ -154,6 +155,7 @@ class AddonManager:
                     "voice_input": settings.get("voice_input", False),
                     "voice_output": settings.get("voice_output", False)
                 },
+                "avatar": { "avatar": settings.get('avatar', False)},
                 "language": {"language": settings.get('language', {}).get('language', 'en')},
                 "system_prompt": {"system_prompt": settings.get('system_prompt', {}).get('system_prompt', 'Not implemented yet')},
                 "cot_enabled": {"cot_enabled": settings.get('cot_enabled', False)},

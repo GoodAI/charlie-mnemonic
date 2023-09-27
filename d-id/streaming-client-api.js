@@ -107,9 +107,24 @@ export async function generateVideoStream(message)
         session_id: sessionId,
       }),
     });
+
+    const { duration: duration, session_id: session_id, status: status } = await talkResponse.json();
+    if (status == "")
+    {
+      console.warn("failed to get video stream, refresh the session by clicking the button below the avatar");
+      duration = 0;
+    }
+    else if (status != "started")
+    {
+      console.error("unknown status when starting a video stream: " + status);
+      duration = 0;
+    }
+
+    return duration;
   }
 };
 
+/* We don't need the destroy button, since session will close automatically after 5 mins of inactivity
 const destroyButton = document.getElementById('destroy-button');
 destroyButton.onclick = async () => {
   await fetch(`${DID_API.url}/talks/streams/${streamId}`, {
@@ -124,6 +139,7 @@ destroyButton.onclick = async () => {
   stopAllStreams();
   closePC();
 };
+*/
 
 function onIceGatheringStateChange() {
   /* d-id connection status update

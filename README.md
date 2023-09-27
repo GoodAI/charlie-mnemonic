@@ -27,6 +27,8 @@ CLANG is a Python application that uses OpenAI’s GPT-4 model to provide an int
 - Uvicorn `sudo apt-get install uvicorn`
 - ffmpeg `sudo apt-get install ffmpeg` (On Windows: Download ffmpeg from the official website (https://ffmpeg.org/download.html) and add it to your system’s PATH.)
 
+### Addon prerequisites
+- Docker
 
 ### Setup
 
@@ -36,6 +38,12 @@ git clone https://github.com/airobinnet/CLANG.git
 cd CLANG
 ```
 1. 1. Checkout the correct branch 
+
+1. 2. build the pythondocker\Dockerfile
+```bash
+cd pythondocker
+docker build -t python-env .
+```
 
 2. It is recommended to run the application in a virtual environment. You can set it up and activate it using the following commands:
 ```bash

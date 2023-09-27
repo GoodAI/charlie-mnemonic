@@ -1,6 +1,9 @@
 import datetime
 import os
 import time
+import logs
+
+logger = logs.Log(__name__, 'agentmemory.log').get_logger()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -37,6 +40,11 @@ def create_memory(category, text, metadata={}, embedding=None, id=None, username
     # add timestamps to metadata
     metadata["created_at"] = datetime.datetime.now().timestamp()
     metadata["updated_at"] = datetime.datetime.now().timestamp()
+
+    logger.debug(f"created_at: {metadata['created_at']}")
+    #convert to human readable format
+    formatted_date = datetime.datetime.fromtimestamp(metadata['created_at']).strftime('%Y-%m-%d %H:%M:%S')
+    logger.debug(f"formatted_date: {formatted_date}")
 
     # if no id is provided, generate one based on count of documents in collection
     if id is None:
@@ -103,7 +111,7 @@ def create_unique_memory(category, content, metadata={}, similarity=0.95, userna
 def search_memory_by_date(
     category,
     search_text,
-    n_results=5,
+    n_results=100,
     filter_date=None,
     contains_text=None,
     include_embeddings=True,
@@ -114,19 +122,46 @@ def search_memory_by_date(
     username=None,
 ):
     if filter_date is not None:
-        # Convert filter_date to datetime object
-        filter_date = datetime.strptime(filter_date, '%Y-%m-%d')
-        
-        # Calculate the timestamps for the start and end of filter_date
-        start_of_date = datetime(filter_date.year, filter_date.month, filter_date.day)
-        end_of_date = start_of_date + datetime.timedelta(1)
-        start_timestamp = time.mktime(start_of_date.timetuple())
-        end_timestamp = time.mktime(end_of_date.timetuple())
-        
-        # Add these timestamps to your filter_metadata
-        filter_metadata = {'metadata.created_at': {'$gte': start_timestamp, '$lt': end_timestamp}}
-    else:
-        filter_metadata = None
+        # convert filter_date to string
+        filter_date = str(filter_date)
+        if isinstance(filter_date, str):
+            # List of date formats
+            logger.debug(f"filter_date: {filter_date}")
+            date_formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%m/%d/%Y', '%d-%m-%Y', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']
+
+            has_time = False  # Flag to track if the date format contains time
+
+            # Try parsing the date with each format
+            for date_format in date_formats:
+                try:
+                    filter_date = datetime.datetime.strptime(filter_date, date_format)
+                    if '%H:%M:%S' in date_format and filter_date.time() != datetime.time(0, 0):  # Check if the date format contains time and it is not 00:00
+                        has_time = True
+                    break
+                except ValueError:
+                    continue
+
+            # Calculate the timestamps for the start and end of filter_date
+            start_of_date = datetime.datetime(filter_date.year, filter_date.month, filter_date.day, filter_date.hour, filter_date.minute, filter_date.second)
+            logger.debug(f"start_of_date: {start_of_date}")
+            if has_time:  # If the date format contains time and it is not 00:00, add an hour
+                end_of_date = start_of_date + datetime.timedelta(hours=1)
+                logger.debug(f"end_of_date: {end_of_date}")
+            else:  # Otherwise, add a day
+                end_of_date = start_of_date + datetime.timedelta(days=1)
+                logger.debug(f"end_of_date: {end_of_date}")
+            start_timestamp = start_of_date.timestamp() - 0.000001
+            end_timestamp = end_of_date.timestamp() + 0.000001
+            logger.debug(f"start_timestamp: {start_timestamp}")
+            logger.debug(f"end_timestamp: {end_timestamp}")
+
+            #filter_metadata = {'created_at': {'$gte': start_timestamp}}
+            #filter_metadata = {'created_at': {'$lte': end_timestamp}}
+            filter_metadata = {'$and': [{'created_at': {'$gt': start_timestamp}}, {'created_at': {'$lt': end_timestamp}}]}
+        else:
+            logger.error(f"filter_date must be a string")
+            return ValueError('filter_date must be a string')
+        logger.debug(f"filter_metadata: {filter_metadata}")
 
     return search_memory(
         category=category,
@@ -142,10 +177,68 @@ def search_memory_by_date(
         username=username
     )
 
+def get_memory_by_date(
+    category,
+    filter_date=None,
+    username=None,
+):
+    if filter_date is not None:
+        # convert filter_date to string
+        filter_date = str(filter_date)
+        if isinstance(filter_date, str):
+            # List of date formats
+            date_formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%m/%d/%Y', '%d-%m-%Y', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']
+
+            has_time = False  # Flag to track if the date format contains time
+
+            # Try parsing the date with each format
+            for date_format in date_formats:
+                try:
+                    filter_date = datetime.datetime.strptime(filter_date, date_format)
+                    if '%H:%M:%S' in date_format and filter_date.time() != datetime.time(0, 0):  # Check if the date format contains time
+                        has_time = True
+                    break
+                except ValueError:
+                    continue
+
+            # Calculate the timestamps for the start and end of filter_date
+            start_of_date = datetime.datetime(filter_date.year, filter_date.month, filter_date.day, filter_date.hour, filter_date.minute, filter_date.second)
+            logger.debug(f"start_of_date: {start_of_date}")
+            if has_time:  # If the date format contains time, add an hour
+                end_of_date = start_of_date + datetime.timedelta(hours=1)
+                logger.debug(f"end_of_date: {end_of_date}")
+            else:  # Otherwise, add a day
+                end_of_date = start_of_date + datetime.timedelta(days=1)
+                logger.debug(f"end_of_date: {end_of_date}")
+            start_timestamp = start_of_date.timestamp()
+            end_timestamp = end_of_date.timestamp()
+            logger.debug(f"start_timestamp: {start_timestamp}")
+            logger.debug(f"end_timestamp: {end_timestamp}")
+
+            # memories = get_client(username=username).get_or_create_collection(category)
+            # memories.get(where={'$and': [{'created_at': {'$gte': start_timestamp}}, {'created_at': {'$lt': int(end_timestamp)}}]})
+            # print(f"memories: {memories}")
+
+            #filter_metadata = {'created_at': {'$gte': start_timestamp}}
+            #filter_metadata = {'created_at': {'$lte': end_timestamp}}
+            memories = get_client(username=username).get_or_create_collection(category)
+            for memory in memories:
+                #print(f"memory: {memory}")
+                pass
+            results = memories.get(where={'$and': [{'created_at': {'$gt': start_timestamp}}, {'created_at': {'$lt': end_timestamp}}]})
+            #print(f"memories: {results}")
+            query = flatten_arrays(results)
+            #print(f"query: {query}")
+
+            # convert the query response to list and return
+            result_list = chroma_collection_to_list(query)
+            #print(f"result_list: {result_list}")
+            return result_list
+
 def search_memory(
     category,
     search_text,
-    n_results=5,
+    n_results=50,
     filter_metadata=None,
     contains_text=None,
     include_embeddings=True,

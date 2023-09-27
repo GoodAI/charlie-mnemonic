@@ -14,6 +14,9 @@ from database import Database
 from memory import export_memory_to_file, import_file_to_memory, wipe_all_memories, stop_database
 import tempfile
 import zipfile
+import logs
+
+logger = logs.Log(__name__, 'routes.log').get_logger()
 
 router = APIRouter()
 templates = Jinja2Templates(directory="static")
@@ -47,14 +50,14 @@ def get_token(request: Request):
 
 async def send_debug_message(username: str, message: str):
     connection = connections.get(username)
-    print(f"connection length: {len(connections)}")
+    #logger.info(f"connection length: {len(connections)}")
     if connection:
         try:
             await connection.send_text(message)
         except Exception as e:
-            print(f"An error occurred when sending a message to user {username}: {e}")
+            logger.error(f"An error occurred when sending a message to user {username}: {e}")
     else:
-        print(f"No active websocket connection for user {username}")
+        logger.error(f"No active websocket connection for user {username}")
 
 
 @router.websocket("/ws/{username}")
@@ -67,21 +70,20 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
             if data == 'ping':
                 await websocket.send_text('pong')
             else:
-                print(f'User {username} sent: {data}')
                 # Send a response back to the client
                 await websocket.send_text(f'Received: {data}')
     except WebSocketDisconnect:
         # Handle client disconnection
         del connections[username]
-        print(f'User {username} disconnected')
+        logger.debug(f'User {username} disconnected')
     except ConnectionResetError:
         # Handle client disconnection
         del connections[username]
-        print(f'User {username} disconnected')
+        logger.debug(f'User {username} disconnected')
     except Exception as e:
         # Handle any other exceptions
         del connections[username]
-        print(f'An error occurred with user {username}: {e}')
+        logger.error(f'An error occurred with user {username}: {e}')
 
 # register route
 @router.post(
@@ -261,7 +263,6 @@ async def check_token(user: UserCheckToken):
     },)
 async def handle_get_settings(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
-    print('session_token: ' + str(session_token))
     auth = Authentication()
     success = auth.check_token(user.username, session_token)
     if not success:
@@ -269,7 +270,8 @@ async def handle_get_settings(request: Request, user: UserName):
     await AddonManager.load_addons(user.username, users_dir)
     with open(os.path.join(users_dir, user.username, 'settings.json'), 'r') as f:
         settings = json.load(f)
-    print(settings)
+    logger.debug(f'Loaded settings for user {user.username}')
+    logger.debug(settings)
     total_tokens_used, total_cost = get_token_usage(user.username)
     settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     return settings
@@ -343,7 +345,6 @@ def count_tokens(message):
         },
     },)
 async def handle_update_settings(request: Request, user: editSettings):
-    print(user)
     session_token = request.cookies.get("session_token")
     auth = Authentication()
     success = auth.check_token(user.username, session_token)

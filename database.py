@@ -1,5 +1,8 @@
 import psycopg2
 import os
+import logs
+
+logger = logs.Log(__name__, 'database.log').get_logger()
 
 DATABASE_URL = os.environ['DATABASE_URL']
 PRODUCTION = os.environ['PRODUCTION']
@@ -135,12 +138,12 @@ class Database:
 
     def execute_migration(self, migration):
         if not self.has_migration_been_executed(migration['name']):
-            print(f'Executing migration: {migration["name"]}')
+            logger.info(f'Executing migration: {migration["name"]}')
             self.cursor.execute(migration['query'])
             self.conn.commit()
             self.log_migration(migration['name'])
         else:
-            print(f'Migration already executed: {migration["name"]}')
+            logger.info(f'Migration already executed: {migration["name"]}')
 
     def migrate_table(self):
         for migration in self.migrations:

@@ -85,6 +85,10 @@ h3{
     background: #a6c1ee;
 }
 
+.input-field button[disabled]:hover {
+    background: #e2c3c3;
+}
+
 .input-field .send-button {
     background: #c3cfe2;
     color: white;
@@ -104,6 +108,10 @@ h3{
 
 .input-field .send-button:hover {
     background: #a6c1ee;
+}
+
+.input-field .send-button[disabled]:hover {
+    background: #e2c3c3;
 }
 
 .message {

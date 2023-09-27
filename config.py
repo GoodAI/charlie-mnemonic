@@ -8,6 +8,7 @@ load_dotenv()
 api_keys = {
     "openai": os.getenv("OPENAI_API_KEY"),
     "chatgpt_model": os.getenv("CHATGPT_MODEL"),
+    "memory_model": os.getenv("MEMORY_MODEL"),
     "openai_embedding_model": os.getenv("OPENAI_EMBEDDING_MODEL"),
     "openweather": os.getenv("OPENWEATHER_API_KEY"),
     "google": os.getenv("GOOGLE_API_KEY"),

@@ -8,7 +8,7 @@ import re
 import sys
 import time
 import uuid
-from memory import MemoryManager
+import memory as _memory
 import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
 from elevenlabs import generate, play, set_api_key
@@ -18,7 +18,8 @@ from pathlib import Path
 from config import api_keys
 from database import Database
 import tiktoken
-from pydub import AudioSegment
+from pydub import audio_segment
+import logs
 
 
 # Set ElevenLabs API key
@@ -32,6 +33,9 @@ max_tokens = 512
 last_messages = {}
 COT_RETRIES = {}
 
+
+    
+logger = logs.Log(__name__, 'utils.log').get_logger()
 
 class MessageSender:
     """This class contains functions to send messages to the user"""
@@ -81,7 +85,7 @@ class MessageSender:
 
             db.conn.commit()
         except Exception as e:
-            print(f"An error occurred: {e}")
+            logger.error(f"An error occurred: {e}")
             MessageSender.send_message({"error": "An error occurred: " + str(e)}, 'red', username)
         finally:
             db.close()
@@ -263,20 +267,20 @@ class OpenAIResponser:
                 await MessageSender.update_token_usage(response, username)
                 return response
             except asyncio.TimeoutError:
-                #print(f"Request timed out, retrying {i+1}/{max_retries}")
+                logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
                 await MessageSender.send_message( { "error": f"Request timed out, retrying {i+1}/{max_retries}" }, "red", username )
             except Exception as e:
-                #print(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
                 await MessageSender.send_message( { "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}" }, "red", username )
         
-        #print("Max retries exceeded")
+        logger.error("Max retries exceeded")
         await MessageSender.send_message( { "error": "Max retries exceeded" }, "red", username )
         raise HTTPException(503, self.error503)
 
     # Todo: add a setting to enable/disable this feature and add the necessary code
     async def get_response_stream(self, messages):
         response = await self.get_response(messages, stream=True)
-        print("Streaming response")
+        logger.info("Streaming response")
         for chunk in response:
             current_content = chunk["choices"][0]["delta"].get("content", "")
             yield current_content
@@ -317,7 +321,7 @@ class AudioProcessor:
     def check_voice(filepath):
         audio = AudioSegment.from_file(filepath)
         if audio.dBFS < -40:  #  Decrease for quieter voices (-50), increase for louder voices (-20)
-            print('No voice detected, dBFS: ' + str(audio.dBFS))
+            logger.info('No voice detected, dBFS: ' + str(audio.dBFS))
             return False
         return True
 
@@ -369,7 +373,7 @@ class AudioProcessor:
             return audio_path, audio
 
         except Exception as e:
-            return print(e)
+            return logger.error(e)
 
 class BrainProcessor:
     """This class contains functions to process the brain"""
@@ -477,7 +481,7 @@ class MessageParser:
         try:
             function_response = function(**args)
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
             function_response = {"content": "error: " + str(e)}
         return function_response
 
@@ -486,7 +490,7 @@ class MessageParser:
         try:
             function_response = await function(**args)
         except Exception as e:
-            print(f"Error: {e}")
+            logger.error(f"Error: {e}")
             function_response = {"content": "error: " + str(e)}
         return function_response
 
@@ -497,7 +501,10 @@ class MessageParser:
             # add the username to the arguments
             converted_function_call_arguments['username'] = username
         except:
-            await exception_handler(message, og_message, function_dict, function_metadata, username, users_dir, steps_string, full_response, background_tasks)
+            if (exception_handler is process_chain_thoughts):
+                await exception_handler(full_response, message, og_message, function_dict, function_metadata, username, users_dir)
+            else:
+                await exception_handler(message, og_message, function_dict, function_metadata, username, users_dir, steps_string, full_response, background_tasks)
             raise
         new_message = {
             "functioncall": "yes", 
@@ -547,8 +554,8 @@ class MessageParser:
                 # history_ids.append(str(uuid.uuid4()))
                 # history_ids.append(str(uuid.uuid4()))
                 # brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
-                memory = MemoryManager()
-                await memory.process_incoming_memory_assistant('responses', f"Assistant: {response['content']}", username)
+                memory = _memory.MemoryManager()
+                await memory.process_incoming_memory_assistant('active_brain', f"Assistant: {response['content']}", username)
                 #background_tasks.add_task(BrainProcessor.keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
         return response
     
@@ -558,7 +565,7 @@ class MessageParser:
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:
-            print("Warning: model not found. Using cl100k_base encoding.")
+            logger.warning("Warning: model not found. Using cl100k_base encoding.")
             encoding = tiktoken.get_encoding("cl100k_base")
         num_tokens = len(encoding.encode(string))
         return num_tokens
@@ -569,7 +576,7 @@ class MessageParser:
         try:
             encoding = tiktoken.encoding_for_model(model)
         except KeyError:
-            print("Warning: model not found. Using cl100k_base encoding.")
+            logger.warning("Warning: model not found. Using cl100k_base encoding.")
             encoding = tiktoken.get_encoding("cl100k_base")
         
         num_tokens = 0
@@ -599,7 +606,7 @@ class MessageParser:
                                     function_tokens += 3
                                     function_tokens += len(encoding.encode(o))
                             else:
-                                print(f"Warning: not supported field {field}")
+                                logger.warning(f"Warning: not supported field {field}")
                     function_tokens += 11
 
             num_tokens += function_tokens
@@ -646,7 +653,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
 
     function_call_token_usage = MessageParser.num_tokens_from_functions(function_metadata, "gpt-4")
-    print(f"function_call_token_usage: {function_call_token_usage}")
+    logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
 
     # load the setting for the user
@@ -676,34 +683,41 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     #print(f"message_tokens: {message_tokens}")
     token_usage += message_tokens
     remaining_tokens = max_token_usage - token_usage
-    #print(f"remaining_tokens: {remaining_tokens}")
-    verbose = settings.get('verbose', {}).get('verbose', False)
-    memory = MemoryManager()
+    logger.debug(f"1. remaining_tokens: {remaining_tokens}")
+    verbose = settings.get('verbose').get('verbose')
+    memory = _memory.MemoryManager()
     kw_brain_string, token_usage_active_brain, unique_results1 = await memory.process_active_brain(f'{message}', username, all_messages, remaining_tokens, verbose)
 
     token_usage += token_usage_active_brain
-    remaining_tokens = max_token_usage - token_usage
-    #print(f"remaining_tokens: {remaining_tokens}")
-    
+    remaining_tokens = remaining_tokens - token_usage_active_brain
+    logger.debug(f"2. remaining_tokens: {remaining_tokens}")
+
+    episodic_memory, timezone = await memory.process_episodic_memory(f'{message}', username, all_messages, remaining_tokens, verbose)
+    if episodic_memory is None or episodic_memory == '':
+        episodic_memory_string = ''
+    else:
+        episodic_memory_string = f"""Episodic Memory of:{timezone}\n{episodic_memory}\n"""
+    episodic_memory_tokens = MessageParser.num_tokens_from_string(episodic_memory_string, "gpt-4")
+    token_usage += episodic_memory_tokens
+    remaining_tokens = remaining_tokens - episodic_memory_tokens
+    logger.debug(f"3. remaining_tokens: {remaining_tokens}")
+
     results, token_usage_relevant_memory, unique_results2 = await memory.process_incoming_memory(None, f'{message}', username, remaining_tokens, verbose)
-
     merged_results_dict = {id: (document, distance) for id, document, distance in unique_results1.union(unique_results2)}
-
     merged_results_list = [(id, document, distance) for id, (document, distance) in merged_results_dict.items()]
-
     merged_results_list.sort(key=lambda x: int(x[0]))
 
     # Create the result string
     merged_result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in merged_results_list)
     token_usage += token_usage_relevant_memory
-    remaining_tokens = max_token_usage - token_usage
-    #print(f"remaining_tokens: {remaining_tokens}")
+    remaining_tokens = remaining_tokens - token_usage_relevant_memory
+    logger.debug(f"4. remaining_tokens: {remaining_tokens}")
 
     # process the results
     history_string = results
 
     observations = 'No observations available.'
-    instruction_string = f"""\nObservations:\n{observations}\n"""
+    instruction_string = f"""{episodic_memory_string}\nObservations:\n{observations}\n"""
 
     notes = await memory.note_taking(all_messages, message, users_dir, username, False, verbose)
 
@@ -716,8 +730,9 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 
     await MessageSender.send_message(f"[{full_message}]", 'blue', username)
 
-    is_cot_enabled = settings.get('cot_enabled', {}).get('cot_enabled', False)
-    print(f"is_cot_enabled: {is_cot_enabled}")
+    cot_settings = settings.get('cot_enabled')
+    is_cot_enabled = cot_settings.get('cot_enabled')
+    logger.debug(f"is_cot_enabled: {is_cot_enabled}")
     if is_cot_enabled:
         response = await start_chain_thoughts(full_message, og_message, username, users_dir)
     else:
@@ -818,7 +833,7 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
             await MessageSender.send_debug(f"processing step: {step}", 1, 'green', username)
             # convert the list to a string before passing it to process_cot_messages
             steps_string = ''.join(steps_list)
-            response = await process_cot_messages(step, steps_string, function_dict, function_metadata, og_message, username, users_dir, message)
+            response = await process_cot_messages(step, function_dict, function_metadata, username, users_dir, steps_string, message, og_message)
             # truncate the response string if it's not one of the last three steps
             response_str = str(response)
             if i < len(steps) - 3:
@@ -857,7 +872,7 @@ Please follow these instructions carefully. If nothing changes, return a copy of
 
 
 
-async def process_cot_messages(message, steps_string, function_dict, function_metadata, og_message, username, users_dir, full_message=''):
+async def process_cot_messages(message, function_dict, function_metadata, username, users_dir, steps_string, full_message='', og_message=''):
         function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
 
         messages = [
@@ -1002,5 +1017,5 @@ async def process_final_message(message, og_message, response, username, users_d
 def check_api_keys():
     OPENAI_API_KEY = api_keys['openai']
     if not len(OPENAI_API_KEY):
-        print("Please set OPENAI_API_KEY environment variable. Exiting.")
+        logger.critical("Please set OPENAI_API_KEY environment variable. Exiting.")
         sys.exit(1)

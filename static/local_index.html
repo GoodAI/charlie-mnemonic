@@ -31,6 +31,10 @@
         let user_name = '';
         let errorMessage = '';
         let max_message_tokens = 1000;
+        var canSend = true;
+        var canRecord = true;
+        var isWaiting = false;
+        var isRecording = false;
 
         // set a temporary socket
         var socket = {
@@ -110,7 +114,7 @@
                     menuItem.onclick = (function(addon) {
                         return function(e) {
                             e.preventDefault();
-                            edit_addon_status(addon, !settings.addons[addon]);
+                            edit_status('addons', addon, !settings.addons[addon]);
                             console.log('change_addon_status: ', addon, !settings.addons[addon]);
                         };
                     })(addon);
@@ -134,7 +138,7 @@
                     audioItem.onclick = (function(audio) {
                         return function(e) {
                             e.preventDefault();
-                            edit_audio_status(audio, !settings.audio[audio]);
+                            edit_status('audio', audio, !settings.audio[audio]);
                             console.log('change_audio_status: ', audio, !settings.audio[audio]);
                         };
                     })(audio);
@@ -162,7 +166,7 @@
             languageItem.appendChild(option2);
             languageItem.value = settings.language.language;
             languageItem.onchange = function(e) {
-                edit_language_status(e.target.value);
+                edit_status('language', 'language', e.target.value);
                 console.log('change_language_status: ', e.target.value);
             }
             settingsMenu.appendChild(languageItem);
@@ -179,7 +183,7 @@
             systemPromptItem.name = 'system_prompt';
             systemPromptItem.value = settings.system_prompt.system_prompt;
             systemPromptItem.onchange = function(e) {
-                edit_system_prompt_status(e.target.value);
+                edit_status('system_prompt', 'system_prompt', e.target.value);
                 console.log('change_system_prompt_status: ', e.target.value);
             }
             settingsMenu.appendChild(systemPromptItem);
@@ -197,7 +201,7 @@
             verboseItem.innerHTML = 'See Memory Retrieval: ' + status;
             verboseItem.onclick = function(e) {
                 e.preventDefault();
-                edit_verbose_status(!settings.verbose.verbose);
+                edit_status('verbose', 'verbose', !settings.verbose.verbose);
                 console.log('change_verbose_status: ', !settings.verbose.verbose);
             }
             settingsMenu.appendChild(verboseItem);
@@ -209,7 +213,7 @@
             cotItem.innerHTML = 'Chain of thought (experimental): ' + status;
             cotItem.onclick = function(e) {
                 e.preventDefault();
-                edit_cot_status(!settings.cot_enabled.cot_enabled);
+                edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
                 console.log('change_cot_status: ', !settings.cot_enabled.cot_enabled);
             }
             settingsMenu.appendChild(cotItem);
@@ -218,97 +222,13 @@
 
         };
 
-        function edit_verbose_status(verbose) {
+        function edit_status(category, setting, value) {
             fetch(API_URL + '/update_settings/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ category: 'verbose', setting: 'verbose', value: verbose, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        function edit_cot_status(cot_enabled) {
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'cot_enabled', setting: 'cot_enabled', value: cot_enabled, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        function edit_addon_status(addon, enabled) {
-            // edit the addon status
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'addons', setting: addon, value: enabled, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        // function for handling audio
-        function edit_audio_status(audio, enabled) {
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'audio', setting: audio, value: enabled, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        // function for handling language status
-        function edit_language_status(language) {
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'language', setting: 'language', value: language, username: user_name }),
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(data => {
-                setSettings(data);
-            })
-            .catch(console.error);
-        };
-
-        // function for handling system prompt status
-        function edit_system_prompt_status(system_prompt) {
-            fetch(API_URL + '/update_settings/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ category: 'system_prompt', setting: 'system_prompt', value: system_prompt, username: user_name }),
+                body: JSON.stringify({ category: category, setting: setting, value: value, username: user_name }),
                 credentials: 'include'
             })
             .then(response => response.json())
@@ -383,8 +303,11 @@
 
             document.getElementById('messages').innerHTML += chatMessage;
             // enable the send  and record button again
-            document.getElementById('send').disabled = false;
-            document.getElementById('record').disabled = false;
+            canSend = true;
+            canRecord = true;
+            isWaiting = false;
+            isRecording = false;
+            canSendMessage();
             document.getElementById('message').placeholder = 'Type a message...';
         };
 
@@ -943,20 +866,20 @@
                     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
                 }
                 content = '';
-                document.getElementById('send').disabled = false;
-                record_button = document.getElementById('record');
-                if (record_button) {
-                    record_button.disabled = false;
-                }
+                canSend = true;
+                canRecord = true;
+                isWaiting = false;
+                isRecording = false;
+                canSendMessage();
                 document.getElementById('message').placeholder = 'Type a message...';
             }
             // enable the send button if the message received contains 'end': 'true'
             if (msg && msg.end && msg.end === 'true') {
-                document.getElementById('send').disabled = false;
-                record_button = document.getElementById('record');
-                if (record_button) {
-                    record_button.disabled = false;
-                }
+                canSend = true;
+                canRecord = true;
+                isWaiting = false;
+                isRecording = false;
+                canSendMessage();
                 document.getElementById('message').placeholder = 'Type a message...';
             }
         };
@@ -1134,8 +1057,11 @@
         document.getElementById('message').placeholder = 'Please wait for the response...';
 
         // disable the send button
-        document.getElementById('send').disabled = true;
-        document.getElementById('record').disabled = true;
+        canSend = false;
+        canRecord = false;
+        isRecording = false;
+        isWaiting = true;
+        canSendMessage();
     }
 
     function addExternalMessage(message) {
@@ -1164,14 +1090,19 @@
         document.getElementById('message').placeholder = 'Please wait for the response...';
 
         // disable the send button
-        document.getElementById('send').disabled = true;
-        document.getElementById('record').disabled = true;
+        canSend = false;
+        canSendMessage();
     }
 
     async function sendMessageToServer(message) {
         if (message === undefined) {
             message = document.getElementById('message').value;
         }
+        canRecord = false;
+        canSend = false;
+        isWaiting = true;
+        isRecording = false;
+        canSendMessage();
         addUserMessage(message);
         try {
             const response = await fetch(API_URL + '/message/', {
@@ -1355,14 +1286,22 @@
             chunks = [];
             document.getElementById('record').innerText = "Record";
             document.getElementById('recordingIndicator').style.display = "none";
-            document.getElementById('send').disabled = true;
-            document.getElementById('record').disabled = true;
+            canSend = true;
+            canRecord = true;
+            isRecording = false;
+            isWaiting = true;
+            canSendMessage();
         } else {
             // If we're not, start a new recording
             navigator.mediaDevices.getUserMedia({ audio: true })
             .then(function(stream) {
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.start();
+                canSend = false;
+                canRecord = true;
+                isRecording = true;
+                isWaiting = false;
+                canSendMessage();
 
                 mediaRecorder.ondataavailable = function(e) {
                     chunks.push(e.data);
@@ -1387,13 +1326,20 @@
                 // Reset the UI
                 document.getElementById('record').innerText = "Record";
                 document.getElementById('recordingIndicator').style.display = "none";
-                document.getElementById('send').disabled = false;
-                document.getElementById('record').disabled = false;
+                canSend = true;
+                canRecord = true;
+                isRecording = false;
+                isWaiting = false;
+                canSendMessage();
             })
 
             document.getElementById('record').innerText = "Stop";
             document.getElementById('recordingIndicator').style.display = "block";
-            document.getElementById('send').disabled = true;
+            canSend = false;
+            canRecord = false;
+            isRecording = true;
+            isWaiting = true;
+            canSendMessage();
         }
     });
 
@@ -1416,13 +1362,14 @@
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
-                document.getElementById('send').disabled = false;
-                record_button = document.getElementById('record');
-                if (record_button) {
-                    record_button.disabled = false;
-                }
+                canSend = true;
+                canRecord = true;
+                isWaiting = false;
+                isRecording = false;
+                canSendMessage();
                 return;
             }
+            // todo: add option toggle to send immediatly or send to text box first
             sendMessageToServer(data.transcription);
         })
         .catch(console.error);
@@ -1719,6 +1666,30 @@
         }
     }
 
+    function canSendMessage() {
+        record_button = document.getElementById('record');
+        if (record_button) {
+                    record_button.disabled = false;
+                }
+        if (canSend && !isWaiting && !isRecording)
+        {
+            document.getElementById('send').disabled = false;
+                if (record_button) {
+                    record_button.disabled = false;
+                }
+        }
+        if (!canSend)
+        {
+            document.getElementById('send').disabled = true;
+        }
+        if (isWaiting)
+        {
+            document.getElementById('send').disabled = true;
+            if (record_button) {
+                record_button.disabled = true;
+            }
+        }
+    }
 
     </script>
     <script type="module" src="cl100k_base.js"></script>
@@ -1738,10 +1709,12 @@
             cost = tokens_used * 0.03 / 1000;
             countDiv.textContent = `Characters: ${message_lenght} - Tokens: ${tokens_used}/${max_message_tokens} - Cost: $${cost.toFixed(4)}`;
             // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
-            if (tokens_used > max_message_tokens) {
-                message.value = lastValidMessage;
+            if (tokens_used > max_message_tokens && message.value.trim() != '') {
+                canSend = false;
+                canSendMessage();
             } else {
-                lastValidMessage = message.value;
+                canSend = true;
+                canSendMessage();
             }
         });
     </script>

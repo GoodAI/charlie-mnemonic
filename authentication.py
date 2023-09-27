@@ -4,6 +4,9 @@ import binascii
 import os
 from fastapi import HTTPException
 from database import Database
+import logs
+
+logger = logs.Log(__name__, 'authentication.log').get_logger()
 
 DATABASE_URL = os.environ['DATABASE_URL']
 PRODUCTION = os.environ['PRODUCTION']
@@ -48,7 +51,7 @@ class Authentication:
         self.db.cursor.execute("UPDATE users SET session_token = %s WHERE username = %s", (session_token, username))
         self.db.conn.commit()
         self.db.close()
-        print(f'User: {username} - Session token: {session_token}')
+        logger.debug(f'User: {username} - Session token: {session_token}')
         # Return the session token
         return session_token
         

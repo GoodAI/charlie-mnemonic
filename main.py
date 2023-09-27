@@ -2,11 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from routes import router
-import logging
 from config import api_keys
 import openai
 from database import Database
 import utils
+import nltk
+
+nltk.download('punkt')
 
 version = utils.SettingsManager.get_version()
 
@@ -15,15 +17,6 @@ openai.api_key = api_keys["openai"]
 
 db = Database()
 db.setup_database()
-
-# add more logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.StreamHandler()
-    ]
-)
 
 # Defining the FastAPI app and metadata
 app = FastAPI(

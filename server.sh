@@ -8,7 +8,7 @@ start() {
 
 stop() {
     kill -15 $(cat server.pid)
-    sleep 120
+    sleep 60
     if ps -p $(cat server.pid) > /dev/null; then
        kill -9 $(cat server.pid)
     fi

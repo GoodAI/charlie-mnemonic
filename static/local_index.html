@@ -17,8 +17,6 @@
 
     <link rel="stylesheet" href="styles.css?v=0.34">
 
-
-</head>
     <script>
         const API_URL = 'https://' + document.domain;
         //const port = 8002;
@@ -148,6 +146,24 @@
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
 
+            // Populate avatar settings
+            h3 = document.createElement('h3');
+            h3.textContent = 'Avatar';
+            settingsMenu.appendChild(h3);
+
+            var avatarItem = document.createElement('a');
+            avatarItem.href = "#";
+            var status = settings.avatar.avatar ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+            avatarItem.innerHTML = 'Enable avatar: ' + status;
+            avatarItem.onclick = function(e) {
+                e.preventDefault();
+                edit_status('avatar', 'avatar', !settings.avatar.avatar);
+                console.log('change_avatar_status: ', !settings.avatar.avatar);
+            };
+            settingsMenu.appendChild(avatarItem);
+            var br = document.createElement('br');
+            settingsMenu.appendChild(br);
+
             // Populate language settings
             h3 = document.createElement('h3');
             h3.textContent = 'Language';
@@ -267,7 +283,18 @@
                 } else {
                     $('#record').hide();
                 }
-                return;
+
+                if (newSettings.avatar.avatar)
+                {
+                    $('#d-id-content').show();
+                    document.getElementById("chat-container").style.minWidth= "50vw";
+                    document.getElementById("chat-container").style.maxWidth= "50vw";
+                }
+                else
+                {
+                    $('#d-id-content').hide();
+                    document.getElementById("chat-container").style.minWidth= "80vw";
+                }
             }
         };
 
@@ -790,7 +817,7 @@
             addExternalMessage(msg);
         };
 
-        function onResponse(msg){
+        async function onResponse(msg){
             var timestamp = new Date().toLocaleTimeString();
             
             // be sure the msg is converted to json
@@ -838,6 +865,27 @@
                 else {
                     tempFormatted = marked(tempReceived);
                 }
+
+                if (settings.avatar.avatar) {
+                    // D-ID avatar
+                    var textToSay = tempReceived.replace(/\n/g, "");
+                    var videoDuration = 0;
+                    var videoPromise;
+                    await import('./d-id/streaming-client-api.js').then(
+                        did => { videoPromise = did.generateVideoStream(textToSay); });
+                    
+                    videoDuration = await videoPromise;
+                    if (videoDuration > 0) {
+                        var numCredits = Math.ceil(videoDuration / 15.0);
+                        var cost = 18.0 * numCredits / 120.0;
+                        console.log("video stream will start soon. duration: " + videoDuration + "; d-id credits: " +  numCredits + "; cost: " +  cost);
+
+                    // Sleep for 3s until the video is ready
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                }
+                    
+                
                 audioElement = '';
                 if(settings.audio.voice_output) {
                     var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
@@ -890,6 +938,7 @@
             return div.innerHTML;
         };
     </script>
+
 </head>
 <body>
     <!-- Socket Info -->
@@ -987,6 +1036,9 @@
             <div id="overlay-loader"></div>
         </div>
     </div>
+    <table>
+        <tr>
+            <td>
         <div id="chat-container" class="chat-container">
             <div id="messages"></div>
             <div class="message-container">
@@ -1009,6 +1061,41 @@
                 </div>
             </div>
         </div>
+    </td>
+    <td>
+
+        <!-- D-ID -->
+        <div id="d-id-content" min-width="400" min-height="400" style="flex: 10%; margin-left: 40px; display: none;">
+            <div id="video-wrapper">
+            <div>
+                <video id="talk-video" width="400" height="400" autoplay></video>
+            </div>
+            </div>
+            <br />
+    
+            <div id="buttons">
+            <button id="connect-button" type="button"><span id="avatar-button-text">Show the avatar</span><span id="loading-icon" style="display: none;"><div class="spinner"></div></span></button>
+            <!-- We don't need the destroy button, since session will close automatically after 5 mins of inactivity
+                <button id="destroy-button" type="button">Destroy</button> 
+            !-->
+            </div>
+    
+            <!-- d-id connection status:
+            <div id="status">
+            ICE gathering status: <label id="ice-gathering-status-label"></label
+            >
+            ICE status: <label id="ice-status-label"></label>
+            Peer connection status: <label id="peer-status-label"></label>
+            Signaling status: <label id="signaling-status-label"></label>
+            Streaming status: <label id="streaming-status-label"></label>
+            </div>
+            !-->
+        </div>
+    </div>
+        <script type="module" src="./d-id/index.js"></script>
+    </td>
+    </tr>
+    </table>
     </body>
     <script>
     let session_token = '';
@@ -1115,7 +1202,7 @@
             });
 
             const data = await handleError(response);
-            onResponse(data);
+            await onResponse(data);
 
         } catch (error) {
             console.error('Failed to send message: ', error);
@@ -1386,6 +1473,22 @@
             $('#record').show();
         } else {
             $('#record').hide();
+        }
+    });
+
+    $('#avatar-checkbox').change(function() {
+        var settings = {
+            avatar: $('#avatar-checkbox').prop('checked')
+        };
+
+        // Show or hide D-ID content based on the setting
+        if (settings.avatar) {
+            $('#d-id-content').show();
+            document.getElementById("chat-container").style.minWidth= "50vw";
+            document.getElementById("chat-container").style.maxWidth= "50vw";
+        } else {
+            $('#d-id-content').hide();
+            document.getElementById("chat-container").style.minWidth= "80vw";
         }
     });
 

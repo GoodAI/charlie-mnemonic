@@ -1815,6 +1815,10 @@
             if (tokens_used > max_message_tokens && message.value.trim() != '') {
                 canSend = false;
                 canSendMessage();
+            }
+            else if (message.value.trim() == '') {
+                canSend = false;
+                canSendMessage();
             } else {
                 canSend = true;
                 canSendMessage();

@@ -319,7 +319,7 @@ class AudioProcessor:
 
     @staticmethod
     def check_voice(filepath):
-        audio = AudioSegment.from_file(filepath)
+        audio = audio_segment.AudioSegment.from_file(filepath)
         if audio.dBFS < -40:  #  Decrease for quieter voices (-50), increase for louder voices (-20)
             logger.info('No voice detected, dBFS: ' + str(audio.dBFS))
             return False

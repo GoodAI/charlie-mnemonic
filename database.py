@@ -151,7 +151,11 @@ class Database:
     
     def get_daily_limit(self):
         self.cursor.execute("SELECT daily_spending_limit FROM admin_controls")
-        daily_limit = self.cursor.fetchone()[0]
+        row = self.cursor.fetchone()
+        if row is not None:
+            daily_limit = row[0]
+        else:
+            daily_limit = 1
         return daily_limit
 
 

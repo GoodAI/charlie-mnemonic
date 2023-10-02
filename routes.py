@@ -20,6 +20,7 @@ import logs
 from typing import Optional
 
 logger = logs.Log(__name__, 'full_log.log').get_logger()
+from config import api_keys
 
 router = APIRouter()
 templates = Jinja2Templates(directory="static")
@@ -33,6 +34,26 @@ ORIGINS = "https://clang.goodai.com"
 users_dir = 'users' # end with a slash
 
 router.mount("/static", StaticFiles(directory="static"), name="static")
+router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
+
+@router.get("/d-id/api.json")
+async def read_did_api_json():
+    if PRODUCTION == 'true':
+        raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        data = { "key" : api_keys['d-id'], "url" : "https://api.d-id.com" }
+        return JSONResponse(content=data)
+
+@router.get("/d-id/{file}")
+async def read_did(file: str):
+    if PRODUCTION == 'true':
+        raise HTTPException(status_code=404, detail="Item not found")
+    else:
+        try:
+            return FileResponse(f'd-id/{file}')
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Item not found")
+
 
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -50,6 +71,13 @@ async def read_root(request: Request):
             return templates.TemplateResponse("local_index.html", {"request": request, "version": version, "daily_limit": daily_limit})
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
+    
+@router.get("/styles.css")
+async def read_root():
+    try:
+        return FileResponse('static/styles.css')
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 def get_token(request: Request):
     return request.cookies.get('session_token')

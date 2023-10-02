@@ -8,7 +8,7 @@ class TestMemory(unittest.TestCase):
         category = "active_brain"
         new_messages = 'Bob'
         username = "Bob"
-        filter_date = "2023-09-27 00:00:32"
+        filter_date = "2023-10-1"
         results_string, results_string2 = "", ""
         print(f'searching for episodic messages on a specific date: {filter_date} in category: {category} for user: {username} and message: {new_messages}')
         episodic_messages = search_memory_by_date(category, new_messages, username=username, filter_date=filter_date)

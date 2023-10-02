@@ -20,7 +20,7 @@
 
 </head>
     <script>
-        const API_URL = 'http://' + document.domain + ':8002';
+        const API_URL = 'https://' + document.domain;
         //const port = 8002;
         //const url = 'http://127.0.0.1';
         //const API_URL = url + ':' + port;
@@ -656,7 +656,7 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('ws://' + document.domain + ':8002/ws/' + username);
+            socket = new WebSocket('wss://' + document.domain + '/ws/' + username);
 
             // Update the username in the widget
             document.getElementById('username').textContent = 'Username: ' + username;

@@ -11,8 +11,8 @@ beautifulsoup4==4.12.2
 certifi==2023.7.22
 cffi==1.15.1
 charset-normalizer==3.2.0
-chroma-hnswlib==0.7.2
-chromadb==0.4.5
+chroma-hnswlib==0.7.3
+chromadb==0.4.13
 click==8.1.6
 colorama==0.4.6
 coloredlogs==15.0.1

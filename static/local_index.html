@@ -15,7 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="styles.css?v=0.34">
+    <link rel="stylesheet" href="styles.css?v=0.40">
 
     <script>
         const API_URL = 'https://' + document.domain;
@@ -29,7 +29,7 @@
         let user_name = '';
         let errorMessage = '';
         let max_message_tokens = 1000;
-        var canSend = true;
+        var canSend = false;
         var canRecord = true;
         var isWaiting = false;
         var isRecording = false;
@@ -88,7 +88,12 @@
             // fill in the userStats
             var userStats = document.getElementById('userStats');
             userStats.innerHTML = '';
-            userStats.innerHTML += '<p>Total Usage: Tokens: ' + settings.usage.total_tokens + ' - Cost: $' + settings.usage.total_cost + '</p>';
+            userStats.innerHTML += '<p>Lifetime: Tokens: ' + settings.usage.total_tokens + ', cost: $' + settings.usage.total_cost + '</p>';
+
+            // fill in the dailyLimit
+            var dailyLimit = document.getElementById('dailyLimit');
+            dailyLimit.innerHTML = '';
+            dailyLimit.innerHTML += '<p>Daily limit: $' + settings.daily_usage.daily_cost.toFixed(5) + '/${{ daily_limit }}</p>';
 
             var settingsMenu = document.getElementById("SidenavAddons");
             settingsMenu.innerHTML = ''; // clear the menu
@@ -465,7 +470,15 @@
             // update the userStats with the new usage
             var userStats = document.getElementById('userStats');
             userStats.innerHTML = '';
-            userStats.innerHTML += '<p>Total Usage: Tokens: ' + msg.usage.total_tokens + ' - Cost: $' + msg.usage.total_cost + '</p>';
+            userStats.innerHTML += '<p>Lifetime: Tokens: ' + msg.usage.total_tokens + ', cost: $' + msg.usage.total_cost + '</p>';
+
+        }
+
+        function handleDailyUsage(msg) {
+            // update the userStats with the new usage
+            var dailyLimit = document.getElementById('dailyLimit');
+            dailyLimit.innerHTML = '';
+            dailyLimit.innerHTML += '<p>Daily limit: $' + msg.daily_usage.daily_cost.toFixed(5) + '/${{ daily_limit }}</p>';
 
         }
 
@@ -729,6 +742,9 @@
                 else if (msg.usage) {
                     handleUsage(msg);
                 }
+                else if (msg.daily_usage) {
+                    handleDailyUsage(msg);
+                }
                 else if (msg.functioncall) {
                     handleFunctionCall(msg);
                 }
@@ -946,10 +962,11 @@
         <p id="username" style="margin: 0; font-weight: bold;"></p>
         <p id="connectionStatus" style="margin: 0;"></p>
     </div>
-    <!-- Big red Abort Button -->
+    <!-- Big red Abort Button 
     <div id="abortButton" style="position: fixed; top: 10px; right: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
         <button id="abort" title="This will shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
     </div>
+    -->
     <!-- Login Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="login-modal">
         <div class="modal-dialog" role="document">
@@ -1004,11 +1021,13 @@
     </div>
     <div id="mySidenav" class="sidenav">
         <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
-        <button id="saveDataBtn">Save Data</button>
-        <button id="deleteDataBtn">Delete Data</button>
-        <input type="file" id="uploadDataInput">
-        <button id="uploadDataBtn">Upload Data</button>
-        <button id="logout-button">Logout</button>
+
+        <button id="logout-button">Logout</button><br><br>
+        <h3>User Data</h3>
+        <button id="saveDataBtn">Save Data</button><br>
+        <button id="deleteDataBtn">Delete Data</button><br>
+        <input type="file" id="uploadDataInput"><br>
+        <button id="uploadDataBtn">Upload Data</button><br>
         <div id="SidenavAddons"></div>
     </div>
     <!-- Right side navigation -->
@@ -1027,6 +1046,7 @@
         </div>
     </div>
     <h1>GoodAI Agent {{version}}</h1>
+    <h2>Personal assistant with long-term memory</h2>
     <div id="overlay">
         <div class="text">Code copied to clipboard</div>
     </div>
@@ -1049,8 +1069,9 @@
                     <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
                 </div> -->
                 <div id="statsWindow" class="statsWindow">
+                    <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
+                    <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
                     <p id="userStats"></p>
-                    <p id="tokenCount">Characters: 0 - Tokens: 0/1000 - Cost: $0.0000</p>
                 </div>
                 <div class="input-field">
                     <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i>
@@ -1139,7 +1160,7 @@
         // remove input text
         document.getElementById('message').value = '';
         // reset token count
-        document.getElementById('tokenCount').textContent = 'Characters: 0 - Tokens: 0/' + max_message_tokens.toString() + ' - Cost: $0.0000';
+        document.getElementById('tokenCount').textContent = 'Characters: 0, tokens: 0/' + max_message_tokens.toString() + ', cost: $0.0000';
         // change placeholder text
         document.getElementById('message').placeholder = 'Please wait for the response...';
 
@@ -1740,14 +1761,14 @@
 
     let abortClicked = false;
 
-    document.getElementById('abort').addEventListener('click', function() {
-        if (!abortClicked) {
-            this.innerHTML = 'Are you sure? This will shut down the whole server! A manual server reboot is required after this! Click again to confirm.';
-            abortClicked = true;
-        } else {
-            big_red_abort_button();
-        }
-    });
+    // document.getElementById('abort').addEventListener('click', function() {
+    //     if (!abortClicked) {
+    //         this.innerHTML = 'Are you sure? This will shut down the whole server! A manual server reboot is required after this! Click again to confirm.';
+    //         abortClicked = true;
+    //     } else {
+    //         big_red_abort_button();
+    //     }
+    // });
 
     function setupCollapsible() {
         var coll = document.getElementsByClassName("collapsible");
@@ -1771,6 +1792,11 @@
 
     function canSendMessage() {
         record_button = document.getElementById('record');
+        const message = document.getElementById("message");
+        if (message.value.trim() == '') {
+            document.getElementById('send').disabled = true;
+            canSend = false;
+        }
         if (record_button) {
                     record_button.disabled = false;
                 }
@@ -1793,6 +1819,12 @@
             }
         }
     }
+    // on page load set send button to disabled
+    canSend = false;
+    canRecord = true;
+    isRecording = false;
+    isWaiting = false;
+    canSendMessage();
 
     </script>
     <script type="module" src="cl100k_base.js"></script>
@@ -1810,7 +1842,7 @@
             message_lenght = message.value.length;
             // $0.03 / 1K tokens
             cost = tokens_used * 0.03 / 1000;
-            countDiv.textContent = `Characters: ${message_lenght} - Tokens: ${tokens_used}/${max_message_tokens} - Cost: $${cost.toFixed(4)}`;
+            countDiv.textContent = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
             // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
             if (tokens_used > max_message_tokens && message.value.trim() != '') {
                 canSend = false;

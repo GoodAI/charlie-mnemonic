@@ -35,7 +35,7 @@ COT_RETRIES = {}
 
 
     
-logger = logs.Log(__name__, 'utils.log').get_logger()
+logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 class MessageSender:
     """This class contains functions to send messages to the user"""
@@ -60,50 +60,86 @@ class MessageSender:
         # print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
 
     @staticmethod
-    async def update_token_usage(response, username):
+    async def update_token_usage(response, username, brain=False, elapsed=0):
         """Update the token usage in the database"""
-        db = Database()
         try:
-            db.open()
-            # get the user_id for the given username
-            db.cursor.execute(f"SELECT id FROM users WHERE username = '{username}'")
-            user_id = db.cursor.fetchone()[0]
+            with Database() as db:
+                result = db.update_token_usage(username, 
+                    total_tokens_used=response['usage']['total_tokens'],
+                    prompt_tokens=response['usage']['prompt_tokens'],
+                    completion_tokens=response['usage']['completion_tokens']
+                )
+                if result is not None:
+                    await MessageSender.send_debug(f"Last message: Prompt tokens: {response['usage']['prompt_tokens']}, Completion tokens: {response['usage']['completion_tokens']}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}", 2, 'red', username)
+                    # cost based on these formulas prompt: $0.03 / 1K tokens completion: $0.06 / 1K tokens
+                    prompt_cost = round(response['usage']['prompt_tokens'] * 0.03 / 1000, 5)
+                    completion_cost = round(response['usage']['completion_tokens'] * 0.06 / 1000, 5)
+                    this_message_total_cost = round(prompt_cost + completion_cost, 5)
 
-            # update or insert the token usage in the statistics table
-            update_or_insert_usage = f"""
-            INSERT INTO statistics (user_id, total_tokens_used, prompt_tokens, completion_tokens) 
-            VALUES ({user_id}, {response['usage']['total_tokens']}, {response['usage']['prompt_tokens']}, {response['usage']['completion_tokens']}) 
-            ON CONFLICT (user_id) DO UPDATE SET 
-            total_tokens_used = statistics.total_tokens_used + {response['usage']['total_tokens']}, 
-            prompt_tokens = statistics.prompt_tokens + {response['usage']['prompt_tokens']}, 
-            completion_tokens = statistics.completion_tokens + {response['usage']['completion_tokens']}"""
-            db.cursor.execute(update_or_insert_usage)
+                    total_prompt_cost = round(result[1] * 0.03 / 1000, 5)
+                    total_completion_cost = round(result[2] * 0.06 / 1000, 5)
+                    total_cost = round(total_prompt_cost + total_completion_cost, 5)
+                    await MessageSender.send_message({"usage": {"total_tokens": result[0], "total_cost": total_cost}}, 'red', username)
 
-            # get the token usage
-            db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = {user_id}")
-            result = db.cursor.fetchone()
+                
+                daily_stats = db.get_daily_stats(username)
+                if daily_stats is not None:
+                    current_spending_count = daily_stats['spending_count'] or 0
+                else:
+                    current_spending_count = 0
+                spending_count = current_spending_count + this_message_total_cost
 
-            db.conn.commit()
+                await MessageSender.send_message({"daily_usage": {"daily_cost": spending_count}}, 'red', username)
+                # update the daily_stats table
+                if brain:
+                    db.update_daily_stats_token_usage(username,
+                        brain_tokens=response['usage']['total_tokens'],
+                        spending_count=spending_count
+                    )
+                else:
+                    db.update_daily_stats_token_usage(username,
+                        prompt_tokens=response['usage']['prompt_tokens'],
+                        generation_tokens=response['usage']['completion_tokens'],
+                        spending_count=spending_count
+                    )
+                current_stats_spending_count = db.get_statistic(username)['total_spending_count'] or 0
+                spending_count = round(current_stats_spending_count + this_message_total_cost, 5)
+                # update the statistics table
+                db.update_statistic(username,
+                    total_spending_count=spending_count
+                )
+                # update the elapsed time
+                # get the total response time and response count from the database
+                stats = db.get_daily_stats(username)
+                if stats is not None:
+                    total_response_time = stats['total_response_time'] or 0
+                    response_count = stats['response_count'] or 0
+                else:
+                    total_response_time = 0
+                    response_count = 0
+                # update the total response time and response count
+                total_response_time += elapsed
+                response_count += 1
+
+                # calculate the new average response time
+                average_response_time = total_response_time / response_count
+
+                db.update_daily_stats_token_usage(username, 
+                                                average_response_time=average_response_time,
+                                                total_response_time=total_response_time,
+                                                response_count=response_count
+                                                )
         except Exception as e:
-            logger.error(f"An error occurred: {e}")
-            MessageSender.send_message({"error": "An error occurred: " + str(e)}, 'red', username)
-        finally:
-            db.close()
+            logger.exception(f"An error occurred: {e}")
+            await MessageSender.send_message({"error": "An error occurred: " + str(e)}, 'red', username)
 
-        if result is not None:
-            await MessageSender.send_debug(f"Last message: Prompt tokens: {response['usage']['prompt_tokens']}, Completion tokens: {response['usage']['completion_tokens']}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}", 2, 'red', username)
-            # cost based on these formulas prompt: $0.03 / 1K tokens completion: $0.06 / 1K tokens
-            prompt_cost = round(result[1] * 0.03 / 1000, 3)
-            completion_cost = round(result[2] * 0.06 / 1000, 3)
-            total_cost = round(prompt_cost + completion_cost, 3)
-            await MessageSender.send_message({"usage": {"total_tokens": result[0], "total_cost": total_cost}}, 'red', username)
 
 
 class AddonManager:
     """This class contains functions to load addons"""
     @staticmethod
     async def load_addons(username, users_dir):
-        settings = {
+        default_settings = {
             "addons": {},
             "audio": { "voice_input": True, "voice_output": True },
             "avatar": { "avatar": False },
@@ -115,71 +151,49 @@ class AddonManager:
 
         function_dict = {}
         function_metadata = []
-
         module_timestamps = {}
 
-        # create the username folder if it doesn't exist
         user_path = os.path.join(users_dir, username)
         settings_file = os.path.join(user_path, 'settings.json')
 
-        # create the user dir if it doesn't exist
         if not os.path.exists(user_path):
             os.makedirs(user_path)
 
-        # create the settings file if it doesn't exist
         if not os.path.exists(settings_file):
             with open(settings_file, 'w') as f:
-                json.dump(settings, f)
+                json.dump(default_settings, f)
 
-        # Load the settings
         with open(settings_file, 'r') as f:
             settings = json.load(f)
 
-        # check if the new keys are in the settings, if not, rewrite the settings file
-        new_keys = ["audio", "language", "system_prompt", "verbose", "avatar"]
-        has_old_settings = False
-        for key in new_keys:
-            if key not in settings:
-                has_old_settings = True
-                break
-        # trying to add some backwards compatibility for old settings files
-        if has_old_settings:
-            settings = {
-                "addons": {
-                    "get_current_weather": settings.get("get_current_weather", False),
-                    "get_search_results": settings.get("get_search_results", False),
-                    "run_python_code": settings.get("run_python_code", False),
-                    "visit_website": settings.get("visit_website", False)
-                },
-                "audio": {
-                    "voice_input": settings.get("voice_input", False),
-                    "voice_output": settings.get("voice_output", False)
-                },
-                "avatar": { "avatar": settings.get('avatar', False)},
-                "language": {"language": settings.get('language', {}).get('language', 'en')},
-                "system_prompt": {"system_prompt": settings.get('system_prompt', {}).get('system_prompt', 'Not implemented yet')},
-                "cot_enabled": {"cot_enabled": settings.get('cot_enabled', False)},
-                "verbose": {"verbose": settings.get('verbose', False)},
-            }
+        # Validate and correct the settings
+        for key, default_value in default_settings.items():
+            # If the key is not in the settings or the type is not the same as the default value, set it to the default value
+            if key not in settings or type(settings[key]) != type(default_value):
+                settings[key] = default_value
+            # If the key is a dict, validate and correct the sub keys
+            elif isinstance(default_value, dict):
+                for sub_key, sub_default_value in default_value.items():
+                    if sub_key not in settings[key] or type(settings[key][sub_key]) != type(sub_default_value):
+                        settings[key][sub_key] = sub_default_value
 
-        # write the new settings back to the file
+        # Save the settings
         with open(settings_file, 'w') as f:
             json.dump(settings, f)
 
-        # Check if addons in settings exist in addons folder
+        # Delete addons that don't exist anymore
         for addon in list(settings["addons"].keys()):
             if not os.path.exists(os.path.join('addons', f"{addon}.py")):
-                # If addon doesn't exist, remove it from settings
                 del settings["addons"][addon]
-
+        
+        # Load addons
         for filename in os.listdir('addons'):
             if filename.endswith('.py'):
                 addon_name = filename[:-3]
-                # Check if the addon is in the settings
                 if addon_name not in settings["addons"]:
-                    # If not, add it with a default value of False
                     settings["addons"][addon_name] = False
 
+                # Only load the addon if it is enabled
                 if settings["addons"].get(addon_name, True):
                     file_path = os.path.join('addons', filename)
                     spec = importlib.util.spec_from_file_location(filename[:-3], file_path)
@@ -193,11 +207,10 @@ class AddonManager:
 
                     spec.loader.exec_module(module)
 
-                    # Check if the module name exists in the module's dictionary
+                    # Add the functions to the function dict
                     if module.__name__ in module.__dict__:
                         function_dict[module.__name__] = module.__dict__[module.__name__]
 
-                        # Check if the module has a doc and parameters attribute
                         function_metadata.append({
                             "name": module.__name__,
                             "description": getattr(module, 'description', 'No description'),
@@ -206,23 +219,21 @@ class AddonManager:
                     else:
                         await MessageSender.send_debug(f"Module {module.__name__} does not have a function with the same name.", 2, 'red', username)
 
-        # Write the new settings back to the file
         with open(settings_file, 'w') as f:
             json.dump(settings, f)
 
         if not function_metadata:
-            # no functions activated, quick hacky fix -> add a default function
             function_metadata.append({
                 "name": "none",
                 "description": "you have no available functions",
                 "parameters": {
                     "type": "object",
-                    "properties": {
-                    },
+                    "properties": {},
                 },
             })
 
         return function_dict, function_metadata
+
 
 class OpenAIResponser:
     """This class contains functions to get responses from OpenAI"""
@@ -247,6 +258,7 @@ class OpenAIResponser:
         
         max_retries = 5
         timeout = 180.0  # timeout in seconds
+        now = time.time()
         
         for i in range(max_retries):
             try:
@@ -266,7 +278,8 @@ class OpenAIResponser:
                     ),
                     timeout=timeout
                 )
-                await MessageSender.update_token_usage(response, username)
+                elapsed = time.time() - now
+                await MessageSender.update_token_usage(response, username, False, elapsed=elapsed)
                 return response
             except asyncio.TimeoutError:
                 logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
@@ -518,8 +531,11 @@ class MessageParser:
         }
         # print(new_message)
         await MessageSender.send_message(new_message, 'red', username)
-
-        function = function_dict[function_call_name]
+        try:
+            function = function_dict[function_call_name]
+        except KeyError:
+            await MessageSender.send_message({"error": f"Function {function_call_name} not found"}, 'red', username)
+            raise HTTPException(404, f"Function {function_call_name} not found")
         if inspect.iscoroutinefunction(function):
             function_response = await MessageParser.ahandle_function_response(function, converted_function_call_arguments)
         else:
@@ -730,7 +746,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     # generate the full message
     full_message = await MessageParser.generate_full_message(username, merged_result_string, last_messages_string, instruction_string, message)
 
-    await MessageSender.send_message(f"[{full_message}]", 'blue', username)
+    await MessageSender.send_debug(f"[{full_message}]", 1, 'gray', username)
 
     cot_settings = settings.get('cot_enabled')
     is_cot_enabled = cot_settings.get('cot_enabled')
@@ -746,13 +762,14 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 
     # process the response
     response = await MessageParser.process_response(response, function_dict, function_metadata, message, og_message, username, process_message, background_tasks, chat_history, chat_metadata, history_ids, last_messages, history_string, last_messages_string, kw_brain_string, users_dir)
-
+    with Database() as db:
+        db.update_message_count(username)
     return response
 
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (only shown if required) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
         {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example: Plan:\n1. step 1 \n2. step 2\n3. step 3\n\n{message}'},
     ]
 
@@ -779,7 +796,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (only shown if required) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
         {"role": "user", "content": f'{message}'},
     ]
 

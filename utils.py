@@ -142,6 +142,7 @@ class AddonManager:
         default_settings = {
             "addons": {},
             "audio": { "voice_input": True, "voice_output": True },
+            "avatar": { "avatar": False },
             "language": { "language": "en" },
             "system_prompt": { "system_prompt": "Not implemented yet" },
             "cot_enabled": { "cot_enabled": False },

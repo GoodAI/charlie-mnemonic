@@ -28,7 +28,7 @@ import nltk
 import config
 import logs
 
-logger = logs.Log(__name__, 'memory.log').get_logger()
+logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 class MemoryManager:
     """A class to manage the memory of the agent."""
@@ -142,7 +142,8 @@ class MemoryManager:
                     logger.debug(f"parsed_date: {parsed_date}")
                     break
                 except ValueError:
-                    return "", ""
+                    parsed_date = None
+                    continue
             else:
                 return "", ""
                 
@@ -159,24 +160,18 @@ class MemoryManager:
                 #print(f"{formatted_date} - {memory['document']} (score: {memory['distance']})")
                 results_string += f"{formatted_date} - {memory['document']} (score: {memory['distance']})\n"
             logger.debug(f"results_string:\n{results_string}")
-            # for memory in episodic_messages_get:
-            #     date = memory['metadata']['created_at']
-            #     formatted_date = datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
-            #     #print(f"{formatted_date} - {memory['document']}")
-            #     results_string2 += f"{formatted_date} - {memory['document']}\n"
-            # print(f"results_string2:\n{results_string2}")
 
             # Check tokens
             token_count = utils.MessageParser.num_tokens_from_string(results_string)
             while token_count > min(1000,remaining_tokens):
                 # Split the result_string by newline and remove the last line if possible
-                result_lines = result_string.split('\n')
+                result_lines = results_string.split('\n')
                 if len(result_lines) > 1:
                     result_lines.pop(-1)
-                    result_string = '\n'.join(result_lines)
+                    results_string = '\n'.join(result_lines)
                 else:
                     # If there are no newline characters, remove a certain number of characters from the end
-                    result_string = result_string[:-100]
+                    results_string = results_string[:-100]
                 token_count = utils.MessageParser.num_tokens_from_string(results_string)
             return results_string, subject
     
@@ -196,6 +191,7 @@ class MemoryManager:
                 # Create a memory for each chunk
                 await self.create_memory(category, chunk, username=username, metadata={'uid': uid})
                 logger.debug(f"adding memory: {chunk} to category: {category}")
+                process_dict['created_new_memory'] = 'yes'
 
         subject_query = await self.openai_manager.ask_openai(all_messages, 'retriever', self.model_used, 100, 0.1, username=username)
         if 'choices' in subject_query and len(subject_query['choices']) > 0 and 'message' in subject_query['choices'][0] and 'content' in subject_query['choices'][0]['message']:
@@ -309,6 +305,7 @@ class MemoryManager:
                 result_string = result_string[:-100]
             token_count = utils.MessageParser.num_tokens_from_string(result_string)
 
+        similar_messages = None
         if len(parts) > 0:
             for part in parts:
                 category, query = part
@@ -608,7 +605,7 @@ class OpenAIManager:
             elapsed = time.time() - now
             logger.info('OpenAI response time: ' + str(elapsed) + 's\n')
             logger.info(f"Completion tokens: {response['usage']['completion_tokens']}, Prompt tokens: {response['usage']['prompt_tokens']}, Total tokens: {response['usage']['total_tokens']}")
-            await utils.MessageSender.update_token_usage(response, username)
+            await utils.MessageSender.update_token_usage(response, username, brain=True, elapsed=elapsed)
             return response
 
         except Exception as e:

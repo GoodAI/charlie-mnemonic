@@ -11,29 +11,29 @@ body {
     margin-left: 0;
 }
 h1 {
-    margin: 0 0 20px;
+    margin: 0 0 5px;
     text-align: center;
     color: #4c4c4c;
 }
 
 h2 {
-    margin: 0 0 10px;
+    margin: 0 0 50px;
     text-align: center;
-    color: #dedede;
-    font-size: 24px;
+    color: #4c4c4c;
+    font-size: 18px;
 }
 
 h3{
     margin: 0 0 10px;
     text-align: center;
-    color: #d4d4d4;
-    font-size: 18px;
+    color: #4c4c4c;
+    font-size: 14px;
 }
 
 .chat-container {
-    width: 80%;
-    max-width: 90%;
-    max-height: 80%;
+    max-width: 80vw;
+    min-width: 80vw;
+    max-height: 80vh;
     height: 800px;
     background: #fff;
     border-radius: 10px;
@@ -66,10 +66,12 @@ h3{
 .input-field button {
     background: #c3cfe2;
     color: white;
-    border: none;
-    padding: 10px 20px;
     cursor: pointer;
     transition: background 0.3s;
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: none;
+    margin-left: 10px;
 }
 
 .input-field button:disabled {

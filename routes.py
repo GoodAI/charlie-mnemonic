@@ -2,10 +2,12 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import signal
-from fastapi import APIRouter, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response, JSONResponse
+from fastapi import APIRouter, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form, Request, Depends
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security.api_key import APIKeyCookie
 from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager, SettingsManager, BrainProcessor, MessageParser
 from authentication import Authentication
 from classes import User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage
@@ -15,8 +17,9 @@ from memory import export_memory_to_file, import_file_to_memory, wipe_all_memori
 import tempfile
 import zipfile
 import logs
+from typing import Optional
 
-logger = logs.Log(__name__, 'routes.log').get_logger()
+logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 router = APIRouter()
 templates = Jinja2Templates(directory="static")
@@ -39,14 +42,17 @@ router.mount("/static", StaticFiles(directory="static"), name="static")
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     version = SettingsManager.get_version()
+    daily_limit = 0
+    with Database() as db:
+        daily_limit = db.get_daily_limit()
     if PRODUCTION == 'true':
         try:
-            return templates.TemplateResponse("live_index.html", {"request": request, "version": version})
+            return templates.TemplateResponse("live_index.html", {"request": request, "version": version, "daily_limit": daily_limit})
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
     else:
         try:
-            return templates.TemplateResponse("local_index.html", {"request": request, "version": version})
+            return templates.TemplateResponse("local_index.html", {"request": request, "version": version, "daily_limit": daily_limit})
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="Item not found")
 
@@ -277,35 +283,14 @@ async def handle_get_settings(request: Request, user: UserName):
         settings = json.load(f)
     logger.debug(f'Loaded settings for user {user.username}')
     logger.debug(settings)
-    total_tokens_used, total_cost = get_token_usage(user.username)
+    total_tokens_used, total_cost = 0, 0
+    with Database() as db:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(user.username, True)
     settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
+    settings['daily_usage'] = {"daily_cost": total_daily_cost}
     return settings
 
-def get_token_usage(username):
-    db = Database()
-    db.open()
-    # get the user_id for the given username
-    db.cursor.execute(f"SELECT id FROM users WHERE username = '{username}'")
-    user_id = db.cursor.fetchone()
-    if user_id is None:
-        db.close()
-        return 0, 0
-
-    user_id = user_id[0]
-
-    # get the token usage from the statistics table
-    db.cursor.execute(f"SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = {user_id}")
-    result = db.cursor.fetchone()
-    db.close()
-    if result is None:
-        return 0, 0 
-
-    prompt_tokens_used = result[1] if result[1] is not None else 0
-    completion_tokens_used = result[2] if result[2] is not None else 0
-    prompt_cost = round(prompt_tokens_used * 0.03 / 1000, 3)
-    completion_cost = round(completion_tokens_used * 0.06 / 1000, 3)
-    total_cost = round(prompt_cost + completion_cost, 3)
-    return result[0], total_cost
 
 def count_tokens(message):
     return MessageParser.num_tokens_from_string(message)
@@ -383,8 +368,11 @@ async def handle_update_settings(request: Request, user: editSettings):
         raise HTTPException(status_code=400, detail="Category not found")
     with open(settings_file, 'w') as f:
         json.dump(settings, f)
-    total_tokens_used, total_cost = get_token_usage(user.username)
+    with Database() as db:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(user.username, True)
     settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
+    settings['daily_usage'] = {"daily_cost": total_daily_cost}
     return settings
 
 
@@ -530,6 +518,8 @@ async def handle_generate_audio(request: Request, message: userMessage, backgrou
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")    
     audio_path, audio = await AudioProcessor.generate_audio(message.prompt, username, users_dir)
+    with Database() as db:
+        db.add_voice_usage(username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")
 
 @router.post("/save_data/", tags=["Data"],
@@ -749,7 +739,6 @@ async def handle_abort_button(request: Request, user: UserName):
         },
     },
 )
-
 async def handle_notoken_message(message: noTokenMessage):
     auth = Authentication()
     session_token = auth.login(message.username, message.password)
@@ -759,79 +748,103 @@ async def handle_notoken_message(message: noTokenMessage):
         raise HTTPException(status_code=400, detail="Prompt is too long")
     return await process_message(message.prompt, message.username, None, users_dir)
 
-@router.get("/admin/statistics", tags=["Admin"],
-            summary="Get statistics",
-    description="This endpoint allows you to get statistics about the users.",
-    response_description="Returns statistics about the users.",
+
+@router.post("/notoken_generate_audio/",
+    tags=["Text to Speech"],
+    summary="Generate audio from text without token",
+    description="This endpoint allows you to generate audio from text by providing a username, session token, and prompt. If the token is valid, an audio file is sent back. If the token is invalid, an HTTP 401 error will be returned.",
+    response_description="Returns an audio file if the token is valid, else returns an HTTPException with status code 401.",
     responses={
         200: {
-            "description": "Statistics retrieved successfully",
+            "description": "Audio generated successfully",
             "content": {
                 "application/json": {
-                    "example": {
-                        "total_users": 1,
-                        "total_messages": 1,
-                        "total_tokens_used": 1,
-                        "total_voice_usage": 1,
-                        "user_statistics": [
-                            {
-                                "username": "user",
-                                "amount_of_messages": 1,
-                                "total_tokens_used": 1,
-                                "voice_usage": 1
-                            }
-                        ]
-                    }
+                    "example": {"message": "Audio generated successfully"}
+                }
+            },
+        },
+        401: {
+            "description": "Token is invalid",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Token is invalid"}
                 }
             },
         },
     },)
-async def get_statistics():
-    db = Database()
-    db.open()
-    db.cursor.execute("SELECT * FROM users INNER JOIN statistics ON users.id = statistics.user_id")
-    user_data = db.cursor.fetchall()
-    db.close()
-    
-    # Calculate overall statistics
-    total_users = len(user_data)
-    # user[0] = id:
-    # user[1] = username:
-    # user[2] = password:
-    # user[3] = session_token:
-    # user[4] = message_history:
-    # user[5] = has_access:
-    # user[6] = role:
-    # user[7] = id:
-    # statistics
-    # user[8] = user_id:
-    # user[9] = amount_of_messages:
-    # user[10] = total_tokens_used:
-    # user[11] = prompt_tokens:
-    # user[12] = completion_tokens:
-    # user[13] = voice_usage:
-    total_messages = sum([user[9] for user in user_data])
-    total_tokens_used = sum([user[10] for user in user_data])
-    total_voice_usage = sum([user[13] for user in user_data])
+async def handle_generate_audio(message: noTokenMessage):
+    auth = Authentication()
+    session_token = auth.login(message.username, message.password)
+    if not session_token:
+        raise HTTPException(status_code=401, detail="User login failed")
+    if count_tokens(message.prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long")   
+    audio_path, audio = await AudioProcessor.generate_audio(message.prompt, message.username, users_dir)
+    return FileResponse(audio_path, media_type="audio/wav")
 
-    # Prepare user statistics
-    user_statistics = []
-    for user in user_data:
-        user_statistics.append({
-            "username": user[1],
-            "role": user[6],
-            "amount_of_messages": user[9],
-            "total_tokens_used": user[10],
-            "voice_usage": user[13]
-        })
 
-    return {
-        "total_users": total_users,
-        "total_messages": total_messages,
-        "total_tokens_used": total_tokens_used,
-        "total_voice_usage": total_voice_usage,
-        "user_statistics": user_statistics
-    }
+security = HTTPBearer()
+
+def get_current_username(username: Optional[str] = Depends(APIKeyCookie(name="username")), 
+                         session_token: Optional[str] = Depends(APIKeyCookie(name="session_token"))):
+    auth = Authentication()
+    print(username, session_token)
+    success = auth.check_token(username, session_token)
+    if not success:
+        raise HTTPException(
+            status_code=403, detail="Invalid authorization code"
+        )
+    return username
+
+@router.get("/admin/statistics/{page}", response_class=HTMLResponse)
+async def get_statistics(request: Request, page: int, items_per_page: int = 5, username: str = Depends(get_current_username)):
+    with Database() as db:
+        role = db.get_user_role(username)[0]
+    if role != 'admin':
+        logger.warning(f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/{page}")
+        raise HTTPException(status_code=403, detail="You are not authorized to view this page")
+    else:
+        with Database() as db:
+            global_stats = json.loads(db.get_global_statistics())
+            # Fetch data based on page number and items per page
+            page_statistics = json.loads(db.get_statistics(page, items_per_page))
+            total_pages = db.get_total_statistics_pages(items_per_page)
+            admin_controls = json.loads(db.get_admin_controls())
+            print(admin_controls)
+            return templates.TemplateResponse("stats.html", {"request": request, 
+                                                             "rows": page_statistics, 
+                                                             "chart_data": json.dumps(page_statistics).replace('"', '\\"'), 
+                                                             "page": page, "items_per_page": items_per_page, 
+                                                             "total_pages": total_pages,
+                                                             "statistics": global_stats,
+                                                             "admin_controls": admin_controls}
+                                                             )
+
+@router.get("/admin/statistics/user/{user_id}", response_class=HTMLResponse)
+async def get_user_statistics(request: Request, user_id: int, username: str = Depends(get_current_username)):
+    # get the user's role from the database
+    with Database() as db:
+        role = db.get_user_role(username)[0]
+    if role != 'admin':
+        logger.warning(f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/user/{user_id}")
+        raise HTTPException(status_code=403, detail="You are not authorized to view this page")
+    else:
+        with Database() as db:
+            user_stats = json.loads(db.get_user_statistics(user_id))
+            return templates.TemplateResponse("user_stats.html", {"request": request, "rows": user_stats})
+        
+@router.post("/admin/update_controls")
+async def update_controls(request: Request, username: str = Depends(get_current_username), id: int = Form(...), daily_spending_limit: str = Form(...), allow_access: str = Form(...), maintenance: str = Form(...)):
+    with Database() as db:
+        role = db.get_user_role(username)[0]
+        if role != 'admin':
+            raise HTTPException(status_code=403, detail="You are not authorized to perform this action")
+        with Database() as db:
+            if id == '' or id == None:
+                id = 1 
+            db.update_admin_controls(id, daily_spending_limit, allow_access, maintenance)
+        return RedirectResponse(url="/admin/statistics/1", status_code=303)
+
 
 @router.get("/{file_path:path}")
 async def read_file(file_path: str):

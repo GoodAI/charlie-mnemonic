@@ -3,7 +3,7 @@ import os
 import time
 import logs
 
-logger = logs.Log(__name__, 'agentmemory.log').get_logger()
+logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 

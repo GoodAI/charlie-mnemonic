@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from database import Database
 import logs
 
-logger = logs.Log(__name__, 'authentication.log').get_logger()
+logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 DATABASE_URL = os.environ['DATABASE_URL']
 PRODUCTION = os.environ['PRODUCTION']

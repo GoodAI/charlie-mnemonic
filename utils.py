@@ -661,8 +661,10 @@ class SettingsManager:
             settings = json.load(f)
         return settings
 
-async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir):
+async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir, display_name=None):
     """Process the message and generate a response"""
+    if display_name is None:
+        display_name = username
     # 1k tokens for the prompt, 1k tokens for the completion, 1k tokens for the permanent memory/notes, 100 tokens for preset prompts
     max_token_usage = 4900
     token_usage = 0
@@ -677,7 +679,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     # load the setting for the user
     settings = await SettingsManager.load_settings(users_dir, username)
 
-    message = username + ': ' + og_message
+    message = display_name + ': ' + og_message
 
     #old_kw_brain = await BrainProcessor.load_brain(username, users_dir)
 
@@ -714,7 +716,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     if episodic_memory is None or episodic_memory == '':
         episodic_memory_string = ''
     else:
-        episodic_memory_string = f"""Episodic Memory of:{timezone}\n{episodic_memory}\n"""
+        episodic_memory_string = f"""Episodic Memory of {timezone}:\n{episodic_memory}\n"""
     episodic_memory_tokens = MessageParser.num_tokens_from_string(episodic_memory_string, "gpt-4")
     token_usage += episodic_memory_tokens
     remaining_tokens = remaining_tokens - episodic_memory_tokens
@@ -769,7 +771,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (only shown if required) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
         {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example: Plan:\n1. step 1 \n2. step 2\n3. step 3\n\n{message}'},
     ]
 
@@ -796,7 +798,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (only shown if required) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
+        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
         {"role": "user", "content": f'{message}'},
     ]
 

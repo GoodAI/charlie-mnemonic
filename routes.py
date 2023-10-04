@@ -2,15 +2,17 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import signal
-from fastapi import APIRouter, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form, Request, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, File, Request, UploadFile, WebSocket, WebSocketDisconnect, Form, Depends
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security.api_key import APIKeyCookie
+import urllib.parse
+from unidecode import unidecode
 from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager, SettingsManager, BrainProcessor, MessageParser
 from authentication import Authentication
-from classes import User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage
+from classes import LoginUser, User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage, UserGoogle
 import shutil
 from database import Database
 from memory import export_memory_to_file, import_file_to_memory, wipe_all_memories, stop_database
@@ -18,6 +20,10 @@ import tempfile
 import zipfile
 import logs
 from typing import Optional
+from jose import jwt
+from jose.exceptions import JWTError
+from google.oauth2 import id_token
+from google.auth.transport import requests
 
 logger = logs.Log(__name__, 'full_log.log').get_logger()
 from config import api_keys
@@ -29,7 +35,7 @@ connections = {}
 
 PRODUCTION = os.environ['PRODUCTION']
 
-ORIGINS = "https://clang.goodai.com"
+ORIGINS = ["https://clang.goodai.com", "*"]
 
 users_dir = 'users' # end with a slash
 
@@ -38,21 +44,15 @@ router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
 
 @router.get("/d-id/api.json")
 async def read_did_api_json():
-    if PRODUCTION == 'true':
-        raise HTTPException(status_code=404, detail="Item not found")
-    else:
-        data = { "key" : api_keys['d-id'], "url" : "https://api.d-id.com" }
-        return JSONResponse(content=data)
+    data = { "key" : api_keys['d-id'], "url" : "https://api.d-id.com" }
+    return JSONResponse(content=data)
 
 @router.get("/d-id/{file}")
 async def read_did(file: str):
-    if PRODUCTION == 'true':
+    try:
+        return FileResponse(f'd-id/{file}')
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
-    else:
-        try:
-            return FileResponse(f'd-id/{file}')
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Item not found")
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -61,16 +61,10 @@ async def read_root(request: Request):
     daily_limit = 0
     with Database() as db:
         daily_limit = db.get_daily_limit()
-    if PRODUCTION == 'true':
-        try:
-            return templates.TemplateResponse("live_index.html", {"request": request, "version": version, "daily_limit": daily_limit})
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Item not found")
-    else:
-        try:
-            return templates.TemplateResponse("local_index.html", {"request": request, "version": version, "daily_limit": daily_limit})
-        except FileNotFoundError:
-            raise HTTPException(status_code=404, detail="Item not found")
+    try:
+        return templates.TemplateResponse("index.html", {"request": request, "version": version, "daily_limit": daily_limit, "production": PRODUCTION})
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Item not found")
     
 @router.get("/styles.css")
 async def read_root():
@@ -147,7 +141,7 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
 )
 async def register(user: User, response: Response):
     auth = Authentication()
-    session_token = auth.register(user.username, user.password)
+    session_token = auth.register(user.username, user.password, user.display_name)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
@@ -156,7 +150,7 @@ async def register(user: User, response: Response):
         else:
             response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
             response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
-        return {'message': 'User registered successfully'}
+        return {'message': 'User registered successfully', 'display_name': user.display_name}
     else:
         raise HTTPException(status_code=400, detail="User registration failed")
     
@@ -185,14 +179,14 @@ async def register(user: User, response: Response):
         }, 
     }, 
 )
-async def login(user: User, response: Response):
+async def login(user: LoginUser, response: Response):
     auth = Authentication()
     session_token = auth.login(user.username, user.password)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
         if PRODUCTION == 'true':
-            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
-            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=LIVE_DOMAIN)
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=ORIGINS)
+            response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=ORIGINS)
         else:
             response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
             response.set_cookie(key="username", value=user.username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
@@ -310,8 +304,10 @@ async def handle_get_settings(request: Request, user: UserName):
     with Database() as db:
         total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(user.username, True)
+        display_name = db.get_display_name(user.username)
     settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings['daily_usage'] = {"daily_cost": total_daily_cost}
+    settings['display_name'] = display_name
     return settings
 
 
@@ -387,6 +383,12 @@ async def handle_update_settings(request: Request, user: editSettings):
                 settings[user.category][user.setting] = user.value
         else:
             raise HTTPException(status_code=400, detail="Setting not found")
+    elif user.category == 'db':
+        with Database() as db:
+            if user.setting == 'display_name':
+                db.update_display_name(user.username, user.value)
+            else:
+                raise HTTPException(status_code=400, detail="Setting not found")
     else:
         raise HTTPException(status_code=400, detail="Category not found")
     with open(settings_file, 'w') as f:
@@ -394,8 +396,10 @@ async def handle_update_settings(request: Request, user: editSettings):
     with Database() as db:
         total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(user.username, True)
+        display_name = db.get_display_name(user.username)
     settings['usage'] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings['daily_usage'] = {"daily_cost": total_daily_cost}
+    settings['display_name'] = display_name
     return settings
 
 
@@ -431,7 +435,7 @@ async def handle_message(request: Request, message: userMessage, background_task
         raise HTTPException(status_code=401, detail="Token is invalid")
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, message.username, background_tasks, users_dir)
+    return await process_message(message.prompt, message.username, background_tasks, users_dir, message.display_name)
 
 # openAI response route without modules
 @router.post("/message_no_modules/",
@@ -880,3 +884,68 @@ async def read_file(file_path: str):
             raise HTTPException(status_code=404, detail="Item not found")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
+
+
+@router.post("/google-login/",
+    tags=["Authentication"], 
+    summary="Login with google", 
+    description="This endpoint allows you to login a user with google If the login is successful, a session token and username will be set in cookies which expire after 90 days. The cookies' secure attribute is set to True, httponly is set to False, and samesite is set to 'None'. If the login fails, an HTTP 401 error will be returned.", 
+    response_description="Returns a success message if the user is logged in successfully, else returns an HTTPException with status code 401.", 
+    responses={
+        200: {
+            "description": "User logged in successfully", 
+            "content": {
+                "application/json": {
+                    "example": {"message": "User logged in successfully"}
+                }
+            }, 
+        }, 
+        401: {
+            "description": "User login failed", 
+            "content": {
+                "application/json": {
+                    "example": {"detail": "User login failed"}
+                }
+            }, 
+        }, 
+    }, 
+)
+async def google_login(request: UserGoogle, response: Response):
+    credential = request.credentials
+    #print(credential)
+    request = requests.Request()
+    id_info = id_token.verify_oauth2_token(
+        credential, request, os.environ.get('GOOGLE_CLIENT_ID'))
+    username = id_info['email']
+    logger.debug(f"User {username} logged in with Google:\n{id_info}")
+
+    # check if email is verified
+    if id_info['email_verified'] == False:
+        raise HTTPException(status_code=401, detail="User login failed, email not verified")
+
+    # compare aud with client id
+    if id_info['aud'] != os.environ.get('GOOGLE_CLIENT_ID'):
+        raise HTTPException(status_code=403, detail="Invalid authorization code")
+
+    auth = Authentication()
+    session_token = auth.google_login(id_info)
+    if session_token:
+        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
+        if PRODUCTION == 'true':
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=ORIGINS)
+            response.set_cookie(key="username", value=username, secure=True, httponly=False, samesite="None", expires=expiracy_date, domain=ORIGINS)
+        else:
+            response.set_cookie(key="session_token", value=session_token, secure=True, httponly=False, samesite="None", expires=expiracy_date)
+            response.set_cookie(key="username", value=username, secure=True, httponly=False, samesite="None", expires=expiracy_date)
+        return {'message': 'User logged in successfully'}
+    else:
+        raise HTTPException(status_code=401, detail="User login failed")
+    
+
+def convert_name(name):
+    # Convert non-ASCII characters to ASCII
+    name = unidecode(name)
+    # replace spaces with underscores
+    name = name.replace(' ', '_')
+    # lowercase the name
+    return name.lower()

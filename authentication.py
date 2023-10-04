@@ -1,3 +1,4 @@
+import datetime
 import psycopg2
 import bcrypt
 import binascii
@@ -5,6 +6,7 @@ import os
 from fastapi import HTTPException
 from database import Database
 import logs
+from unidecode import unidecode
 
 logger = logs.Log(__name__, 'full_log.log').get_logger()
 
@@ -15,17 +17,17 @@ class Authentication:
     def __init__(self):
         self.db = Database()
 
-    def register(self, username, password):
+    def register(self, username, password, display_name):
         self.db.open()
         try:
             hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
             hashed_password_str = hashed_password.decode("utf-8")
             session_token = binascii.hexlify(os.urandom(24)).decode()
-            self.db.cursor.execute("INSERT INTO users (username, password, session_token) VALUES (%s, %s, %s)", (username, hashed_password_str, session_token))
+            self.db.cursor.execute("INSERT INTO users (username, password, session_token, display_name) VALUES (%s, %s, %s, %s)", (username, hashed_password_str, session_token, display_name))
             self.db.conn.commit()
             return session_token
         except psycopg2.IntegrityError:
-            raise HTTPException(status_code=400, detail="Username already exists.")
+            raise HTTPException(status_code=400, detail="Email already exists.")
         finally:
             self.db.close()
 
@@ -54,6 +56,41 @@ class Authentication:
         logger.debug(f'User: {username} - Session token: {session_token}')
         # Return the session token
         return session_token
+    
+    def convert_name(self, name):
+        # Convert non-ASCII characters to ASCII
+        name = unidecode(name)
+        # replace spaces with underscores
+        name = name.replace(' ', '_')
+        # lowercase the name
+        return name.lower()
+    
+    def google_login(self, id_info):
+        display_name, google_id, username = id_info['name'], id_info['sub'], id_info['email']
+        session_token = binascii.hexlify(os.urandom(24)).decode()
+        hashed_password_str = bcrypt.hashpw(session_token.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+
+        self.db.open()
+        self.db.cursor.execute("SELECT username, id FROM users WHERE username = %s OR google_id = %s", (username, google_id))
+        user = self.db.cursor.fetchone()
+
+        if user is None:
+            # If the user doesn't exist, create a new user
+            self.db.cursor.execute("""
+                INSERT INTO users (google_id, username, password, session_token, has_access, role, display_name)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (google_id, username, hashed_password_str, session_token, True, 'user', display_name))
+        else:
+            # If the user exists, update the session token and google_id
+            self.db.cursor.execute("""
+                UPDATE users SET google_id = %s, session_token = %s, password = %s WHERE username = %s OR google_id = %s
+            """, (google_id, session_token, hashed_password_str, username, google_id))
+
+        self.db.conn.commit()
+        self.db.close()
+        logger.debug(f'User: {username} - Session token: {session_token}')
+        return session_token
+
         
     def logout(self, username, session_token):
         self.db.open()

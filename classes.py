@@ -1,10 +1,18 @@
 
 from typing import Union
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class User(BaseModel):
-    username: str
+    username: str = Field(..., min_length=1, max_length=50)
     password: str
+    display_name: str = Field(..., min_length=1, max_length=50)
+ 
+class LoginUser(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str
+
+class UserGoogle(BaseModel):
+    credentials: str
 
 class UserName(BaseModel):
     username: str
@@ -16,6 +24,7 @@ class UserCheckToken(BaseModel):
 class userMessage(BaseModel):
     prompt: str
     username: str
+    display_name: str
 
 class noTokenMessage(BaseModel):
     prompt: str

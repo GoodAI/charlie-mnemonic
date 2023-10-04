@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <title>Chatbot</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
     <script src="//cdnjs.cloudflare.com/ajax/libs/marked/2.1.3/marked.min.js"></script>
@@ -15,10 +16,20 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="styles.css?v=0.40">
+
+    <script type="module" src="cl100k_base.js"></script>
+    <link rel="stylesheet" href="styles.css?v=0.41">
+
 
     <script>
-        const API_URL = 'https://' + document.domain;
+        let production = '{{ production }}';
+        production = production.trim();
+        if (production == 'False' || production == 'false' || production == '0' || production == 'False\n' || production == 'false\n' || production == '0\n') {
+            production = false;
+        } else {
+            production = true;
+        }
+        let API_URL = production ? 'https://' : 'http://' + document.domain + ':' + location.port;
         //const port = 8002;
         //const url = 'http://127.0.0.1';
         //const API_URL = url + ':' + port;
@@ -27,6 +38,7 @@
         var tempFormatted = '';
         var settings = {};
         let user_name = '';
+        let display_name = '';
         let errorMessage = '';
         let max_message_tokens = 1000;
         var canSend = false;
@@ -194,23 +206,23 @@
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
 
-            // Populate system prompt settings
+            // Populate Display Name settings
             h3 = document.createElement('h3');
-            h3.textContent = 'System Prompt';
+            h3.textContent = 'Display Name';
             settingsMenu.appendChild(h3);
 
-            var systemPromptItem = document.createElement('textarea');
-            systemPromptItem.id = 'system_prompt';
-            systemPromptItem.name = 'system_prompt';
-            systemPromptItem.value = settings.system_prompt.system_prompt;
-            systemPromptItem.onchange = function(e) {
-                edit_status('system_prompt', 'system_prompt', e.target.value);
-                console.log('change_system_prompt_status: ', e.target.value);
+            var displayNameItem = document.createElement('textarea');
+            displayNameItem.id = 'display_name';
+            displayNameItem.name = 'display_name';
+            displayNameItem.value = settings.display_name;
+            displayNameItem.onchange = function(e) {
+                edit_status('db','display_name', e.target.value);
+                console.log('change_display_name_status: ', e.target.value);
             }
-            settingsMenu.appendChild(systemPromptItem);
+            settingsMenu.appendChild(displayNameItem);
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
-            
+
             h3 = document.createElement('h3');
             h3.textContent = 'Other settings';
             settingsMenu.appendChild(h3);
@@ -241,9 +253,30 @@
             var br = document.createElement('br');
             settingsMenu.appendChild(br);
 
+            // Populate system prompt settings
+            h3 = document.createElement('h3');
+            h3.textContent = 'System Prompt';
+            settingsMenu.appendChild(h3);
+
+            var systemPromptItem = document.createElement('textarea');
+            systemPromptItem.id = 'system_prompt';
+            systemPromptItem.name = 'system_prompt';
+            systemPromptItem.value = settings.system_prompt.system_prompt;
+            systemPromptItem.onchange = function(e) {
+                edit_status('system_prompt', 'system_prompt', e.target.value);
+                console.log('change_system_prompt_status: ', e.target.value);
+            }
+            settingsMenu.appendChild(systemPromptItem);
+            var br = document.createElement('br');
+            settingsMenu.appendChild(br);
         };
 
         function edit_status(category, setting, value) {
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlayMessage.textContent = "Updating Settings...";
+            overlay.style.display = 'flex';
+
             fetch(API_URL + '/update_settings/', {
                 method: 'POST',
                 headers: {
@@ -254,7 +287,9 @@
             })
             .then(response => response.json())
             .then(data => {
+                overlayMessage.textContent = "Settings Updated";
                 setSettings(data);
+                overlay.style.display = 'none';
             })
             .catch(console.error);
         };
@@ -266,6 +301,13 @@
             overlay.style.display = 'none';
             if (newSettings) {
                 console.log('received settings:', newSettings);
+                // if no display name is set, use the username
+                if (newSettings.display_name == null || newSettings.display_name == '') {
+                    newSettings.display_name = user_name;
+                }
+                // Update the username in the widget
+                display_name = newSettings.display_name;
+                document.getElementById('username').textContent = 'Display Name: ' + display_name;
                 settings = newSettings;
                 populateSettingsMenu(settings);
                 if (newSettings.audio.voice_input) {
@@ -683,10 +725,9 @@
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
-            socket = new WebSocket('wss://' + document.domain + '/ws/' + username);
-
-            // Update the username in the widget
-            document.getElementById('username').textContent = 'Username: ' + username;
+            prefix = production ? 'wss://' : 'ws://';
+            console.log('connecting to: ' + prefix + document.domain + ':' + location.port + '/ws/' + username);
+            var socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
 
             var reconnectInterval = null;
 
@@ -972,15 +1013,14 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Enter your username and password</h5>
+                    <h5 class="modal-title">Login</h5>
                 </div>
                 <div class="modal-body">
                     <form id="login-form">
                         <div class="form-group">
                             <div class="loginError"></div>
-                            <label for="username-input">Username</label>
-                            <input type="text" class="form-control" id="username-input" placeholder="Enter your username" maxlength="20" pattern="^[a-zA-Z0-9_]*$" required>
-                            <small class="form-text text-muted">Max 20 characters, no special characters except underscore.</small>
+                            <label for="username-input">Email</label>
+                            <input type="text" class="form-control" id="username-input" placeholder="Enter your email" maxlength="50" required>
                         </div>
                         <div class="form-group">
                             <label for="password-input">Password</label>
@@ -989,6 +1029,26 @@
                         <button type="submit" class="btn btn-primary">Login</button>
                     </form>
                     <p class="mt-3">Don't have an account? <a href="#" id="register-link">Register</a></p>
+                    <hr class="my-4">
+                    <h2 class="fs-5 fw-bold mb-3">Or use Google</h2>
+                    <center>
+                        <div id="g_id_onload"
+                            data-client_id="542383045898-lt6g33jc7dcv6mqhhkujirhfopa6fobf.apps.googleusercontent.com"
+                            data-context="signin"
+                            data-callback="handleCredentialResponse"
+                            data-nonce=""
+                            data-auto_prompt="false">
+                        </div>
+
+                        <div class="g_id_signin"
+                            data-type="standard"
+                            data-shape="rectangular"
+                            data-theme="outline"
+                            data-text="signin_with"
+                            data-size="large"
+                            data-logo_alignment="left">
+                        </div>
+                    </center>
                 </div>
             </div>
         </div>
@@ -1004,9 +1064,13 @@
                     <form id="register-form">
                         <div class="form-group">
                             <div id="register-error" class="text-danger"></div>
-                            <label for="register-username-input">Username</label>
-                            <input type="text" class="form-control" id="register-username-input" placeholder="Enter your username" maxlength="20" pattern="^[a-zA-Z0-9_]*$" required>
-                            <small class="form-text text-muted">Max 20 characters, no special characters except underscore.</small>
+                            <label for="register-username-input">Email</label>
+                            <input type="text" class="form-control" id="register-username-input" placeholder="Enter your email" maxlength="50" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-display_name-input">Display Name</label>
+                            <input type="text" class="form-control" id="register-display_name-input" placeholder="Enter your display name" maxlength="50" pattern="^[a-zA-Z0-9_ \u00C0-\u00FF ]*$" required>
+                            <small class="form-text text-muted">Max 50 characters.</small>
                         </div>
                         <div class="form-group">
                             <label for="register-password-input">Password</label>
@@ -1218,7 +1282,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({'prompt': message, 'username': user_name}),
+                body: JSON.stringify({'prompt': message, 'username': user_name, 'display_name': display_name[0]}),
                 credentials: 'include'
             });
 
@@ -1567,6 +1631,36 @@
         }
     }
 
+    // function to login a user
+    async function handleCredentialResponse(input) {
+        const response = await fetch(API_URL + '/google-login/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ credentials: input.credential }),
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const responseBody = await response.json();
+                errorMessage = responseBody.detail || errorMessage;
+            } catch (e) {
+                console.error('Failed to parse error response as JSON: ', e);
+            }
+            throw new Error(errorMessage);
+        }
+        else {
+            // set the session token
+            session_token = getCookie('session_token');
+            loginModal.hide();
+            user_name = username;
+            loadCookies();
+        }
+    }
+
     // function to handle the login form submission
     document.getElementById('login-form').addEventListener('submit', async function(event) {
         event.preventDefault();
@@ -1588,13 +1682,13 @@
     });
 
     // function to register a user
-    async function register(username, password) {
+    async function register(username, password, displayname) {
         const response = await fetch(API_URL + '/register/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ username: username, password: password }),
+            body: JSON.stringify({ username: username, password: password, display_name: displayname }),
             credentials: 'include'
         });
 
@@ -1609,11 +1703,18 @@
         event.preventDefault();
         username = document.getElementById('register-username-input').value.trim();
         var password = document.getElementById('register-password-input').value.trim();
-        if (username && password) {
+        var displayname = document.getElementById('register-display_name-input').value.trim();
+        // check if the username is a valid email address
+        if (!validateEmail(username)) {
+            document.getElementById('register-error').innerText = 'Please enter a valid email address';
+            return;
+        }
+        if (username && password && displayname) {
             try {
-                await register(username, password);
+                await register(username, password, displayname);
                 registerModal.hide();
                 user_name = username;
+                display_name = displayname;
                 loadCookies();
             }
             catch (error) {
@@ -1623,6 +1724,12 @@
             }
         }
     });
+
+    function validateEmail(email) {
+        // https://stackoverflow.com/a/46181/112731
+        var re = /\S+@\S+\.\S+/;
+        return re.test(email);
+    }
 
     // function to delete a cookie
     function deleteCookie(name) {
@@ -1690,6 +1797,10 @@
         for(var i = 0; i < cookieArr.length; i++) {
             var cookiePair = cookieArr[i].split("=");
             if(cookiePair[0] === name) {
+                if (name == 'username') { 
+                    // remove possible double quotes from around the username
+                    cookiePair[1] = cookiePair[1].replace(/"/g, '');
+                }
                 return decodeURIComponent(cookiePair[1]);
             }
         }
@@ -1703,6 +1814,8 @@
         if(sessionToken) {
             // session token exists, no need to login
             user_name = getCookie('username');
+            // remove possible double quotes from around the username
+            user_name = user_name.replace(/"/g, '');
             console.log('session token found, logging in as ' + user_name);
             overlayMessage.textContent = "Logging in...";
             overlay.style.display = 'flex';
@@ -1825,37 +1938,34 @@
     isRecording = false;
     isWaiting = false;
     canSendMessage();
+    
+    // Get the textarea and count div
+    const message = document.getElementById("message");
+    const countDiv = document.getElementById("tokenCount");
+    let lastValidMessage = '';
 
-    </script>
-    <script type="module" src="cl100k_base.js"></script>
-    <script>
-        // Get the textarea and count div
-        const message = document.getElementById("message");
-        const countDiv = document.getElementById("tokenCount");
-        let lastValidMessage = '';
-
-        // Add an input event listener to the textarea
-        message.addEventListener("input", function () {
-            // Encode the input text into tokens
-            const tokens = GPTTokenizer_cl100k_base.encode(message.value);
-            tokens_used = tokens.length;
-            message_lenght = message.value.length;
-            // $0.03 / 1K tokens
-            cost = tokens_used * 0.03 / 1000;
-            countDiv.textContent = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
-            // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
-            if (tokens_used > max_message_tokens && message.value.trim() != '') {
-                canSend = false;
-                canSendMessage();
-            }
-            else if (message.value.trim() == '') {
-                canSend = false;
-                canSendMessage();
-            } else {
-                canSend = true;
-                canSendMessage();
-            }
-        });
+    // Add an input event listener to the textarea
+    message.addEventListener("input", function () {
+        // Encode the input text into tokens
+        const tokens = GPTTokenizer_cl100k_base.encode(message.value);
+        tokens_used = tokens.length;
+        message_lenght = message.value.length;
+        // $0.03 / 1K tokens
+        cost = tokens_used * 0.03 / 1000;
+        countDiv.textContent = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
+        // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
+        if (tokens_used > max_message_tokens && message.value.trim() != '') {
+            canSend = false;
+            canSendMessage();
+        }
+        else if (message.value.trim() == '') {
+            canSend = false;
+            canSendMessage();
+        } else {
+            canSend = true;
+            canSendMessage();
+        }
+    });
     </script>
 </body>
 </html>

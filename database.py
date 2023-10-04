@@ -411,6 +411,32 @@ class Database:
         self.cursor.execute("SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s", (user_id,))
         return self.cursor.fetchone()
     
+    def get_display_name(self, username):
+        """Get the display name for the given username.
+        username: the username of the user
+        
+        returns: a dictionary containing the display name
+        """
+        # get the user_id for the given username
+        user_id = self.get_user(username)[0]
+
+        # get the display name
+        self.cursor.execute("SELECT display_name FROM users WHERE id = %s", (user_id,))
+        return self.cursor.fetchone()
+    
+    def update_display_name(self, username, display_name):
+        """Update the display name for the given username.
+        username: the username of the user
+        
+        returns: a dictionary containing the display name
+        """
+        # get the user_id for the given username
+        user_id = self.get_user(username)[0]
+
+        # update the display name
+        self.cursor.execute("UPDATE users SET display_name = %s WHERE id = %s", (display_name, user_id))
+        self.conn.commit()
+    
     def get_token_usage(self, username, daily=False):
         """Get the token usage for the given username.
         username: the username of the user

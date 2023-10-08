@@ -307,7 +307,7 @@
                 }
                 // Update the username in the widget
                 display_name = newSettings.display_name;
-                document.getElementById('username').textContent = 'Display Name: ' + display_name;
+                document.getElementById('username').innerHTML = 'Display Name: <a href="/profile" target="_blank">' + display_name + '</a>';
                 settings = newSettings;
                 populateSettingsMenu(settings);
                 if (newSettings.audio.voice_input) {
@@ -347,7 +347,6 @@
 
         function showErrorMessage(message) {
             var timestamp = new Date().toLocaleTimeString();
-            // remove newlines from the content
             var content = message;
             var tempchild = document.getElementById('messages').lastChild;
             if (tempchild && tempchild.querySelector) {
@@ -363,7 +362,8 @@
                 lastMessage.classList.remove('last-message');
             }
 
-            var chatMessage = `
+            var chatMessage = document.createElement('div');
+            chatMessage.innerHTML = `
                 <div class="message error">
                     <span class="timestamp">${timestamp}</span>
                     <div class="bubble">
@@ -374,8 +374,8 @@
                     </div>
                 </div>
             `;
+            document.getElementById('messages').appendChild(chatMessage.firstChild);
 
-            document.getElementById('messages').innerHTML += chatMessage;
             // enable the send  and record button again
             canSend = true;
             canRecord = true;
@@ -401,17 +401,16 @@
             let color = msg.color ? msg.color : 'white';
             let message = msg.message.replace(/\n/g, '<br>');
 
-            // Select the correct debug content element based on the debug number
             let debugContentElementId = `debugContent${debugNumber}`;
             let objDiv = document.getElementById(debugContentElementId);
 
-            // Check if the scroll is near the bottom
             let isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
 
-            // Add the debug message to the debug content
-            objDiv.innerHTML += `<p style="color:${color};">${message}</p>`;
+            let debugMessage = document.createElement('p');
+            debugMessage.style.color = color;
+            debugMessage.innerHTML = message;
+            objDiv.appendChild(debugMessage);
 
-            // Scroll to the bottom if the scroll was near the bottom before adding the message
             if (isNearBottom) {
                 objDiv.scrollTop = objDiv.scrollHeight;
             }
@@ -424,7 +423,6 @@
             console.log('content:', content);
             tempchild = document.getElementById('messages').lastChild;
             if (tempchild) {
-                // check if the tempchild has a spinner, if so, remove it
                 if (tempchild.querySelector('.spinner') != null) {
                     tempchild.querySelector('.spinner').remove();
                     document.getElementById('messages').lastChild.remove();
@@ -436,7 +434,8 @@
                 lastMessage.classList.remove('last-message');
             }
 
-            var chatMessage = `
+            var chatMessage = document.createElement('div');
+            chatMessage.innerHTML = `
                 <div class="message fr">
                     <span class="timestamp">${timestamp}</span>
                     <div class="bubble">
@@ -447,14 +446,12 @@
                     </div>
                 </div>
             `;
+            document.getElementById('messages').appendChild(chatMessage);
 
-            document.getElementById('messages').innerHTML += chatMessage;
+            var botMessage = document.createElement('div');
+            botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            document.getElementById('messages').appendChild(botMessage);
 
-            // create a bot message div with a loading spinner
-            var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-            var element = document.createElement('div');
-            element.innerHTML = botMessage;
-            document.getElementById('messages').innerHTML += botMessage;
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             content = '';
             tempReceived = '';
@@ -468,7 +465,6 @@
             console.log('content:' + content);
             tempchild = document.getElementById('messages').lastChild;
             if (tempchild) {
-                // check if the tempchild has a spinner, if so, remove it
                 if (tempchild.querySelector('.spinner') != null) {
                     tempchild.querySelector('.spinner').remove();
                     document.getElementById('messages').lastChild.remove();
@@ -482,7 +478,8 @@
                 lastMessage.classList.remove('last-message');
             }
 
-            var chatMessage = `
+            var chatMessage = document.createElement('div');
+            chatMessage.innerHTML = `
                 <div class="message plan">
                     <span class="timestamp">${timestamp}</span>
                     <div class="bubble">
@@ -493,15 +490,13 @@
                     </div>
                 </div>
             `;
+            document.getElementById('messages').appendChild(chatMessage);
 
-            document.getElementById('messages').innerHTML += chatMessage;
-        
-            
-            // create a bot message div with a loading spinner
             var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-            var element = document.createElement('div');
-            element.innerHTML = botMessage;
-            document.getElementById('messages').innerHTML += botMessage;
+            var botMessageElement = document.createElement('div');
+            botMessageElement.innerHTML = botMessage;
+            document.getElementById('messages').appendChild(botMessageElement);
+
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             content = '';
             tempReceived = '';
@@ -525,14 +520,12 @@
         }
 
         function handleFunctionCall(msg) {
-            // remove newlines from the content
             var timestamp = new Date().toLocaleTimeString();
             var content = msg.message;
             console.log('using addon');
             console.log('content:', content);
             tempchild = document.getElementById('messages').lastChild;
             if (tempchild) {
-                // check if the tempchild has a spinner, if so, remove it
                 if (tempchild.querySelector('.spinner') != null) {
                     tempchild.querySelector('.spinner').remove();
                     document.getElementById('messages').lastChild.remove();
@@ -546,7 +539,6 @@
                 lastMessage.classList.remove('last-message');
             }
 
-            // Create a string representation of args properties
             var argsString = '';
             for (var key in args) {
                 if (args.hasOwnProperty(key)) {
@@ -566,14 +558,15 @@
                 </div>
             `;
 
-            document.getElementById('messages').innerHTML += chatMessage;
-            
-            
-            // create a bot message div with a loading spinner
+            var chatMessageElement = document.createElement('div');
+            chatMessageElement.innerHTML = chatMessage;
+            document.getElementById('messages').appendChild(chatMessageElement);
+
             var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-            var element = document.createElement('div');
-            element.innerHTML = botMessage;
-            document.getElementById('messages').innerHTML += botMessage;
+            var botMessageElement = document.createElement('div');
+            botMessageElement.innerHTML = botMessage;
+            document.getElementById('messages').appendChild(botMessageElement);
+
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
             content = '';
             tempReceived = '';
@@ -612,8 +605,49 @@
                 </div>
             `;
 
-            document.getElementById('messages').innerHTML += chatMessage;
+            var chatMessageElement = document.createElement('div');
+            chatMessageElement.innerHTML = chatMessage;
+            document.getElementById('messages').appendChild(chatMessageElement);
         }
+
+        function handleRateLimit(msg) {
+            const toastContainer = document.querySelector('.toast-container');
+            const timestamp = new Date().toLocaleTimeString();
+            const button = '<button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>';
+            let toastType, toastMessage;
+
+            if (msg.content.warning) {
+                toastType = 'Rate Limit Warning';
+                toastMessage = msg.content.warning;
+            } else if (msg.content.error) {
+                toastType = 'Rate Limit Error';
+                toastMessage = msg.content.error;
+            } else {
+                toastType = 'Rate Limit Info';
+                toastMessage = msg.content.message;
+            }
+
+            const toastEl = document.createElement('div');
+            toastEl.classList.add('toast');
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.innerHTML = `
+                <div class="toast-header">
+                    ${toastType}
+                    <small>${timestamp}</small>
+                    ${button}
+                </div>
+                <div class="toast-body">
+                    ${toastMessage}
+                </div>
+            `;
+
+            const myToast = new bootstrap.Toast(toastEl, { delay: 10000 });
+            toastContainer.appendChild(toastEl);
+            myToast.show();
+        }
+
 
         function handleRelations(msg) {
             var timestamp = new Date().toLocaleTimeString();
@@ -633,9 +667,9 @@
                 if (category != 'input' && category != 'created_new_memory' && category != 'result_string' && category != 'token_count' && category != 'similar_messages' && category != 'results_list_after_token_check' && category != 'results_list_before_token_check') {
                     content += `<b>Category: ${category}</b><br/>`;
                     for (var query in msg[category]['query_results']) {
-                        content += `<b>&nbsp;&nbsp;Query: ${query}</b> -> <br/>`;
+                        content += `<b>  Query: ${query}</b> -> <br/>`;
                         for (var result of msg[category]['query_results'][query]) {
-                            content += `&nbsp;&nbsp;&nbsp;&nbsp;(${result[0]}) ${result[1]} (score: ${result[2]})<br/>`;
+                            content += `    (${result[0]}) ${result[1]} (score: ${result[2]})<br/>`;
                         }
                     }
                 }
@@ -660,13 +694,14 @@
                 </div>
             `;
 
-            document.getElementById('messages').innerHTML += chatMessage;
+            var chatMessageElement = document.createElement('div');
+            chatMessageElement.innerHTML = chatMessage;
+            document.getElementById('messages').appendChild(chatMessageElement);
 
-            // create a bot message div with a loading spinner
             var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-            var element = document.createElement('div');
-            element.innerHTML = botMessage;
-            document.getElementById('messages').innerHTML += botMessage;
+            var botMessageElement = document.createElement('div');
+            botMessageElement.innerHTML = botMessage;
+            document.getElementById('messages').appendChild(botMessageElement);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
 
@@ -712,16 +747,16 @@
                 </div>
             `;
 
-            document.getElementById('messages').innerHTML += chatMessage;
+            var chatMessageElement = document.createElement('div');
+            chatMessageElement.innerHTML = chatMessage;
+            document.getElementById('messages').appendChild(chatMessageElement);
 
             var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-            var element = document.createElement('div');
-            element.innerHTML = botMessage;
-            document.getElementById('messages').innerHTML += botMessage;
+            var botMessageElement = document.createElement('div');
+            botMessageElement.innerHTML = botMessage;
+            document.getElementById('messages').appendChild(botMessageElement);
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
-
-
 
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
@@ -778,6 +813,9 @@
                     }
                     else if (msg.type == 'relations') {
                         handleRelations(msg.content);
+                    }
+                    else if (msg.type == 'rate_limit') {
+                        handleRateLimit(msg);
                     }
                 }
                 else if (msg.usage) {
@@ -945,7 +983,7 @@
                 
                 audioElement = '';
                 if(settings.audio.voice_output) {
-                    var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
+                    var chatMessage = '<br><div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
                     document.getElementById('messages').innerHTML += chatMessage;
 
                     var playButtons = document.querySelectorAll('.play-button');
@@ -1008,6 +1046,10 @@
         <button id="abort" title="This will shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
     </div>
     -->
+    <!-- Toasts -->
+    <div class="toast-container position-fixed top-0 end-0 p-3">
+    </div>
+      
     <!-- Login Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="login-modal">
         <div class="modal-dialog" role="document">
@@ -1208,18 +1250,21 @@
         if (lastMessage) {
             lastMessage.classList.remove('last-message');
         }
-        var chatMessage = '<div class="message user last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>'; 
-        document.getElementById('messages').innerHTML += chatMessage;
+
+        var chatMessage = document.createElement('div');
+        chatMessage.innerHTML = '<div class="message user last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>';
+        document.getElementById('messages').appendChild(chatMessage.firstChild);
+
         var lastMessage2 = document.querySelector('.last-message');
-                    if (lastMessage2) {
-                        lastMessage2.classList.remove('last-message');
-                    }
+        if (lastMessage2) {
+            lastMessage2.classList.remove('last-message');
+        }
 
         // create a bot message div with a loading spinner
-        var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-        var element = document.createElement('div');
-        element.innerHTML = botMessage;
-        document.getElementById('messages').innerHTML += botMessage;
+        var botMessage = document.createElement('div');
+        botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+        document.getElementById('messages').appendChild(botMessage.firstChild);
+
         document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         // remove input text
         document.getElementById('message').value = '';

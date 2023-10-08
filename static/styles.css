@@ -70,6 +70,9 @@ table tr td {
     border: none;
     padding: 10px;
     outline: none;
+    form-sizing: content;
+    min-height: 2lh;
+    max-height: 10lh;
 }
 
 .input-field button {
@@ -805,7 +808,7 @@ pre {
     margin: 0 auto;
     /*padding: 50px 0 0 0;*/
   }
-  video {
+  #talk-video {
     display: block;
     /*border:1px solid;*/
     border-radius: 50%;

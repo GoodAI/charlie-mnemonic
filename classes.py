@@ -26,6 +26,14 @@ class userMessage(BaseModel):
     username: str
     display_name: str
 
+class UserUpdate(BaseModel):
+    has_access: bool
+    role: str
+
+class generateAudioMessage(BaseModel):
+    prompt: str
+    username: str
+
 class noTokenMessage(BaseModel):
     prompt: str
     username: str

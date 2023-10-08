@@ -8,6 +8,8 @@ import re
 import sys
 import time
 import uuid
+
+import aiohttp
 import memory as _memory
 import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
@@ -94,13 +96,13 @@ class MessageSender:
                 if brain:
                     db.update_daily_stats_token_usage(username,
                         brain_tokens=response['usage']['total_tokens'],
-                        spending_count=spending_count
+                        spending_count=this_message_total_cost
                     )
                 else:
                     db.update_daily_stats_token_usage(username,
                         prompt_tokens=response['usage']['prompt_tokens'],
                         generation_tokens=response['usage']['completion_tokens'],
-                        spending_count=spending_count
+                        spending_count=this_message_total_cost
                     )
                 current_stats_spending_count = db.get_statistic(username)['total_spending_count'] or 0
                 spending_count = round(current_stats_spending_count + this_message_total_cost, 5)
@@ -124,9 +126,9 @@ class MessageSender:
                 # calculate the new average response time
                 average_response_time = total_response_time / response_count
 
-                db.update_daily_stats_token_usage(username, 
-                                                average_response_time=average_response_time,
+                db.replace_daily_stats_token_usage(username,
                                                 total_response_time=total_response_time,
+                                                average_response_time=average_response_time,
                                                 response_count=response_count
                                                 )
         except Exception as e:
@@ -233,17 +235,47 @@ class AddonManager:
             })
 
         return function_dict, function_metadata
-
-
+    
 class OpenAIResponser:
     """This class contains functions to get responses from OpenAI"""
     error503 = "OpenAI server is busy, try again later"
-    
-    def __init__(self, openai_model, temperature, max_tokens, max_responses):
+
+    def __init__(self, openai_model, temperature, max_tokens, max_responses, username):
         self.openai_model = openai_model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.max_responses = max_responses
+        self.username = username
+
+        async def log_response_headers(session, trace_config_ctx, params: aiohttp.TraceRequestEndParams):
+            # Extract the headers
+            tokens_used = params.response.headers['x-ratelimit-remaining-tokens']
+            requests_remaining = params.response.headers['x-ratelimit-remaining-requests']
+            tokens_limit = params.response.headers['x-ratelimit-limit-tokens']
+            requests_limit = params.response.headers['x-ratelimit-limit-requests']
+
+            # Calculate the usage
+            tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
+            requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
+
+            # Print the normal usage
+            logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
+            logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
+            await MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
+
+            # Print the warning if above 50% of the rate limit
+            if tokens_usage > 50 or requests_usage > 50:
+                logger.warning('WARNING: You have used more than 50% of your rate limit.')
+                await MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 50% of your rate limit."}}, "blue", self.username)
+
+            # Print the error if above rate limit
+            if tokens_usage >= 100 or requests_usage >= 100:
+                logger.error('ERROR: You have exceeded your rate limit: tokens_usage: ' + str(tokens_usage) + '%, requests_usage: ' + str(requests_usage) + '%')
+                await MessageSender.send_message({"type": "rate_limit", "content": {"error": "ERROR: You have exceeded your rate limit: tokens_usage: " + str(tokens_usage) + "%, requests_usage: " + str(requests_usage) + "%"}}, "blue", self.username)
+
+
+        self.trace_config = aiohttp.TraceConfig()
+        self.trace_config.on_request_end.append(log_response_headers)
 
     async def get_response(self, username, messages, stream=False, function_metadata=None, function_call="auto"):
         if function_metadata is None:
@@ -255,42 +287,50 @@ class OpenAIResponser:
                     "properties": {},
                 },
             }]
-        
+
         max_retries = 5
         timeout = 180.0  # timeout in seconds
         now = time.time()
-        
-        for i in range(max_retries):
-            try:
-                response = await asyncio.wait_for(
-                    openai.ChatCompletion.acreate(
-                        model=self.openai_model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        n=self.max_responses,
-                        top_p=1,
-                        frequency_penalty=0,
-                        presence_penalty=0,
-                        messages=messages,
-                        stream=stream,
-                        functions=function_metadata,
-                        function_call=function_call,
-                    ),
-                    timeout=timeout
-                )
-                elapsed = time.time() - now
-                await MessageSender.update_token_usage(response, username, False, elapsed=elapsed)
-                return response
-            except asyncio.TimeoutError:
-                logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
-                await MessageSender.send_message( { "error": f"Request timed out, retrying {i+1}/{max_retries}" }, "red", username )
-            except Exception as e:
-                logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
-                await MessageSender.send_message( { "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}" }, "red", username )
-        
-        logger.error("Max retries exceeded")
-        await MessageSender.send_message( { "error": "Max retries exceeded" }, "red", username )
-        raise HTTPException(503, self.error503)
+
+        session = aiohttp.ClientSession(trace_configs=[self.trace_config])
+        openai.aiosession.set(session)
+
+        try:
+            for i in range(max_retries):
+                try:
+                    response = await asyncio.wait_for(
+                        openai.ChatCompletion.acreate(
+                            model=self.openai_model,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            n=self.max_responses,
+                            top_p=1,
+                            frequency_penalty=0,
+                            presence_penalty=0,
+                            messages=messages,
+                            stream=stream,
+                            functions=function_metadata,
+                            function_call=function_call,
+                        ),
+                        timeout=timeout
+                    )
+                    elapsed = time.time() - now
+                    await MessageSender.update_token_usage(response, username, False, elapsed=elapsed)
+                    return response
+                except asyncio.TimeoutError:
+                    logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
+                    await MessageSender.send_message({"error": f"Request timed out, retrying {i+1}/{max_retries}"}, "red", username)
+                except Exception as e:
+                    logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                    await MessageSender.send_message({"error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"}, "red", username)
+
+            logger.error("Max retries exceeded")
+            await MessageSender.send_message({"error": "Max retries exceeded"}, "red", username)
+            raise HTTPException(503, self.error503)
+
+        finally:
+            await session.close()
+
 
     # Todo: add a setting to enable/disable this feature and add the necessary code
     async def get_response_stream(self, messages):
@@ -412,60 +452,21 @@ class BrainProcessor:
         with open(brain_path, 'w') as f:
             f.write(brain)
 
-    @staticmethod
-    async def keyword_generation(message, username, history_string, last_messages_string, old_kw_brain, users_dir):
-        # Todo: replace with the new brain
-        # Generate a new kw_brain
-        partial_message = MessageParser.get_message('keyword_generation', {
-            'history_string': history_string,
-            'last_messages_string': last_messages_string,
-            'message': message,
-        })
-        kw_brain = await generate_keywords(partial_message, old_kw_brain, username)
-        json_str = kw_brain
-        kw_brain_string = ''
-        full_brain_string = f"Old Brain Data: {old_kw_brain}\n\nNew messages:\n{partial_message}\n\n"
-        
-        kw_brain_string = json_str
-        file_message = {
-            "prompt": str(full_brain_string) + ' ->',
-            "completion": ' ' + str(kw_brain_string)
-        }
-        # save the user message and bot message to a file
-        brain_responses_file = os.path.join('data', 'brain_responses.jsonl')
-        with open(brain_responses_file, 'a') as f:
-            f.write(json.dumps(file_message) + '\n')
-        BrainProcessor.write_brain(json_str, username, users_dir)
-        await MessageSender.send_debug(f"New Brain Data: {json_str}", 2, 'cyan', username)
-
-    @staticmethod
-    async def process_brain_results(results):
-        result_length = 0
-        result_string = ''
-        history_string = ''
-        if results is not None and 'documents' in results and results['documents']:
-            result_length = len(results['documents'])
-        for i in range(result_length):
-            role = results['metadatas'][i]['role']
-            if role == 'user':
-                result_string += f"Result {i}: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
-                history_string += f"{results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
-            else:
-                result_string += f"Result {i}: {results['metadatas'][i]['role']}: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
-                history_string += f"Assistant: {results['documents'][i]} (score: {round(results['distances'][i], 3)})\n"
-        return result_string, history_string
     
     @staticmethod
     async def delete_recent_messages(user):
+        global last_messages
         last_messages[user] = []
 
 class MessageParser:
     """This class contains functions to parse messages and generate responses"""
     @staticmethod
     def get_message(type, parameters):
+        with Database() as db:
+            display_name = db.get_display_name(parameters['username'])[0]
         """Parse the message based on the type and parameters"""
         if (type == 'start_message'):
-            return f"You are talking to {parameters['username']}\nMemory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\n{parameters['instruction_string']}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {parameters['message']}"
+            return f"You are talking to {display_name}\nMemory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\n{parameters['instruction_string']}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {parameters['message']}"
         elif (type == 'keyword_generation'):
             return f"Memory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\nLast message: {parameters['message']}"
         
@@ -533,13 +534,13 @@ class MessageParser:
         await MessageSender.send_message(new_message, 'red', username)
         try:
             function = function_dict[function_call_name]
-        except KeyError:
-            await MessageSender.send_message({"error": f"Function {function_call_name} not found"}, 'red', username)
-            raise HTTPException(404, f"Function {function_call_name} not found")
-        if inspect.iscoroutinefunction(function):
-            function_response = await MessageParser.ahandle_function_response(function, converted_function_call_arguments)
-        else:
-            function_response = MessageParser.handle_function_response(function, converted_function_call_arguments)
+            if inspect.iscoroutinefunction(function):
+                function_response = await MessageParser.ahandle_function_response(function, converted_function_call_arguments)
+            else:
+                function_response = MessageParser.handle_function_response(function, converted_function_call_arguments)
+        except KeyError as e:
+            await MessageSender.send_message({"error": f"Function {function_call_name} not found: {e}"}, 'red', username)
+            function_response = f"Function {function_call_name} not found: {e}"
         return await process_function_reply(function_call_name, function_response, message, og_message, function_dict, function_metadata, username, merge, users_dir)
     
     @staticmethod
@@ -554,7 +555,8 @@ class MessageParser:
         return response
 
     @staticmethod
-    async def process_response(response, function_dict, function_metadata, message, og_message, username, process_message, background_tasks,chat_history, chat_metadata, history_ids, last_messages, history_string, last_messages_string, old_kw_brain, users_dir):
+    async def process_response(response, function_dict, function_metadata, message, og_message, username, process_message, background_tasks,chat_history, chat_metadata, history_ids, history_string, last_messages_string, old_kw_brain, users_dir):
+        global last_messages
         if 'function_call' in response:
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
@@ -565,7 +567,9 @@ class MessageParser:
             if response['content'] is not None:
                 # chat_metadata.append({"role": "user"})
                 # chat_history.append(message)
-                last_messages[username].append(f"{username}: "  + message)
+                with Database() as db:
+                    display_name = db.get_display_name(username)[0]
+                last_messages[username].append(f"{display_name}: "  + message)
                 # chat_metadata.append({"role": "assistant"})
                 # chat_history.append(str(response['content']))
                 last_messages[username].append("assistant: " + str(response['content']))
@@ -663,10 +667,11 @@ class SettingsManager:
 
 async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir, display_name=None):
     """Process the message and generate a response"""
+    global last_messages
     if display_name is None:
         display_name = username
     # 1k tokens for the prompt, 1k tokens for the completion, 1k tokens for the permanent memory/notes, 100 tokens for preset prompts
-    max_token_usage = 4900
+    max_token_usage = 4700
     token_usage = 0
 
     chat_history, chat_metadata, history_ids = [], [], []
@@ -689,9 +694,19 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         last_messages[username] = []
 
     if last_messages[username] != []:
+        last_messages[username].append(message)
         last_messages_string = '\n'.join(last_messages[username][-10:])
     else:
         last_messages_string = 'No messages yet.'
+
+    # keep the last messages below 1000 tokens, if it is above 1000 tokens, delete the oldest messages until it is below 1000 tokens
+    last_messages_tokens = MessageParser.num_tokens_from_string(last_messages_string, "gpt-4")
+    logger.debug(f"last_messages_tokens: {last_messages_tokens}")
+    while last_messages_tokens > 1000:
+        last_messages[username].pop(0)
+        last_messages_string = '\n'.join(last_messages[username][-10:])
+        last_messages_tokens = MessageParser.num_tokens_from_string(last_messages_string, "gpt-4")
+        logger.debug(f"new last_messages_tokens: {last_messages_tokens}")
 
     # brainManager = BrainManager()
     # results = await brainManager.run(message, last_messages_string, username, users_dir)
@@ -741,7 +756,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 
     notes = await memory.note_taking(all_messages, message, users_dir, username, False, verbose)
 
-    instruction_string += f"""\n\nDiscard anything from the above messages if it conflicts with these notes!\n{notes}\n"""
+    instruction_string += f"""\n\nDiscard anything from the above messages if it conflicts with these notes!\n{notes}\n--end notes---"""
 
     #kw_brain_string = old_kw_brain
 
@@ -763,7 +778,8 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     response = json.loads(response)
 
     # process the response
-    response = await MessageParser.process_response(response, function_dict, function_metadata, message, og_message, username, process_message, background_tasks, chat_history, chat_metadata, history_ids, last_messages, history_string, last_messages_string, kw_brain_string, users_dir)
+    response = await MessageParser.process_response(response, function_dict, function_metadata, message, og_message, username, process_message, background_tasks, chat_history, chat_metadata, history_ids, history_string, last_messages_string, kw_brain_string, users_dir)
+    
     with Database() as db:
         db.update_message_count(username)
     return response
@@ -771,11 +787,11 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan, separated with newlines between steps. Each step is a function call and its instructions, nothing else! Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible! Use the following format for plans: \n\n1. function_call(argument1, argument2)\n2. another_function_call(argument3, argument4)\n\nNothing else. Keep the steps as simple and as few as possible.'},
-        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example: Plan:\n1. step 1 \n2. step 2\n3. step 3\n\n{message}'},
+        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan in JSON format. Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible, each step should include a maximum of 5 detailed instructions! Use the following json format for plans: {{"1": "this is step 1 with 5 instructions", "2": "this is step 2 if needed"}}\n\nNothing else. Keep the steps as simple and as few as possible. Do not make things up, ask questions if you are not certain.'},
+        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example for plan: {{"1": "in this step we do max 5 instructions, include details like filenames if needed", "2": "in this example we can use filenames from step 1 to continue other instructions"}}\n\n\n\n{message}'},
     ]
 
-    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
     response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
 
     final_response = response
@@ -798,11 +814,11 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are a GoodAI chat Agent. You have an extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user.'},
+        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain.'},
         {"role": "user", "content": f'{message}'},
     ]
 
-    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
     response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
     
     await MessageSender.send_debug(f"response: {response}", 1, 'green', username)
@@ -836,25 +852,25 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         final_response = final_response.replace('PLAN:', '')
         # remove leading and trailing whitespace
         final_response = final_response.strip()
-        # split the final response into a list of steps
-        steps = final_response.split('\n')
-        steps = [step.strip() for step in steps if step]
         
-        # If there's only 1 step, take each number as a step
-        if len(steps) == 1 and steps[0].isdigit():
-            steps = list(steps[0])
-
-        # If no different steps, take the whole text as a step
-        if len(set(steps)) == 1:
-            steps = [final_response]
-
+        # parse the plan as json
+        try:
+            plan = json.loads(final_response)
+        except:
+            # we cant load the plan as json, so use the whole response as the plan
+            plan = final_response
+        # plan is in format {1: 'step 1', 2: 'step 2'}
+        # get the steps
+        steps = list(plan.keys())
+        steps.sort()
         # create a string of the steps
         steps_list = []
+        # go through each step
         for i, step in enumerate(steps):
             await MessageSender.send_debug(f"processing step: {step}", 1, 'green', username)
             # convert the list to a string before passing it to process_cot_messages
             steps_string = ''.join(steps_list)
-            response = await process_cot_messages(step, function_dict, function_metadata, username, users_dir, steps_string, message, og_message)
+            response = await process_cot_messages(plan[step], function_dict, function_metadata, username, users_dir, steps_string, message, og_message)
             # truncate the response string if it's not one of the last three steps
             response_str = str(response)
             if i < len(steps) - 3:
@@ -885,7 +901,7 @@ Please follow these instructions carefully. If nothing changes, return a copy of
         {'role': 'user', 'content': f' If nothing changes, return the old active_brain data in a structured plain text format with nothing in front or behind!\nOld active_brain Data: {old_kw_brain}\n\nNew messages:\n{prompt}\n\n'},
     ]
     
-    openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses, username)
     response = await openai_response.get_response(username, new_message)
 
     await MessageSender.send_debug(f"kw resp: {response}", 1, 'green', username)
@@ -897,12 +913,12 @@ async def process_cot_messages(message, function_dict, function_metadata, userna
         function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
 
         messages = [
-            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can.'},
+            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. Memory is handled automatically for you.'},
             {"role": "user", "content": f'Memory: {full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
         ]
         await MessageSender.send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
         
-        openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+        openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
         response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
         await MessageSender.send_debug(f"process_cot_messages response: {response}", 2, 'red', username)
         response = response['choices'][0]['message']
@@ -921,21 +937,21 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
     # add user to COT_RETRIES if they don't exist
     if username not in COT_RETRIES:
-        COT_RETRIES[username] = 1
+        COT_RETRIES[username] = 0
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     if COT_RETRIES[username] >= 1:
         await MessageSender.send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
         messages = [
-            {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Respond with YES: <your summary>'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Respond with YES: <your summary>'},
+            {"role": "system", "content": f'Another AI has executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Respond with YES: <your summary>'},
+            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet, so be sure to display anything needed. Respond with YES: <your summary>'},
         ]
     else:
         messages = [
-            {"role": "system", "content": f'You have executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so repeat everything in short. Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "system", "content": f'Another AI has executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so be sure to display anything needed.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
         ]
 
-    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
     response = await openai_response.get_response(username, messages, function_metadata=function_metadata)
 
     response = response['choices'][0]['message']['content']
@@ -958,7 +974,7 @@ async def process_function_reply(function_call_name, function_response, message,
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     
     messages=[
-                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only.'},
+                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!)'},
                 {"role": "user", "content": f'{message}'},
                 {
                     "role": "function",
@@ -966,7 +982,7 @@ async def process_function_reply(function_call_name, function_response, message,
                     "content": str(function_response),
                 },
             ]
-    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses)
+    openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
     second_response = await openai_response.get_response(username, messages)
 
     final_response = second_response["choices"][0]["message"]["content"]

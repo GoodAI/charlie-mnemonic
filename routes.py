@@ -12,7 +12,7 @@ import urllib.parse
 from unidecode import unidecode
 from utils import process_message, OpenAIResponser, AudioProcessor, AddonManager, SettingsManager, BrainProcessor, MessageParser
 from authentication import Authentication
-from classes import LoginUser, User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage, UserGoogle
+from classes import LoginUser, User, UserCheckToken, UserName, editSettings, userMessage, noTokenMessage, UserGoogle, generateAudioMessage
 import shutil
 from database import Database
 from memory import export_memory_to_file, import_file_to_memory, wipe_all_memories, stop_database
@@ -37,7 +37,7 @@ PRODUCTION = os.environ['PRODUCTION']
 
 ORIGINS = ["https://clang.goodai.com", "*"]
 
-users_dir = 'users' # end with a slash
+users_dir = 'users'
 
 router.mount("/static", StaticFiles(directory="static"), name="static")
 router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
@@ -61,10 +61,12 @@ async def read_root(request: Request):
     daily_limit = 0
     with Database() as db:
         daily_limit = db.get_daily_limit()
-    try:
+        maintenance_mode = db.get_maintenance_mode()
+
+    if maintenance_mode == 'true' or maintenance_mode == 'True' or maintenance_mode == True:
+        return templates.TemplateResponse("maintenance.html", {"request": request, "version": version, "daily_limit": daily_limit, "production": PRODUCTION})
+    else:
         return templates.TemplateResponse("index.html", {"request": request, "version": version, "daily_limit": daily_limit, "production": PRODUCTION})
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Item not found")
     
 @router.get("/styles.css")
 async def read_root():
@@ -435,6 +437,19 @@ async def handle_message(request: Request, message: userMessage, background_task
         raise HTTPException(status_code=401, detail="Token is invalid")
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
+    total_tokens_used, total_cost, daily_limit, total_daily_tokens_used, total_daily_cost, display_name = 0, 0, 0, 0, 0, ''
+    with Database() as db:
+        total_tokens_used, total_cost = db.get_token_usage(message.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(message.username, True)
+        display_name = db.get_display_name(message.username)
+        daily_limit = db.get_daily_limit()
+        has_access = db.get_user_access(message.username)
+    if not has_access or has_access == 'false' or has_access == 'False':
+        logger.info(f'user {message.username} does not have access')
+        raise HTTPException(status_code=400, detail="You do not have access yet, ask permission from the administrator or wait for your trial to start")
+    if total_daily_cost >= daily_limit:
+        logger.info(f'user {message.username} reached daily limit')
+        raise HTTPException(status_code=400, detail="You reached your daily limit. Please wait until tomorrow to continue using the service.")
     return await process_message(message.prompt, message.username, background_tasks, users_dir, message.display_name)
 
 # openAI response route without modules
@@ -467,7 +482,7 @@ async def handle_message_no_modules(request: Request, message: userMessage, audi
     success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1)
+    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, message.username)
     messages = [
         {"role": "system", "content": message.username + ': ' + message.prompt + '\nAssistant: '}
     ]
@@ -535,18 +550,17 @@ async def handle_message_audio(request: Request, audio_file: UploadFile, backgro
             },
         },
     },)
-async def handle_generate_audio(request: Request, message: userMessage, background_tasks: BackgroundTasks = None):
+async def handle_generate_audio(request: Request, message: generateAudioMessage):
     session_token = request.cookies.get("session_token")
-    username = request.cookies.get("username")
     auth = Authentication()
-    success = auth.check_token(username, session_token)
+    success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")    
-    audio_path, audio = await AudioProcessor.generate_audio(message.prompt, username, users_dir)
+    audio_path, audio = await AudioProcessor.generate_audio(message.prompt, message.username, users_dir)
     with Database() as db:
-        db.add_voice_usage(username, len(message.prompt))
+        db.add_voice_usage(message.username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")
 
 @router.post("/save_data/", tags=["Data"],
@@ -642,7 +656,7 @@ async def handle_delete_data(request: Request, user: UserName):
     wipe_all_memories(user.username)
     stop_database(user.username)
     # remove all users recent messages
-    await BrainProcessor.delete_recent_messages(user.username)
+    #await BrainProcessor.delete_recent_messages(user.username)
     # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
     shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
     return {'message': 'User data deleted successfully'}
@@ -799,7 +813,7 @@ async def handle_notoken_message(message: noTokenMessage):
             },
         },
     },)
-async def handle_generate_audio(message: noTokenMessage):
+async def handle_notoken_generate_audio(message: noTokenMessage):
     auth = Authentication()
     session_token = auth.login(message.username, message.password)
     if not session_token:
@@ -815,13 +829,25 @@ security = HTTPBearer()
 def get_current_username(username: Optional[str] = Depends(APIKeyCookie(name="username")), 
                          session_token: Optional[str] = Depends(APIKeyCookie(name="session_token"))):
     auth = Authentication()
-    print(username, session_token)
     success = auth.check_token(username, session_token)
     if not success:
         raise HTTPException(
             status_code=403, detail="Invalid authorization code"
         )
     return username
+
+@router.post("/admin/update_user/{user_id}")
+async def update_user(user_id: int, has_access: str = Form(...), role: str = Form(...), username: str = Depends(get_current_username)):
+    with Database() as db:
+        role_db = db.get_user_role(username)[0]
+    if role_db != 'admin':
+        logger.warning(f"User {username} (role: {role_db}) is not authorized to update this user: {user_id}")
+        raise HTTPException(status_code=403, detail="You are not authorized to update this user")
+    else:
+        with Database() as db:
+            db.update_user(user_id, has_access, role)
+            logger.info(f"User {username} (role: {role_db}) updated user: {user_id}")
+            return {"message": f"User {user_id} updated successfully"}
 
 @router.get("/admin/statistics/{page}", response_class=HTMLResponse)
 async def get_statistics(request: Request, page: int, items_per_page: int = 5, username: str = Depends(get_current_username)):
@@ -837,7 +863,6 @@ async def get_statistics(request: Request, page: int, items_per_page: int = 5, u
             page_statistics = json.loads(db.get_statistics(page, items_per_page))
             total_pages = db.get_total_statistics_pages(items_per_page)
             admin_controls = json.loads(db.get_admin_controls())
-            print(admin_controls)
             return templates.TemplateResponse("stats.html", {"request": request, 
                                                              "rows": page_statistics, 
                                                              "chart_data": json.dumps(page_statistics).replace('"', '\\"'), 
@@ -871,7 +896,26 @@ async def update_controls(request: Request, username: str = Depends(get_current_
                 id = 1 
             db.update_admin_controls(id, daily_spending_limit, allow_access, maintenance)
         return RedirectResponse(url="/admin/statistics/1", status_code=303)
-
+    
+@router.get("/profile", response_class=HTMLResponse)
+async def get_user_profile(request: Request, username: str = Depends(get_current_username)):
+    with Database() as db:
+        user_id = db.get_user_id(username)
+        daily_stats = json.loads(db.get_user_statistics(user_id))
+        user_profile = json.loads(db.get_user_profile(username))
+        return templates.TemplateResponse("user_profile.html", {"request": request, "profile": user_profile, "daily_stats": daily_stats})
+    
+@router.get("/data/{file_path:path}")
+async def read_file(file_path: str, username: str = Depends(get_current_username)):
+    converted_name = convert_name(username)
+    host_path = os.path.join(os.getcwd(), 'users', converted_name, 'data', file_path)
+    if os.path.exists(host_path):
+        response = FileResponse(host_path)
+        # no cache for data files
+        response.headers["Cache-Control"] = "public, max-age=0"
+        return response
+    else:
+        raise HTTPException(status_code=404, detail="Item not found")
 
 @router.get("/{file_path:path}")
 async def read_file(file_path: str):
@@ -912,7 +956,6 @@ async def read_file(file_path: str):
 )
 async def google_login(request: UserGoogle, response: Response):
     credential = request.credentials
-    #print(credential)
     request = requests.Request()
     id_info = id_token.verify_oauth2_token(
         credential, request, os.environ.get('GOOGLE_CLIENT_ID'))
@@ -947,5 +990,7 @@ def convert_name(name):
     name = unidecode(name)
     # replace spaces with underscores
     name = name.replace(' ', '_')
+    name = name.replace('@', '_')
+    name = name.replace('.', '_')
     # lowercase the name
     return name.lower()

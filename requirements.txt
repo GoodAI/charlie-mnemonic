@@ -112,3 +112,4 @@ python-jose[cryptography]==3.3.0
 google-auth==2.23.2
 Authlib==1.2.1
 unidecode==1.3.7
+moviepy==1.0.3

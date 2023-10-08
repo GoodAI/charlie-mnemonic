@@ -3,6 +3,7 @@ import json
 import os
 import secrets
 import time
+import aiohttp
 import openai
 from tenacity import retry, stop_after_attempt, wait_fixed
 from agentmemory import (
@@ -122,6 +123,7 @@ class MemoryManager:
         process_dict = {'input': new_messages}
         # todo: extract the needed date from the message and use that as the date
         # add the date-extractor
+        self.openai_manager.set_username(username)
         timeline = await self.openai_manager.ask_openai(all_messages, 'date-extractor', self.model_used, 100, 0.1, username=username)
         if 'choices' in timeline and len(timeline['choices']) > 0 and 'message' in timeline['choices'][0] and 'content' in timeline['choices'][0]['message']:
             subject = timeline['choices'][0]['message']['content']
@@ -170,7 +172,7 @@ class MemoryManager:
                     result_lines.pop(-1)
                     results_string = '\n'.join(result_lines)
                 else:
-                    # If there are no newline characters, remove a certain number of characters from the end
+                    # If there are no newline characters, remove a certain number of characters from the endsecretso
                     results_string = results_string[:-100]
                 token_count = utils.MessageParser.num_tokens_from_string(results_string)
             return results_string, subject
@@ -193,6 +195,7 @@ class MemoryManager:
                 logger.debug(f"adding memory: {chunk} to category: {category}")
                 process_dict['created_new_memory'] = 'yes'
 
+        self.openai_manager.set_username(username)
         subject_query = await self.openai_manager.ask_openai(all_messages, 'retriever', self.model_used, 100, 0.1, username=username)
         if 'choices' in subject_query and len(subject_query['choices']) > 0 and 'message' in subject_query['choices'][0] and 'content' in subject_query['choices'][0]['message']:
             subject = subject_query['choices'][0]['message']['content']
@@ -255,6 +258,7 @@ class MemoryManager:
         """Process the incoming memory and return the updated active brain data."""
         process_dict = {'input': content}
         logger.debug(f"Processing incoming memory: {content}")
+        self.openai_manager.set_username(username)
         subject_query = await self.openai_manager.ask_openai(content, 'categorise_query', self.model_used, 100, 0.1, username=username)
         if 'choices' in subject_query and len(subject_query['choices']) > 0:
             choice = subject_query['choices'][0]
@@ -318,6 +322,7 @@ class MemoryManager:
             for similar_message in similar_messages:
                     logger.debug(f"({similar_message['id']}) {similar_message['document']} - score: {similar_message['distance']}")
         else:
+            self.openai_manager.set_username(username)
             subject_category = await self.openai_manager.ask_openai(content, 'categorise', self.model_used, 100, 0.1, username=username)
             if 'choices' in subject_category and len(subject_category['choices']) > 0 and 'message' in subject_category['choices'][0] and 'content' in subject_category['choices'][0]['message']:
                 category = subject_category['choices'][0]['message']['content']
@@ -457,6 +462,7 @@ class MemoryManager:
                 current_file = f"{filedir}/{file}"
                 with open(current_file, "r") as f:
                     file_content = f.read()
+                    self.openai_manager.set_username(username)
                     summary = await self.openai_manager.ask_openai(file_content, 'summary_memory', self.model_used, int(max_tokens_per_file), 0.1, username=username)
                     with open(current_file, "w") as f:
                         new_content = summary['choices'][0]['message']['content']
@@ -475,6 +481,7 @@ class MemoryManager:
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
                 # summarize the message
+                self.openai_manager.set_username(username)
                 message = await self.openai_manager.ask_openai(message, 'summarize', self.model_used, 500, 0.1, username=username)
                 message = message['choices'][0]['message']['content']
 
@@ -485,6 +492,7 @@ class MemoryManager:
             while retry_count < 5:
                 try:
                     # todo: inform gpt about the remaining tokens available, if it exceeds the limit, summarize the existing list and purge unneeded items
+                    self.openai_manager.set_username(username)
                     note_taking_query = await self.openai_manager.ask_openai(final_message, 'notetaker', self.model_used, 1000, 0.1, username=username)
                     process_dict['note_taking_query'] = json.dumps(note_taking_query)
                     actions = self.process_note_taking_query(note_taking_query)
@@ -580,13 +588,48 @@ class MemoryManager:
 
 class OpenAIManager:
     """A class to manage the OpenAI API."""
+    def set_username(self, username):
+        self.username = username
+
+    def __init__(self):
+        async def log_response_headers(session, trace_config_ctx, params: aiohttp.TraceRequestEndParams):
+                # Extract the headers
+                tokens_used = params.response.headers['x-ratelimit-remaining-tokens']
+                requests_remaining = params.response.headers['x-ratelimit-remaining-requests']
+                tokens_limit = params.response.headers['x-ratelimit-limit-tokens']
+                requests_limit = params.response.headers['x-ratelimit-limit-requests']
+
+                # Calculate the usage
+                tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
+                requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
+
+                # Print the normal usage
+                logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
+                logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
+                await utils.MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
+
+                # Print the warning if above 50% of the rate limit
+                if tokens_usage > 50 or requests_usage > 50:
+                    logger.warning('WARNING: You have used more than 50% of your rate limit.')
+                    await utils.MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 50% of your rate limit."}}, "blue", self.username)
+
+                # Print the error if above rate limit
+                if tokens_usage >= 100 or requests_usage >= 100:
+                    logger.error('ERROR: You have exceeded your rate limit: tokens_usage: ' + str(tokens_usage) + '%, requests_usage: ' + str(requests_usage) + '%')
+                    await utils.MessageSender.send_message({"type": "rate_limit", "content": {"error": "ERROR: You have exceeded your rate limit: tokens_usage: " + str(tokens_usage) + "%, requests_usage: " + str(requests_usage) + "%"}}, "blue", self.username)
+
+        self.trace_config = aiohttp.TraceConfig()
+        self.trace_config.on_request_end.append(log_response_headers)
+
     @retry(stop=stop_after_attempt(10), wait=wait_fixed(5))
     async def ask_openai(self, prompt, role, model_choice='gpt-4-0613', tokens=1000, temp=0.1, username=None):
         """Ask the OpenAI API a question and return the response."""
-        #print(colored(f"Prompt: {prompt}", 'red'))
         now = time.time()
         current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
         role_content = self.get_role_content(role, current_date_time)
+
+        session = aiohttp.ClientSession(trace_configs=[self.trace_config])
+        openai.aiosession.set(session)
 
         try:
             messages = [
@@ -612,6 +655,10 @@ class OpenAIManager:
             logger.error(e)
             raise e
 
+        finally:
+            await session.close()
+
+
     def get_role_content(self, role, current_date_time):
         """Return the content for the role."""
         role_content = "You are an ChatGPT-powered chat bot."
@@ -634,7 +681,7 @@ class OpenAIManager:
         if role == 'retriever':
             role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a cross-encoder. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == 'notetaker':
-            role_content = "You are a note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added, updated or deleted, how and where it should be stored. Only store memories if explicitly asked or like shopping lists, reminders, the user's info, procedural instructions,.. DO NOT store Imperative Instructions, or chat history or regular messages! Use timestamps only if needed. Reply in an escaped json format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {\"action\": \"create\", \"file\": \"shoppinglist\", \"content\": \"cookies\"}, {\"action\": \"update\", \"file\": \"shoppinglist\", \"content\": \"cookies\napples\nbananas\npotatoes\"} ]"
+            role_content = "You are a note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing notes should be updated or deleted. Only store memories if explicitly asked or things like shopping lists, reminders, the user's info, procedural instructions,.. DO NOT store Imperative Instructions, or chat history or regular messages! Remove completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {\"action\": \"create\", \"file\": \"shoppinglist\", \"content\": \"cookies\"}, {\"action\": \"update\", \"file\": \"shoppinglist\", \"content\": \"cookies\napples\nbananas\npotatoes\"} ]"
         if role == 'summary_memory':
             role_content = "You are a memory summarizer. You get a list of the current notes, your task is to summarize the current notes as short as possible while maintaining all details. Only keep memories worth remembering, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in a plain text format with only the notes, nothing else."
         if role == 'summarize':

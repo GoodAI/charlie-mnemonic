@@ -35,7 +35,7 @@ connections = {}
 
 PRODUCTION = os.environ['PRODUCTION']
 
-ORIGINS = ["https://clang.goodai.com", "*"]
+ORIGINS = os.environ['ORIGINS']
 
 users_dir = 'users'
 

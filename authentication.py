@@ -79,7 +79,7 @@ class Authentication:
             self.db.cursor.execute("""
                 INSERT INTO users (google_id, username, password, session_token, has_access, role, display_name)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (google_id, username, hashed_password_str, session_token, True, 'user', display_name))
+            """, (google_id, username, hashed_password_str, session_token, False, 'user', display_name))
         else:
             # If the user exists, update the session token and google_id
             self.db.cursor.execute("""

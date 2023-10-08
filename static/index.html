@@ -29,7 +29,7 @@
         } else {
             production = true;
         }
-        let API_URL = production ? 'https://' : 'http://' + document.domain + ':' + location.port;
+        let API_URL = (production ? 'https://' : 'http://') + document.domain + ':' + location.port;
         //const port = 8002;
         //const url = 'http://127.0.0.1';
         //const API_URL = url + ':' + port;

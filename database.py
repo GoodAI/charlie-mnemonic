@@ -215,13 +215,16 @@ class Database:
     def get_statistics(self, page, items_per_page):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         offset = (page - 1) * items_per_page
-        dict_cursor.execute("SELECT * FROM statistics ORDER BY id LIMIT %s OFFSET %s", (items_per_page, offset))
+        dict_cursor.execute("""
+            SELECT users.id AS user_id, users.username, users.role, users.has_access, statistics.user_id as user_sid, statistics.amount_of_messages, statistics.total_tokens_used, statistics.prompt_tokens, statistics.completion_tokens, statistics.voice_usage, statistics.total_spending_count, statistics.total_average_response_time
+            FROM users 
+            LEFT JOIN statistics 
+            ON users.id = statistics.user_id 
+            ORDER BY users.id LIMIT %s OFFSET %s
+            """, (items_per_page, offset))
         rows = dict_cursor.fetchall()
-        for row in rows:
-            row['username'] = self.get_username(row['user_id'])[0]
-            row['role'] = self.get_user_role(row['username'])[0]
-            row['has_access'] = self.get_user_access(row['username'])
         return json.dumps(rows, default=str)
+
     
     def get_total_statistics_pages(self, items_per_page):
         self.cursor.execute("SELECT COUNT(*) FROM statistics")

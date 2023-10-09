@@ -242,13 +242,6 @@ class Database:
         dict_cursor.execute("SELECT * FROM statistics WHERE user_id = %s", (user_id,))
         return dict_cursor.fetchone()
 
-    def add_statistic(self, user_id, amount_of_messages=0, total_tokens_used=0, prompt_tokens=0, completion_tokens=0, voice_usage=0):
-        self.cursor.execute("""
-        INSERT INTO statistics (user_id, amount_of_messages, total_tokens_used, prompt_tokens, completion_tokens, voice_usage) 
-        VALUES (%s, %s, %s, %s, %s, %s)
-        """, (user_id, amount_of_messages, total_tokens_used, prompt_tokens, completion_tokens, voice_usage))
-        self.conn.commit()
-
     def update_statistic(self, username, **kwargs):
         """Update the statistic for the given username.
         username: the name of the user

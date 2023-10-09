@@ -1,9 +1,11 @@
+import asyncio
 import datetime
 import json
 import os
 import secrets
 import time
 import aiohttp
+from fastapi import HTTPException
 import openai
 from tenacity import retry, stop_after_attempt, wait_fixed
 from agentmemory import (
@@ -558,27 +560,33 @@ class MemoryManager:
                 logger.error("Error: query is not valid json: " + query['choices'][0]['message']['content'])
                 return actions
 
-            # check if query_json is a list or a single object
             if isinstance(query_json, list):
-                # loop through each action in the query
                 for action_dict in query_json:
-                    # extract the action, file and content from the action
                     if 'action' in action_dict and 'file' in action_dict and 'content' in action_dict:
                         action = action_dict['action']
                         file = action_dict['file']
                         content = action_dict['content']
-                        actions.append((action, file, content))
+                    elif 'action' in action_dict and action_dict['action'] == 'skip':
+                        action = action_dict['action']
+                        file = ''
+                        content = ''
                     else:
                         logger.error("Error: action list does not contain the required elements: " + str(action_dict))
+                        continue
+                    actions.append((action, file, content))
             elif isinstance(query_json, dict):
-                # extract the action, file and content from the action
                 if 'action' in query_json and 'file' in query_json and 'content' in query_json:
                     action = query_json['action']
                     file = query_json['file']
                     content = query_json['content']
-                    actions.append((action, file, content))
+                elif 'action' in query_json and query_json['action'] == 'skip':
+                    action = query_json['action']
+                    file = ''
+                    content = ''
                 else:
                     logger.error("Error: action does not contain the required elements: " + str(query_json))
+                    return
+                actions.append((action, file, content))
 
         else:
             logger.error("Error: query does not contain the required elements")
@@ -588,30 +596,32 @@ class MemoryManager:
 
 class OpenAIManager:
     """A class to manage the OpenAI API."""
+    error503 = "OpenAI server is busy, try again later"
     def set_username(self, username):
         self.username = username
 
     def __init__(self):
         async def log_response_headers(session, trace_config_ctx, params: aiohttp.TraceRequestEndParams):
                 # Extract the headers
-                tokens_used = params.response.headers['x-ratelimit-remaining-tokens']
-                requests_remaining = params.response.headers['x-ratelimit-remaining-requests']
-                tokens_limit = params.response.headers['x-ratelimit-limit-tokens']
-                requests_limit = params.response.headers['x-ratelimit-limit-requests']
+                tokens_used = params.response.headers.get('x-ratelimit-remaining-tokens', 40000)
+                requests_remaining = params.response.headers.get('x-ratelimit-remaining-requests', 200)
+                tokens_limit = params.response.headers.get('x-ratelimit-limit-tokens', 40000)
+                requests_limit = params.response.headers.get('x-ratelimit-limit-requests', 200)
 
                 # Calculate the usage
                 tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
                 requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
-
+                print(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
+                print(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
                 # Print the normal usage
-                logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
-                logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
-                await utils.MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
+                # logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
+                # logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
+                # await utils.MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
 
                 # Print the warning if above 50% of the rate limit
-                if tokens_usage > 50 or requests_usage > 50:
-                    logger.warning('WARNING: You have used more than 50% of your rate limit.')
-                    await utils.MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 50% of your rate limit."}}, "blue", self.username)
+                if tokens_usage > 20 or requests_usage > 20:
+                    logger.warning('WARNING: You have used more than 20% of your rate limit.')
+                    await utils.MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 20% of your rate limit."}}, "blue", self.username)
 
                 # Print the error if above rate limit
                 if tokens_usage >= 100 or requests_usage >= 100:
@@ -631,29 +641,43 @@ class OpenAIManager:
         session = aiohttp.ClientSession(trace_configs=[self.trace_config])
         openai.aiosession.set(session)
 
+        
+        max_retries = 5
+        timeout = 180.0  # timeout in seconds
+
+        messages = [
+            {"role": "system", "content": role_content},
+            {"role": "user", "content": prompt},
+        ]
         try:
-            messages = [
-                {"role": "system", "content": role_content},
-                {"role": "user", "content": prompt},
-            ]
+            for i in range(max_retries):
+                try:
+                    response = await asyncio.wait_for(
+                        openai.ChatCompletion.acreate(
+                            model=model_choice,
+                            messages=messages,
+                            temperature=temp,
+                            max_tokens=tokens,
+                            stream=False
+                        ),
+                        timeout=timeout
+                    )
 
-            response = await openai.ChatCompletion.acreate(
-                model=model_choice,
-                messages=messages,
-                temperature=temp,
-                max_tokens=tokens,
-                stream=False
-            )
+                    elapsed = time.time() - now
+                    logger.info('OpenAI response time: ' + str(elapsed) + 's\n')
+                    logger.info(f"Completion tokens: {response['usage']['completion_tokens']}, Prompt tokens: {response['usage']['prompt_tokens']}, Total tokens: {response['usage']['total_tokens']}")
+                    await utils.MessageSender.update_token_usage(response, username, brain=True, elapsed=elapsed)
+                    return response
+                except asyncio.TimeoutError:
+                    logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
+                    await utils.MessageSender.send_message({"error": f"Request timed out, retrying {i+1}/{max_retries}"}, "red", username)
+                except Exception as e:
+                    logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                    await utils.MessageSender.send_message({"error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"}, "red", username)
 
-            elapsed = time.time() - now
-            logger.info('OpenAI response time: ' + str(elapsed) + 's\n')
-            logger.info(f"Completion tokens: {response['usage']['completion_tokens']}, Prompt tokens: {response['usage']['prompt_tokens']}, Total tokens: {response['usage']['total_tokens']}")
-            await utils.MessageSender.update_token_usage(response, username, brain=True, elapsed=elapsed)
-            return response
-
-        except Exception as e:
-            logger.error(e)
-            raise e
+            logger.error("Max retries exceeded")
+            await utils.MessageSender.send_message({"error": "Max retries exceeded"}, "red", username)
+            raise HTTPException(503, self.error503)
 
         finally:
             await session.close()

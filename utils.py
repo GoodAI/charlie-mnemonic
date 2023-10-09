@@ -8,7 +8,7 @@ import re
 import sys
 import time
 import uuid
-
+from tenacity import retry, stop_after_attempt, wait_fixed
 import aiohttp
 import memory as _memory
 import openai
@@ -249,24 +249,24 @@ class OpenAIResponser:
 
         async def log_response_headers(session, trace_config_ctx, params: aiohttp.TraceRequestEndParams):
             # Extract the headers
-            tokens_used = params.response.headers['x-ratelimit-remaining-tokens']
-            requests_remaining = params.response.headers['x-ratelimit-remaining-requests']
-            tokens_limit = params.response.headers['x-ratelimit-limit-tokens']
-            requests_limit = params.response.headers['x-ratelimit-limit-requests']
+            tokens_used = params.response.headers.get('x-ratelimit-remaining-tokens', 40000)
+            requests_remaining = params.response.headers.get('x-ratelimit-remaining-requests', 200)
+            tokens_limit = params.response.headers.get('x-ratelimit-limit-tokens', 40000)
+            requests_limit = params.response.headers.get('x-ratelimit-limit-requests', 200)
 
             # Calculate the usage
             tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
             requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
 
             # Print the normal usage
-            logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
-            logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
-            await MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
+            # logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
+            # logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
+            # await MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
 
             # Print the warning if above 50% of the rate limit
-            if tokens_usage > 50 or requests_usage > 50:
-                logger.warning('WARNING: You have used more than 50% of your rate limit.')
-                await MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 50% of your rate limit."}}, "blue", self.username)
+            if tokens_usage > 20 or requests_usage > 20:
+                logger.warning('WARNING: You have used more than 20% of your rate limit.')
+                await MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 20% of your rate limit."}}, "blue", self.username)
 
             # Print the error if above rate limit
             if tokens_usage >= 100 or requests_usage >= 100:
@@ -277,6 +277,7 @@ class OpenAIResponser:
         self.trace_config = aiohttp.TraceConfig()
         self.trace_config.on_request_end.append(log_response_headers)
 
+    @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
     async def get_response(self, username, messages, stream=False, function_metadata=None, function_call="auto"):
         if function_metadata is None:
             function_metadata = [{
@@ -515,7 +516,11 @@ class MessageParser:
         try:
             converted_function_call_arguments = MessageParser.convert_function_call_arguments(function_call_arguments)
             # add the username to the arguments
-            converted_function_call_arguments['username'] = username
+            if converted_function_call_arguments is not None:
+                converted_function_call_arguments['username'] = username
+            else:
+                logger.error("converted_function_call_arguments is None: " + str(function_call_arguments))
+                raise ValueError("converted_function_call_arguments is None")
         except:
             if (exception_handler is process_chain_thoughts):
                 await exception_handler(full_response, message, og_message, function_dict, function_metadata, username, users_dir)
@@ -627,6 +632,8 @@ class MessageParser:
                                 for o in v['enum']:
                                     function_tokens += 3
                                     function_tokens += len(encoding.encode(o))
+                            elif field == 'items':
+                                    function_tokens += 10
                             else:
                                 logger.warning(f"Warning: not supported field {field}")
                     function_tokens += 11
@@ -856,30 +863,33 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
         # parse the plan as json
         try:
             plan = json.loads(final_response)
+            # get the steps
+            steps = list(plan.keys())
+            steps.sort()
+            # create a string of the steps
+            steps_list = []
+            # go through each step
+            for i, step in enumerate(steps):
+                await MessageSender.send_debug(f"processing step: {step}", 1, 'green', username)
+                # convert the list to a string before passing it to process_cot_messages
+                steps_string = ''.join(steps_list)
+                response = await process_cot_messages(plan[step], function_dict, function_metadata, username, users_dir, steps_string, message, og_message)
+                # truncate the response string if it's not one of the last three steps
+                response_str = str(response)
+                if i < len(steps) - 3:
+                    truncated_response = response_str
+                else:
+                    truncated_response = response_str
+                steps_list.append('step:' + step + '\nresponse:' + truncated_response + '\n')
+            # convert the final list to a string
+            steps_string = ''.join(steps_list)
         except:
             # we cant load the plan as json, so use the whole response as the plan
             plan = final_response
-        # plan is in format {1: 'step 1', 2: 'step 2'}
-        # get the steps
-        steps = list(plan.keys())
-        steps.sort()
-        # create a string of the steps
-        steps_list = []
-        # go through each step
-        for i, step in enumerate(steps):
-            await MessageSender.send_debug(f"processing step: {step}", 1, 'green', username)
-            # convert the list to a string before passing it to process_cot_messages
-            steps_string = ''.join(steps_list)
-            response = await process_cot_messages(plan[step], function_dict, function_metadata, username, users_dir, steps_string, message, og_message)
-            # truncate the response string if it's not one of the last three steps
+            response = await process_cot_messages(plan, function_dict, function_metadata, username, users_dir, '', message, og_message)
             response_str = str(response)
-            if i < len(steps) - 3:
-                truncated_response = response_str
-            else:
-                truncated_response = response_str
-            steps_list.append('step:' + step + '\nresponse:' + truncated_response + '\n')
-        # convert the final list to a string
-        steps_string = ''.join(steps_list)
+            steps_string = f'Plan: {plan}\nresponse: {response_str}\n'
+
         return await summarize_cot_responses(steps_string, message, og_message, username, users_dir)
 
 
@@ -942,13 +952,13 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     if COT_RETRIES[username] >= 1:
         await MessageSender.send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Respond with YES: <your summary>'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet, so be sure to display anything needed. Respond with YES: <your summary>'},
+            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Respond with YES: <your summary>'},
+            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. Respond with YES: <your summary>'},
         ]
     else:
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for the user and here are the results, Communicate directly and actively in short with the user about what you have done. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about what you have done. The user did not see any of the steps results yet, so be sure to display anything needed.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the steps results yet, so be sure to display anything needed, especially the response to the user question.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
         ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)

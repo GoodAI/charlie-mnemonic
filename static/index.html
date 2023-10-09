@@ -316,7 +316,7 @@
                         $('#record').show();
                     })
                     .catch(function(err) {
-                        edit_audio_status('voice_input', false);
+                        edit_status('audio', 'voice_input', false);
                         $('#record').hide();
                         if (err.name === 'NotAllowedError') {
                             alert('Permission to access microphone was denied. Please allow access to the microphone and try again.');
@@ -860,7 +860,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ username: username}),
+                body: JSON.stringify({ username: user_name}),
                 credentials: 'include'
             })
             .then(handleError)
@@ -900,6 +900,8 @@
                         throw new Error('500: Server Error');
                     case 503:
                         throw new Error('503: Service Unavailable');
+                    case 504:
+                        throw new Error('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
                     default:
                         throw new Error('Network response was not ok: ' + response.status);
                 }
@@ -1874,11 +1876,11 @@
         }
     }
 
+    // function to delete session and username cookies
     function deleteCookies() {
-        document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        document.cookie = 'username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        deleteCookie('session_token');
+        deleteCookie('username');
     }
-
 
     // check for session token when page loads
     window.onload = function() {

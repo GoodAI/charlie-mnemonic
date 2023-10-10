@@ -31,7 +31,7 @@ set_api_key(api_keys['elevenlabs'])
 openai_model = api_keys['chatgpt_model']
 max_responses = 1
 temperature = 0.2
-max_tokens = 512
+max_tokens = 1000
 last_messages = {}
 COT_RETRIES = {}
 
@@ -472,7 +472,7 @@ class MessageParser:
             return f"Memory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\nLast message: {parameters['message']}"
         
     @staticmethod
-    def convert_function_call_arguments(arguments):
+    async def convert_function_call_arguments(arguments, username, tryAgain=True):
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
@@ -489,7 +489,22 @@ class MessageParser:
                     try:
                         arguments = eval(arguments)
                     except Exception:
-                        arguments = None
+                        if tryAgain:
+                            # ask openai to re-generate the message
+                            message = f"This is an invalid function call argument json, rewrite it so it's a valid json, only reply with the rewritten json: Invalid json: {arguments}\nValid Json: "
+                            logger.exception(f"Invalid json: {arguments}, username: {username}, trying to re-generate the message...")
+                            print(f"Invalid json: {arguments}, username: {username}, trying to re-generate the message...")
+                            messages = [
+                                {"role": "system", "content": f'You are an award winning json fixer, fix the following invalid json, only reply with the rewritten json.'},
+                                {"role": "user", "content": f'{message}'},
+                            ]
+                            openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses, username)
+                            response = await openai_response.get_response(username, messages, stream=False, function_metadata=None, function_call="auto")
+                            await MessageParser.convert_function_call_arguments(response['choices'][0]['message']['content'], username, False)
+                        else:
+                            logger.exception(f"Invalid json: {arguments}, username: {username}")
+                            print(f"Invalid json: {arguments}, username: {username}")
+                            return None
         # print(f"Arguments:\n{str(arguments)}")
         return arguments
 
@@ -513,20 +528,13 @@ class MessageParser:
 
     @staticmethod
     async def process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, exception_handler, merge=True, users_dir='users/', steps_string='', full_response=None, background_tasks: BackgroundTasks = None):
-        try:
-            converted_function_call_arguments = MessageParser.convert_function_call_arguments(function_call_arguments)
-            # add the username to the arguments
-            if converted_function_call_arguments is not None:
-                converted_function_call_arguments['username'] = username
-            else:
-                logger.error("converted_function_call_arguments is None: " + str(function_call_arguments))
-                raise ValueError("converted_function_call_arguments is None")
-        except:
-            if (exception_handler is process_chain_thoughts):
-                await exception_handler(full_response, message, og_message, function_dict, function_metadata, username, users_dir)
-            else:
-                await exception_handler(message, og_message, function_dict, function_metadata, username, users_dir, steps_string, full_response, background_tasks)
-            raise
+        converted_function_call_arguments = await MessageParser.convert_function_call_arguments(function_call_arguments, username)
+        # add the username to the arguments
+        if converted_function_call_arguments is not None:
+            converted_function_call_arguments['username'] = username
+        else:
+            logger.error("converted_function_call_arguments is None: " + str(function_call_arguments))
+            return {"content": "error: converted_function_call_arguments is None: " + str(function_call_arguments)}
         new_message = {
             "functioncall": "yes", 
             "color": "red", 

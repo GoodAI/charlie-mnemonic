@@ -656,7 +656,7 @@ async def handle_delete_data(request: Request, user: UserName):
     wipe_all_memories(user.username)
     stop_database(user.username)
     # remove all users recent messages
-    #await BrainProcessor.delete_recent_messages(user.username)
+    await BrainProcessor.delete_recent_messages(user.username)
     # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
     shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
     return {'message': 'User data deleted successfully'}

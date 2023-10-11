@@ -829,7 +829,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     messages = [
-        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain.'},
+        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If using python, include print statements to track your progress. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain.'},
         {"role": "user", "content": f'{message}'},
     ]
 
@@ -931,7 +931,7 @@ async def process_cot_messages(message, function_dict, function_metadata, userna
         function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
 
         messages = [
-            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. Memory is handled automatically for you.'},
+            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. Memory is handled automatically for you. If using python, include print statements to track your progress.'},
             {"role": "user", "content": f'Memory: {full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
         ]
         await MessageSender.send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
@@ -960,12 +960,12 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     if COT_RETRIES[username] >= 1:
         await MessageSender.send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Respond with YES: <your summary>'},
+            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Respond with YES: <your summary>'},
             {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. Respond with YES: <your summary>'},
         ]
     else:
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
             {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the steps results yet, so be sure to display anything needed, especially the response to the user question.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
         ]
 
@@ -992,7 +992,7 @@ async def process_function_reply(function_call_name, function_response, message,
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     
     messages=[
-                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no triple quotes!)'},
+                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them and display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!)'},
                 {"role": "user", "content": f'{message}'},
                 {
                     "role": "function",

@@ -2,13 +2,17 @@ import logging
 import os
 import sys
 import traceback
+import codecs
 
 class SafeFileHandler(logging.FileHandler):
+    def _open(self):
+        return codecs.open(self.baseFilename, self.mode, 'utf-8')
+
     def emit(self, record):
         try:
             super().emit(record)
         except UnicodeEncodeError:
-            record.msg = record.msg.encode(sys.getfilesystemencoding(), errors='replace').decode(sys.getfilesystemencoding())
+            record.msg = record.msg.encode('utf-8', errors='replace').decode('utf-8')
             super().emit(record)
 
 class Log:

@@ -374,7 +374,7 @@
                     </div>
                 </div>
             `;
-            document.getElementById('messages').appendChild(chatMessage.firstChild);
+            document.getElementById('messages').appendChild(chatMessage);
 
             // enable the send  and record button again
             canSend = true;
@@ -897,12 +897,16 @@
                         errorMessage = '';
                         throw new Error('401: Unauthorized');
                     case 500:
+                        showErrorMessage('500: Server Error');
                         throw new Error('500: Server Error');
                     case 503:
+                        showErrorMessage('503: Service Unavailable');
                         throw new Error('503: Service Unavailable');
                     case 504:
+                        showErrorMessage('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
                         throw new Error('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
                     default:
+                        showErrorMessage('An error occurred. Please try again later. (Error ' + response.status + ')');
                         throw new Error('Network response was not ok: ' + response.status);
                 }
             }
@@ -1581,11 +1585,7 @@
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
-                canSend = true;
-                canRecord = true;
-                isWaiting = false;
-                isRecording = false;
-                canSendMessage();
+                showErrorMessage('Too low volume or no voice detected!');
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first

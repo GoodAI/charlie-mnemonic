@@ -259,6 +259,7 @@ class MemoryManager:
     async def process_incoming_memory(self, category, content, username=None, remaining_tokens=1000, verbose=False):
         """Process the incoming memory and return the updated active brain data."""
         process_dict = {'input': content}
+        unique_results = set()
         logger.debug(f"Processing incoming memory: {content}")
         self.openai_manager.set_username(username)
         subject_query = await self.openai_manager.ask_openai(content, 'categorise_query', self.model_used, 100, 0.1, username=username)
@@ -282,7 +283,6 @@ class MemoryManager:
             logger.error("Error: parts does not contain the required elements")
             process_dict['error'] = "parts does not contain the required elements"
         else:
-            unique_results = set()
             for part in parts:
                 category, query = part
                 process_dict[category] = {}

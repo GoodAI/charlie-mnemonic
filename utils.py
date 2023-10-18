@@ -153,22 +153,22 @@ class AddonManager:
             "verbose": { "verbose": False },
         }
 
-        function_dict = {}
-        function_metadata = []
-        module_timestamps = {}
-
         name = unidecode(username)
         # replace spaces and @ with underscores
         name = name.replace(' ', '_')
         name = name.replace('@', '_')
         name = name.replace('.', '_')
         # lowercase the name
-        username = name.lower()
+        data_username = name.lower()
+
+        function_dict = {}
+        function_metadata = []
+        module_timestamps = {}
         
-        users_data_dir = os.path.join(users_dir, name, 'data')
+        data_dir = os.path.join(users_dir, data_username, 'data')
         # create the users directory if it doesn't exist
-        if not os.path.exists(users_data_dir):
-            os.makedirs(users_data_dir)
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
 
         user_path = os.path.join(users_dir, username)
         settings_file = os.path.join(user_path, 'settings.json')

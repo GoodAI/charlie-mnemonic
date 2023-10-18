@@ -1,7 +1,5 @@
 import logging
 import os
-import sys
-import traceback
 import codecs
 
 class SafeFileHandler(logging.FileHandler):

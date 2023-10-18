@@ -70,9 +70,8 @@ table tr td {
     border: none;
     padding: 10px;
     outline: none;
-    form-sizing: content;
     min-height: 2lh;
-    max-height: 10lh;
+    line-height: 1.5em;
 }
 
 .input-field button {
@@ -815,3 +814,37 @@ pre {
     background-color: #fff;
   }
   /* END D-ID specific styles */
+
+  .image-wrapper {
+    position: relative;
+    display: inline-block;
+    background: #c3cfe2;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s;
+    padding: 5px 5px;
+    border-radius: 5px;
+    border: none;
+    margin-left: 10px;
+}
+
+.image-wrapper img {
+    max-width: 100px;
+    max-height: 36px;
+}
+
+.hover-text {
+    position: absolute;
+    top: 70%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    display: none;
+    font-size: small;
+}
+
+.hover-text i {
+    color: red;
+    border-radius: 50%;
+}
+

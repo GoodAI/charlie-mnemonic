@@ -149,10 +149,19 @@
                 <br>
                 <nav>
                     <ul class="pagination">
-                        <!-- Add buttons for previous and next page -->
+                        <!-- Add buttons for previous page -->
                         <li class="page-item {% if page <= 1 %}disabled{% endif %}">
                             <a class="page-link" href="{% if page > 1 %}{{ url_for('get_statistics', page=page-1) }}{% else %}#{% endif %}" tabindex="-1">Previous</a>
                         </li>
+                
+                        <!-- Add page numbers -->
+                        {% for i in range(1, total_pages + 1) %}
+                        <li class="page-item {% if page == i %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('get_statistics', page=i) }}">{{ i }}</a>
+                        </li>
+                        {% endfor %}
+                
+                        <!-- Add buttons for next page -->
                         <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
                             <a class="page-link" href="{{ url_for('get_statistics', page=page+1) }}">Next</a>
                         </li>

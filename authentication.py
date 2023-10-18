@@ -8,7 +8,7 @@ from database import Database
 import logs
 from unidecode import unidecode
 
-logger = logs.Log(__name__, 'full_log.log').get_logger()
+logger = logs.Log('authentication', 'authentication.log').get_logger()
 
 DATABASE_URL = os.environ['DATABASE_URL']
 PRODUCTION = os.environ['PRODUCTION']

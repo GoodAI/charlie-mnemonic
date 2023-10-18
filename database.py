@@ -229,7 +229,7 @@ class Database:
     def get_total_statistics_pages(self, items_per_page):
         self.cursor.execute("SELECT COUNT(*) FROM statistics")
         total_items = self.cursor.fetchone()[0]
-        return math.ceil(total_items / items_per_page)
+        return math.ceil(total_items / float(items_per_page))
 
     def get_statistic(self, username):
         """Get the statistic for the given username.

@@ -478,7 +478,7 @@ async def handle_message_image(request: Request, image_file: UploadFile, prompt:
         logger.info(f'user {username} reached daily limit')
         raise HTTPException(status_code=400, detail="You reached your daily limit. Please wait until tomorrow to continue using the service.")
     # check the size of the image, if it's too big +5mb, return an error
-    if image_file.content_length > 5000000:
+    if image_file.size > 5000000:
         raise HTTPException(status_code=400, detail="Image is too big, please use an image that is less than 5mb")
     # save the image to the user's directory
     converted_name  = convert_name(username)

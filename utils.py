@@ -24,6 +24,7 @@ from pydub import audio_segment
 import logs
 import replicate
 import prompts
+from unidecode import unidecode
 
 logger = logs.Log('utils', 'utils.log').get_logger()
 
@@ -155,6 +156,19 @@ class AddonManager:
         function_dict = {}
         function_metadata = []
         module_timestamps = {}
+
+        name = unidecode(username)
+        # replace spaces and @ with underscores
+        name = name.replace(' ', '_')
+        name = name.replace('@', '_')
+        name = name.replace('.', '_')
+        # lowercase the name
+        username = name.lower()
+        
+        users_data_dir = os.path.join(users_dir, name, 'data')
+        # create the users directory if it doesn't exist
+        if not os.path.exists(users_data_dir):
+            os.makedirs(users_data_dir)
 
         user_path = os.path.join(users_dir, username)
         settings_file = os.path.join(user_path, 'settings.json')

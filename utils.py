@@ -470,6 +470,7 @@ class BrainProcessor:
 class MessageParser:
     """This class contains functions to parse messages and generate responses"""
     @staticmethod
+    @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
     async def get_image_description(image_url, prompt, file_name):
         """Get the description of an image using a LLAVA 1.5 API"""
         output = replicate.run(

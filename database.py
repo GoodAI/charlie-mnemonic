@@ -6,8 +6,9 @@ from psycopg2.extras import RealDictCursor
 import os
 import importlib
 import logs
+import math
 
-logger = logs.Log(__name__, 'full_log.log').get_logger()
+logger = logs.Log('database', 'database.log').get_logger()
 
 DATABASE_URL = os.environ['DATABASE_URL']
 PRODUCTION = os.environ['PRODUCTION']
@@ -225,11 +226,10 @@ class Database:
         rows = dict_cursor.fetchall()
         return json.dumps(rows, default=str)
 
-    
     def get_total_statistics_pages(self, items_per_page):
         self.cursor.execute("SELECT COUNT(*) FROM statistics")
         total_items = self.cursor.fetchone()[0]
-        return total_items // items_per_page + 1
+        return math.ceil(total_items / items_per_page)
 
     def get_statistic(self, username):
         """Get the statistic for the given username.

@@ -6,7 +6,7 @@ from logs import Log
 
 logger = Log(__name__, 'full_log.log').get_logger()
 
-description = """This addon allows you to execute python code in a non persistant terminal, When opening be sure to open from /data/filename.
+description = """This addon allows you to execute python code in a non persistant terminal, When opening files be sure to open from /data/filename.
 Always include print statements to track the progress or path and name(s) of generated files.
 Save any generated files in the /data/ directory with the format /data/filename.ext.
 You must always display media that's been saved in the /data/ directory, using the markdown format [description](data/filename.ext) or html tags for video's (without triple quotes).
@@ -29,6 +29,7 @@ parameters = {
 }
 
 async def run_python_code(content, pip_packages=[], previous_content='', username=None):
+    logger.debug(f'running python code for user {username}')
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, sync_run_python_code, content, pip_packages, previous_content, username)
 
@@ -42,7 +43,6 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
     name = name.replace('.', '_')
     # lowercase the name
     username = name.lower()
-    logger.debug(f'running python code for user {username}')
 
     if (previous_content != ''):
         new_content = previous_content + '\n' + content
@@ -95,7 +95,6 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         }
 
         # Remove the container
-        logger.debug(f'Removing container for user {username}')
         container.remove(force=True)
 
         return response

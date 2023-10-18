@@ -26,6 +26,12 @@ class userMessage(BaseModel):
     username: str
     display_name: str
 
+class userImageMessage(BaseModel):
+    prompt: str
+    username: str
+    display_name: str
+    image: str
+
 class UserUpdate(BaseModel):
     has_access: bool
     role: str

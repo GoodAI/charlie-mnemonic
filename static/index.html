@@ -758,6 +758,46 @@
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
 
+        async function get_recent_messages(username) {
+            try {
+                const response = await fetch(API_URL + '/get_recent_messages/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({'username': user_name}),
+                    credentials: 'include'
+                });
+
+                const data = await handleError(response);
+                console.log('recent messages:', data);
+
+                // data is an array with messages from the user and the assistant
+                let messages = [];
+
+                data.forEach(message => {
+                    let user = message.split(':')[0];
+                    let text = message.split(': ').slice(1).join(': ');
+
+                    if (user === 'assistant') {
+                        messages.push({text: text, user: 'bot'});
+                    } else {
+                        messages.push({text: text, user: 'user'});
+                    } 
+                });
+
+                // Process the messages in the order they were received
+                messages.forEach(message => {
+                    addCustomMessage(message.text, message.user, false, true);
+                });
+
+            } catch (error) {
+                console.error('Failed to send message: ', error);
+                showErrorMessage('Failed to send message: ' + error);
+            }
+        }
+
+
         function get_settings(username) {
             var timestamp = new Date().toLocaleTimeString();
             prefix = production ? 'wss://' : 'ws://';
@@ -1135,6 +1175,8 @@
         <a href="javascript:void(0)" class="closebtn" onclick="event.stopPropagation(); closeNav()">&times;</a>
 
         <button id="logout-button">Logout</button><br><br>
+        <h3>Recent Message</h3>
+        <button id="clearMsgBtn">Clear recent messages</button><br>
         <h3>User Data</h3>
         <button id="saveDataBtn">Save Data</button><br>
         <button id="deleteDataBtn">Delete Data</button><br>
@@ -1188,6 +1230,9 @@
                 <div class="input-field">
                     <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i>
                     <textarea id="message" placeholder="Type a message..."></textarea>
+                    <input type="file" id="uploadImageInput" accept="image/*" hidden><br>
+                    <i class="fa fa-paperclip cogwheel" id="upload-image"></i>
+                    <div id="image-preview"></div>
                     <button id="record" class="record-button">Record</button>
                     <div id="recordingIndicator" style="display: none;">Recording...</div>
                     <button id="send" class="send-button">Send</button>
@@ -1274,6 +1319,8 @@
         document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         // remove input text
         document.getElementById('message').value = '';
+        var textarea = document.getElementById('message');
+        textarea.rows = 2;
         // reset token count
         document.getElementById('tokenCount').textContent = 'Characters: 0, tokens: 0/' + max_message_tokens.toString() + ', cost: $0.0000';
         // change placeholder text
@@ -1285,6 +1332,40 @@
         isRecording = false;
         isWaiting = true;
         canSendMessage();
+    }
+
+    function addCustomMessage(message, user, showLoading = false, replaceNewLines = false) {
+        //var escaped_message = escapeHTML(message);
+        if (replaceNewLines) {
+            var messageReplaced = message.replace(/\n/g, "<br>");
+        }
+        else {
+            var messageReplaced = message.replace(/\n/g, "");
+        }
+        messageFormatted = marked(messageReplaced);
+        var timestamp = new Date().toLocaleTimeString();
+        var lastMessage = document.querySelector('.last-message');
+        if (lastMessage) {
+            lastMessage.classList.remove('last-message');
+        }
+
+        var chatMessage = document.createElement('div');
+        chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>';
+        document.getElementById('messages').appendChild(chatMessage);
+
+        var lastMessage2 = document.querySelector('.last-message');
+        if (lastMessage2) {
+            lastMessage2.classList.remove('last-message');
+        }
+
+        if (showLoading) {
+            // create a bot message div with a loading spinner
+            var botMessage = document.createElement('div');
+            botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
+            document.getElementById('messages').appendChild(botMessage);
+        }
+        // scroll to the bottom of the chat
+        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
     }
 
     function addExternalMessage(message) {
@@ -1483,12 +1564,111 @@
         }
     }
 
+    async function delete_recent_messages() {
+        try {
+            const overlay = document.getElementById('overlay_msg');
+            const overlayMessage = document.getElementById('overlay-message');
+            overlayMessage.textContent = "Deleting Messages...";
+            overlay.style.display = 'flex';
+
+            const response = await fetch(API_URL + '/delete_recent_messages/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({'username': user_name}),
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+            console.log(data.message);
+            overlayMessage.textContent = data.message;
+
+            // Hide the overlay after a delay to let the user see the message
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 2000);
+            // clear the messages
+            document.getElementById('messages').innerHTML = '';
+
+        } catch (error) {
+            await handleError(error);
+            console.error('Failed to delete messages: ', error);
+            
+            // Hide the overlay in case of error
+            overlay.style.display = 'none';
+        }
+    }
+
+    async function send_image(image_file, prompt) {
+        try {
+            var message = document.getElementById('message').value;
+            // put image and prompt into a string
+            // if prompt is not empty, set the message to prompt
+            if (prompt) {
+                message = prompt;
+            }
+            // convert the image to base64
+            var reader = new FileReader();
+            reader.readAsDataURL(image_file);
+            reader.onloadend = function() {
+                var base64data = reader.result;
+                // ![The San Juan Mountains are beautiful!](/assets/images/san-juan-mountains.jpg "San Juan Mountains")
+                var fullmessage = '![image!](' + base64data + ' "image")<p>' + message + '</p>';
+                fullmessage = marked(fullmessage);
+                addCustomMessage(fullmessage, 'user', true);
+            }
+            
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            
+            canRecord = false;
+            canSend = false;
+            isWaiting = true;
+            isRecording = false;
+            canSendMessage();
+
+            const formData = new FormData();
+            formData.append('username', user_name);
+            formData.append('image_file', image_file);
+            formData.append('prompt', message);
+
+            const response = await fetch(API_URL + '/message_with_image/', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include'
+            });
+            console.log(response);
+            const data = await response.json();
+            console.log(data.content);
+            //addCustomMessage(data.content, 'bot');
+            await onResponse(data);
+
+        } catch (error) {
+            await handleError(error);
+            console.error('Failed to upload image: ', error);
+
+            // Hide the overlay in case of error
+            overlay.style.display = 'none';
+        }
+    }
+
     document.getElementById('send').addEventListener('click', async function() {
         // make sure the message is not empty
         if (document.getElementById('message').value.trim() === '') {
             return;
         }
-        sendMessageToServer();
+        const fileInput = document.getElementById('uploadImageInput');
+        if (fileInput.files.length > 0) {
+            send_image(fileInput.files[0]);
+            // clear the file input
+            //fileInput.value = '';
+            // clear the image preview
+            //document.getElementById('image-preview').innerHTML = '';
+            // clear the message input
+            document.getElementById('message').value = '';
+        } else {
+            sendMessageToServer();
+        }
     });
 
 
@@ -1589,7 +1769,18 @@
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first
-            sendMessageToServer(data.transcription);
+            const fileInput = document.getElementById('uploadImageInput');
+            if (fileInput.files.length > 0) {
+                send_image(fileInput.files[0], data.transcription);
+                // clear the file input
+                //fileInput.value = '';
+                // clear the image preview
+                //document.getElementById('image-preview').innerHTML = '';
+                // clear the message input
+                document.getElementById('message').value = '';
+            } else {
+                sendMessageToServer(data.transcription);
+            }
         })
         .catch(console.error);
     }
@@ -1869,6 +2060,8 @@
             overlay.style.display = 'flex';
             loginModal.hide();
             get_settings(user_name);
+            get_recent_messages(user_name);
+            
         } else {
             // no session token, show the login modal
             loginModal.show();
@@ -1899,6 +2092,68 @@
             upload_user_data(fileInput.files[0]);
         }
     });
+
+    document.getElementById('clearMsgBtn').addEventListener('click', delete_recent_messages);
+
+    document.getElementById('upload-image').addEventListener('click', function() {
+        
+        const fileInput = document.getElementById('uploadImageInput');
+        if (fileInput.files.length > 0) {
+            //send_image(fileInput.files[0]);
+        }
+        else { 
+            // trigger the file input as if the user clicked it
+            document.getElementById('uploadImageInput').click();
+        }
+    });
+
+    // check if an image was uploaded
+    document.getElementById('uploadImageInput').addEventListener('change', function() {
+        if (this.files.length > 0) {
+            // check the size of the image, max 5MB
+            if (this.files[0].size > 5000000) {
+                alert('The image is too large, max 5MB!');
+                // clear the file input
+                this.value = '';
+                return;
+            }
+            // set the image-preview innerhtml to the uploaded image
+            document.getElementById('image-preview').innerHTML = `
+                <div class="image-wrapper">
+                    <img src="${URL.createObjectURL(this.files[0])}" alt="uploaded image">
+                    <div class="hover-text">
+                        <i class="fa fa-times-circle"></i>
+                        <p>Delete</p>
+                    </div>
+                </div>`;
+
+                let imageWrapper = document.querySelector('.image-wrapper');
+                imageWrapper.addEventListener('mouseover', function() {
+                    this.querySelector('.hover-text').style.display = 'block';
+                });
+                imageWrapper.addEventListener('mouseout', function() {
+                    this.querySelector('.hover-text').style.display = 'none';
+                });
+                // show the image-preview
+            document.getElementById('image-preview').style.display = 'block';
+            // hide the upload-image button
+            document.getElementById('upload-image').style.display = 'none';
+        }
+    });
+
+    // check if the preview image was clicked, is so, remove it, show the upload-image button and clear the file input
+    document.getElementById('image-preview').addEventListener('click', function() {
+        // remove the preview image
+        document.getElementById('image-preview').innerHTML = '';
+        // hide the preview image
+        document.getElementById('image-preview').style.display = 'none';
+        // show the upload-image button
+        document.getElementById('upload-image').style.display = 'block';
+        // clear the file input
+        document.getElementById('uploadImageInput').value = '';
+    });
+    
+
 
     async function big_red_abort_button() {
         try {
@@ -1990,6 +2245,21 @@
     // Get the textarea and count div
     const message = document.getElementById("message");
     const countDiv = document.getElementById("tokenCount");
+    var textarea = document.getElementById('message');
+    var lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
+    var viewportHeight = window.innerHeight;
+    var limit = Math.floor((viewportHeight * 0.7) / lineHeight); // max lines based on 70% of viewport height
+    var min = 2; // minimum number of lines
+
+    textarea.oninput = function() {
+        var lines = textarea.value.split('\n');
+        // Remove inline styles to re-enable automatic resizing
+        textarea.style.height = "";
+        textarea.style.width = "";
+        
+        // Adjust the rows attribute to make the textarea grow/shrink
+        textarea.rows = Math.min(Math.max(lines.length, min), limit);
+    };
     let lastValidMessage = '';
 
     // Add an input event listener to the textarea

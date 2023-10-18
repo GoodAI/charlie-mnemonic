@@ -22,6 +22,10 @@ from database import Database
 import tiktoken
 from pydub import audio_segment
 import logs
+import replicate
+import prompts
+
+logger = logs.Log('utils', 'utils.log').get_logger()
 
 
 # Set ElevenLabs API key
@@ -35,9 +39,6 @@ max_tokens = 1000
 last_messages = {}
 COT_RETRIES = {}
 
-
-    
-logger = logs.Log(__name__, 'full_log.log').get_logger()
 
 class MessageSender:
     """This class contains functions to send messages to the user"""
@@ -165,8 +166,15 @@ class AddonManager:
             with open(settings_file, 'w') as f:
                 json.dump(default_settings, f)
 
-        with open(settings_file, 'r') as f:
-            settings = json.load(f)
+        # Check if settings file exists and is not empty
+        if os.path.exists(settings_file) and os.path.getsize(settings_file) > 0:
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+            except json.JSONDecodeError:
+                settings = default_settings
+        else:
+            settings = default_settings
 
         # Validate and correct the settings
         for key, default_value in default_settings.items():
@@ -462,14 +470,39 @@ class BrainProcessor:
 class MessageParser:
     """This class contains functions to parse messages and generate responses"""
     @staticmethod
+    async def get_image_description(image_url, prompt, file_name):
+        """Get the description of an image using a LLAVA 1.5 API"""
+        output = replicate.run(
+            "yorickvp/llava-13b:6bc1c7bb0d2a34e413301fee8f7cc728d2d4e75bfab186aa995f63292bda92fc",
+            input={"image": open(image_url, "rb"), "prompt": prompt},
+        )
+        # The yorickvp/llava-13b model can stream output as it's running.
+        # The predict method returns an iterator, and you can iterate over that output.
+        full_response = ''.join([item for item in output])
+        # prompt looks like this: image_description = "The user asked: '{}' for the attached image (/data/{})\nYour visual interpreter gave this description (don't mention 'based on the description', just say you can see) based on the prompt: '{}'\n"
+        return prompts.image_description.format(prompt, file_name, full_response)
+
+    @staticmethod
+    def get_recent_messages(username):
+        global last_messages
+        if username not in last_messages:
+            last_messages[username] = []
+        return last_messages[username]
+
+    @staticmethod
     def get_message(type, parameters):
         with Database() as db:
             display_name = db.get_display_name(parameters['username'])[0]
         """Parse the message based on the type and parameters"""
         if (type == 'start_message'):
-            return f"You are talking to {display_name}\nMemory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\n{parameters['instruction_string']}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {parameters['message']}"
+            return prompts.start_message.format(display_name, parameters['memory'], 
+                                                parameters['last_messages_string'], 
+                                                parameters['instruction_string'], 
+                                                parameters['message'])
         elif (type == 'keyword_generation'):
-            return f"Memory Module: (low score = better relevancy):\n{parameters['memory']}\n\n10 most recent messages:\n{parameters['last_messages_string']}\n\nLast message: {parameters['message']}"
+            return prompts.keyword_generation.format(display_name, parameters['memory'], 
+                                                parameters['last_messages_string'], 
+                                                parameters['message'])
         
     @staticmethod
     async def convert_function_call_arguments(arguments, username, tryAgain=True):
@@ -491,11 +524,11 @@ class MessageParser:
                     except Exception:
                         if tryAgain:
                             # ask openai to re-generate the message
-                            message = f"This is an invalid function call argument json, rewrite it so it's a valid json, only reply with the rewritten json: Invalid json: {arguments}\nValid Json: "
+                            message = prompts.invalid_json.format(arguments)
                             logger.exception(f"Invalid json: {arguments}, username: {username}, trying to re-generate the message...")
                             print(f"Invalid json: {arguments}, username: {username}, trying to re-generate the message...")
                             messages = [
-                                {"role": "system", "content": f'You are an award winning json fixer, fix the following invalid json, only reply with the rewritten json.'},
+                                {"role": "system", "content": prompts.invalid_json_system_prompt},
                                 {"role": "user", "content": f'{message}'},
                             ]
                             openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses, username)
@@ -582,7 +615,7 @@ class MessageParser:
                 # chat_history.append(message)
                 with Database() as db:
                     display_name = db.get_display_name(username)[0]
-                last_messages[username].append(f"{display_name}: "  + message)
+                last_messages[username].append(message)
                 # chat_metadata.append({"role": "assistant"})
                 # chat_history.append(str(response['content']))
                 last_messages[username].append("assistant: " + str(response['content']))
@@ -679,8 +712,20 @@ class SettingsManager:
         with open(settings_file, 'r') as f:
             settings = json.load(f)
         return settings
+    
+async def start_reasoning(full_message, message, username, users_dir):
+    """Process a question and let the AGI work until it finds an answer"""
+    # 1. parse the full message and the message
+    messages = [
+        {"role": "system", "content": prompts.reasoning_system_prompt},
+        {"role": "user", "content": f'{full_message}'},
+    ]
+    # 2. ask the llm to find an answer and do it step by step
+    # 3. parse step 1 and 2 together and ask the AGI if it needs additional steps or information, ask it to fix errors if needed
+    # 4. repeat step 3 until the llm is done
+    # 5. return the answer
 
-async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir, display_name=None):
+async def process_message(og_message, username, background_tasks: BackgroundTasks, users_dir, display_name=None, image_prompt=None):
     """Process the message and generate a response"""
     global last_messages
     if display_name is None:
@@ -709,7 +754,6 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
         last_messages[username] = []
 
     if last_messages[username] != []:
-        last_messages[username].append(message)
         last_messages_string = '\n'.join(last_messages[username][-10:])
     else:
         last_messages_string = 'No messages yet.'
@@ -753,12 +797,12 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     logger.debug(f"3. remaining_tokens: {remaining_tokens}")
 
     results, token_usage_relevant_memory, unique_results2 = await memory.process_incoming_memory(None, f'{message}', username, remaining_tokens, verbose)
-    merged_results_dict = {id: (document, distance) for id, document, distance in unique_results1.union(unique_results2)}
-    merged_results_list = [(id, document, distance) for id, (document, distance) in merged_results_dict.items()]
+    merged_results_dict = {id: (document, distance, formatted_date) for id, document, distance, formatted_date in unique_results1.union(unique_results2)}
+    merged_results_list = [(id, document, distance, formatted_date) for id, (document, distance, formatted_date) in merged_results_dict.items()]
     merged_results_list.sort(key=lambda x: int(x[0]))
 
     # Create the result string
-    merged_result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in merged_results_list)
+    merged_result_string = '\n'.join(f"({id}){formatted_date} - {document} (score: {distance})" for id, document, distance, formatted_date in merged_results_list)
     token_usage += token_usage_relevant_memory
     remaining_tokens = remaining_tokens - token_usage_relevant_memory
     logger.debug(f"4. remaining_tokens: {remaining_tokens}")
@@ -770,13 +814,18 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     instruction_string = f"""{episodic_memory_string}\nObservations:\n{observations}\n"""
 
     notes = await memory.note_taking(all_messages, message, users_dir, username, False, verbose)
-
-    instruction_string += f"""\n\nDiscard anything from the above messages if it conflicts with these notes!\n{notes}\n--end notes---"""
+    
+    if notes is not None or notes != '':
+        notes_string = prompts.notes_string.format(notes)
+        instruction_string += notes_string
 
     #kw_brain_string = old_kw_brain
 
     # generate the full message
-    full_message = await MessageParser.generate_full_message(username, merged_result_string, last_messages_string, instruction_string, message)
+    if image_prompt is not None:
+        full_message = await MessageParser.generate_full_message(username, merged_result_string, last_messages_string, instruction_string, image_prompt)
+    else:
+        full_message = await MessageParser.generate_full_message(username, merged_result_string, last_messages_string, instruction_string, message)
 
     await MessageSender.send_debug(f"[{full_message}]", 1, 'gray', username)
 
@@ -785,6 +834,7 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
     logger.debug(f"is_cot_enabled: {is_cot_enabled}")
     if is_cot_enabled:
         response = await start_chain_thoughts(full_message, og_message, username, users_dir)
+        #response = await start_AGI(full_message, og_message, username, users_dir)
     else:
         response = await generate_response(full_message, og_message, username, users_dir)
     
@@ -801,9 +851,11 @@ async def process_message(og_message, username, background_tasks: BackgroundTask
 
 async def start_chain_thoughts(message, og_message, username, users_dir):
     function_dict, function_metadata = await AddonManager.load_addons(username, users_dir)
+    system_prompt = prompts.chain_thoughts_system_prompt
+    message_prompt = prompts.chain_thoughts_message_prompt.format(message)
     messages = [
-        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Write a reply in the form of SAY: what to say, or PLAN: a step plan in JSON format. Either PLAN, or SAY something, but not both. Do NOT use function calls straight away, make a plan first, this plan will be executed step by step by another ai, so include all the details in as few steps as possible, each step should include a maximum of 5 detailed instructions! Use the following json format for plans: {{"1": "this is step 1 with 5 instructions", "2": "this is step 2 if needed"}}\n\nNothing else. Keep the steps as simple and as few as possible. Do not make things up, ask questions if you are not certain.'},
-        {"role": "user", "content": f'\n\nRemember, SAY: what to say, or PLAN: a step plan, separated with newlines between steps. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Use as few steps as possible! Example for plan: {{"1": "in this step we do max 5 instructions, include details like filenames if needed", "2": "in this example we can use filenames from step 1 to continue other instructions"}}\n\n\n\n{message}'},
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": message_prompt},
     ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
@@ -828,8 +880,9 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
 
 async def generate_response(message, og_message, username, users_dir):
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
+    system_prompt = prompts.system_prompt
     messages = [
-        {"role": "system", "content": f'You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. You can use function calls to achieve your goal. If using python, include print statements to track your progress. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain.'},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": f'{message}'},
     ]
 
@@ -904,35 +957,17 @@ async def process_chain_thoughts(full_response, message, og_message, function_di
     else:
         return final_response
         #wait start_chain_thoughts(message, og_message, username, users_dir)
-    
-
-async def generate_keywords(prompt, old_kw_brain, username):
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
-    system_message = f"""Your role is an AI Brain Emulator. You will receive two types of data: 'old active_brain data' and 'new messages'.Your task is to update the 'old active_brain data' based on the 'new messages' you receive.
-You should focus on retaining important keywords, general instructions (not tasks!), numbers, dates, and events from each user. You can add or remove categories per user request. New memories should be added instantly.
-DO NOT include any recent or last messages, home info, tasks, settings or observations in the updated data. Any incoming data that falls into these categories must be discarded.
-The output must be in a structured plain text format, the current date is: '{current_date_time}'.
-Please follow these instructions carefully. If nothing changes, return a copy of the old active_brain data, nothing else!"""
-
-    new_message = [
-        {'role': 'system', 'content': system_message},
-        {'role': 'user', 'content': f' If nothing changes, return the old active_brain data in a structured plain text format with nothing in front or behind!\nOld active_brain Data: {old_kw_brain}\n\nNew messages:\n{prompt}\n\n'},
-    ]
-    
-    openai_response = OpenAIResponser(openai_model, temperature, 1000, max_responses, username)
-    response = await openai_response.get_response(username, new_message)
-
-    await MessageSender.send_debug(f"kw resp: {response}", 1, 'green', username)
-    return response['choices'][0]['message']['content']
-
 
 
 async def process_cot_messages(message, function_dict, function_metadata, username, users_dir, steps_string, full_message='', og_message=''):
+        global last_messages
+        memory = _memory.MemoryManager()
         function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
-
+        system_prompt = prompts.process_cot_system_prompt
+        message_prompt = prompts.process_cot_message_prompt.format(full_message, steps_string, message)
         messages = [
-            {"role": "system", "content": f'You are executing functions for the user step by step, focus on the current step only, the rest of the info is for context only. Don\'t say you can\'t do things or can\'t write complex code because you can. Memory is handled automatically for you. If using python, include print statements to track your progress.'},
-            {"role": "user", "content": f'Memory: {full_message}--end memory--\n\nPrevious steps and the results: {steps_string}\n\nCurrent step: {message}\nUse a function call or write a short reply, nothing else\nEither write a short reply or use a function call, but not both.'},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message_prompt},
         ]
         await MessageSender.send_debug(f"process_cot_messages messages: {messages}", 1, 'red', username)
         
@@ -945,13 +980,16 @@ async def process_cot_messages(message, function_dict, function_metadata, userna
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
             response = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_cot_messages, False, users_dir, steps_string)
+            memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
             return response
         else:
+            memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
             await MessageSender.send_debug(f'{response}', 1, 'green', username)
             return response['content']
 
 async def summarize_cot_responses(steps_string, message, og_message, username, users_dir):
     global COT_RETRIES
+    global last_messages
     # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
     # add user to COT_RETRIES if they don't exist
     if username not in COT_RETRIES:
@@ -959,14 +997,18 @@ async def summarize_cot_responses(steps_string, message, og_message, username, u
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
     if COT_RETRIES[username] >= 1:
         await MessageSender.send_debug(f'Too many CoT retries, skipping...', 1, 'red', username)
+        system_prompt = prompts.cot_too_many_retries_system_prompt
+        message_prompt = prompts.cot_too_many_retries_message_prompt.format(steps_string)
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Respond with YES: <your summary>'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary>, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. Respond with YES: <your summary>'},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message_prompt},
         ]
     else:
+        system_prompt = prompts.cot_system_prompt
+        message_prompt = prompts.cot_message_prompt.format(steps_string)
         messages = [
-            {"role": "system", "content": f'Another AI has executed some functions for you and here are the results, Communicate directly and actively in short with the user about these steps. The user did not see any of the results yet, so be sure to display anything needed, especially the response to the user question. If filenames or paths are included be sure to repeat them or display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
-            {"role": "user", "content": f'Steps Results:\n{steps_string}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the steps results yet, so be sure to display anything needed, especially the response to the user question.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps.'},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message_prompt},
         ]
 
     openai_response = OpenAIResponser(openai_model, temperature, max_tokens, max_responses, username)
@@ -990,9 +1032,9 @@ async def process_function_reply(function_call_name, function_response, message,
 
     second_response = None
     function_dict, function_metadata = await  AddonManager.load_addons(username, users_dir)
-    
+    system_prompt = prompts.function_reply_system_prompt
     messages=[
-                {"role": "system", "content": f'You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them and display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!)'},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f'{message}'},
                 {
                     "role": "function",
@@ -1034,8 +1076,7 @@ async def process_final_message(message, og_message, response, username, users_d
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
     last_messages_string = '\n'.join(last_messages[username][-10:])
-
-    full_message = f"Relevant info: {message}\n\nEverything above this line is for context only!\n\nThe user asked for {og_message}\nYour last response was:\n\n{response}\n\nTry to complete your task again with the new information."
+    full_message = prompts.full_message.format(message, og_message, response)
 
     await MessageSender.send_debug(f'{full_message}', 1, 'cyan', username)
 

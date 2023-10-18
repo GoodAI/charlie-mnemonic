@@ -31,7 +31,7 @@ import nltk
 import config
 import logs
 
-logger = logs.Log(__name__, 'full_log.log').get_logger()
+logger = logs.Log('memory', 'memory.log').get_logger()
 
 class MemoryManager:
     """A class to manage the memory of the agent."""
@@ -102,7 +102,6 @@ class MemoryManager:
         """Stop the database."""
         return stop_database(username=username)
 
-    # Use the function
     async def split_text_into_chunks(self, text, max_chunk_len=150, overlap=25):
         """Split the text into chunks of up to `max_chunk_len` tokens each, with `overlap` tokens of overlap."""
         # Tokenize the text into sentences, then tokenize each sentence into words
@@ -222,31 +221,33 @@ class MemoryManager:
                     id = id.lstrip('0') or '0'
                     document = result.get('document')
                     distance = round(result.get('distance'), 3)
-                    results_list.append((id, document, distance))
+                    date = result['metadata']['created_at']
+                    formatted_date = datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
+                    results_list.append((id, document, distance, formatted_date))
                     # Add the result to the list for this data item
-                    process_dict[category]['query_results'][data].append((id, document, distance))
+                    process_dict[category]['query_results'][data].append((id, document, distance, formatted_date))
 
         process_dict['results_list_before_token_check'] = results_list.copy()
         result_string = ''
-        result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in results_list)
+        result_string = '\n'.join(f"({id}) {formatted_date} - {document} (score: {distance})" for id, document, distance, formatted_date in results_list)
         token_count = utils.MessageParser.num_tokens_from_string(result_string)
         while token_count > min(1000,remaining_tokens):
             if len(results_list) > 1:
                 results_list.sort(key=lambda x: int(x[2]), reverse=True)
                 results_list.pop(0)
-                result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in results_list)
+                result_string = '\n'.join(f"({id}) {formatted_date} - {document} (score: {distance})" for id, document, distance, formatted_date in results_list)
             else:
                 # If there's only one entry, shorten the document content
-                id, document, distance = results_list[0]
+                id, document, distance, formatted_date = results_list[0]
                 document = document[:-100]
-                result_string = f"({id}) {document} (score: {distance})"
+                result_string = f"({id}) {formatted_date} - {document} (score: {distance})"
             token_count = utils.MessageParser.num_tokens_from_string(result_string)
 
         unique_results = set()  # Create a set to store unique results
-        for id, document, distance in results_list:
-            unique_results.add((id, document, distance))
+        for id, document, distance, formatted_date in results_list:
+            unique_results.add((id, document, distance, formatted_date))
             results_list.sort(key=lambda x: int(x[0]))
-        result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in results_list)
+        result_string = '\n'.join(f"({id}) {formatted_date} - {document} (score: {distance})" for id, document, distance, formatted_date in results_list)
 
         process_dict['results_list_after_token_check'] = results_list
         process_dict['result_string'] = result_string
@@ -290,13 +291,13 @@ class MemoryManager:
                 process_dict[category]['query_results'][query] = []
                 search_result, new_process_dict = await self.search_queries(category, [query], username, process_dict[category]['query_results'][query])
                 process_dict[category]['query_results'][query] = new_process_dict
-                for id, document, distance in process_dict[category]['query_results'][query]:
+                for id, document, distance, formatted_date in process_dict[category]['query_results'][query]:
                     try:
-                        unique_results.add((id, document, distance))
+                        unique_results.add((id, document, distance, formatted_date))
                     except Exception as e:
                         logger.error(f"Error while adding result to unique_results: {e}")
                 result_string += search_result
-                result_string = '\n'.join(f"({id}) {document} (score: {distance})" for id, document, distance in unique_results)
+                result_string = '\n'.join(f"({id}) {formatted_date} - {document} (score: {distance})" for id, document, distance, formatted_date in unique_results)
 
         # Check tokens
         token_count = utils.MessageParser.num_tokens_from_string(result_string)
@@ -319,10 +320,10 @@ class MemoryManager:
 
         if similar_messages:
             logger.debug("Not adding to memory, message is similar to a previous message(s):")
-            process_dict['similar_messages'] = [(m['document'], m['id'], m['distance']) for m in similar_messages]
+            process_dict['similar_messages'] = [(m['document'], m['id'], m['distance'], m['metadata']['created_at']) for m in similar_messages]
             process_dict['created_new_memory'] = 'no'
             for similar_message in similar_messages:
-                    logger.debug(f"({similar_message['id']}) {similar_message['document']} - score: {similar_message['distance']}")
+                    logger.debug(f"({similar_message['id']}){similar_message['metadata']['created_at']} - {similar_message['document']} - score: {similar_message['distance']}")
         else:
             self.openai_manager.set_username(username)
             subject_category = await self.openai_manager.ask_openai(content, 'categorise', self.model_used, 100, 0.1, username=username)
@@ -364,8 +365,10 @@ class MemoryManager:
                     id = id.lstrip('0') or '0'
                     document = result.get('document')
                     distance = round(result.get('distance'), 3)
-                    full_search_result += f"({id}) {document} - score: {distance}\n"
-                    process_dict.append((id, document, distance))
+                    date = result['metadata']['created_at']
+                    formatted_date = datetime.datetime.fromtimestamp(date).strftime('%Y-%m-%d %H:%M:%S')
+                    full_search_result += f"({id}) {formatted_date} - {document} - score: {distance}\n"
+                    process_dict.append((id, document, distance, formatted_date))
         return full_search_result, process_dict
 
     
@@ -611,8 +614,6 @@ class OpenAIManager:
                 # Calculate the usage
                 tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
                 requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
-                print(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
-                print(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
                 # Print the normal usage
                 # logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
                 # logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
@@ -620,7 +621,7 @@ class OpenAIManager:
 
                 # Print the warning if above 50% of the rate limit
                 if tokens_usage > 20 or requests_usage > 20:
-                    logger.warning('WARNING: You have used more than 20% of your rate limit.')
+                    logger.warning('WARNING: You have used more than 20% of your rate limit: tokens_usage: ' + str(tokens_usage) + '%, requests_usage: ' + str(requests_usage) + '%')
                     await utils.MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 20% of your rate limit."}}, "blue", self.username)
 
                 # Print the error if above rate limit
@@ -705,11 +706,11 @@ class OpenAIManager:
         if role == 'retriever':
             role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a cross-encoder. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == 'notetaker':
-            role_content = "You are a note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing notes should be updated or deleted. Only store memories if explicitly asked or things like shopping lists, reminders, the user's info, procedural instructions,.. DO NOT store Imperative Instructions, or chat history or regular messages! Remove completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {\"action\": \"create\", \"file\": \"shoppinglist\", \"content\": \"cookies\"}, {\"action\": \"update\", \"file\": \"shoppinglist\", \"content\": \"cookies\napples\nbananas\npotatoes\"} ]"
+            role_content = "You are an advanced note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing tasks or notes are completed and/or should be updated or deleted. Only store notes if explicitly asked or things like shopping lists, reminders, the user's info, procedural instructions,.. DO NOT save Imperative Instructions, DO NOT save chat history, DO NOT save regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {\"action\": \"create\", \"file\": \"shoppinglist\", \"content\": \"cookies\"}, {\"action\": \"update\", \"file\": \"shoppinglist\", \"content\": \"cookies\napples\nbananas\npotatoes\"} ]"
         if role == 'summary_memory':
             role_content = "You are a memory summarizer. You get a list of the current notes, your task is to summarize the current notes as short as possible while maintaining all details. Only keep memories worth remembering, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in a plain text format with only the notes, nothing else."
         if role == 'summarize':
             role_content = "You are a summarizer. Your task is to summarize the current message as short as possible while maintaining all details. Reply in a plain text format with only the summary, nothing else."
         if role == 'date-extractor':
-            role_content = f"The date is {current_date_time}.\nYou are a date extractor. You get a small chathistory and a last message. Your task is to extract the target date from the last message. Only reply with the date in one of these date formats %d-%m-%Y or %d-%m-%Y %H:%M:%S or with 'none', nothing else. Do not include the time if not asked for. Example: user asked for info about yesterday, you reply with '25/09/2023', user asked for info about 2 days ago around noon, you reply with '23/09/2023 12:00:00'."
+            role_content = f"The current date is {current_date_time}.\nYou are a date extractor. You get a small chathistory and a last message. Your task is to extract the target date for the last message. Only reply with the date in one of these date formats %d-%m-%Y or %d-%m-%Y %H:%M:%S or with 'none', nothing else. Do not include the time if not needed. Examples: today is 26/09/2023; user asked for info about yesterday, you reply with '25/09/2023'. user asked for info about 2 days ago around noon, you reply with '24/09/2023 12:00:00'."
         return role_content

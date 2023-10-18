@@ -4,9 +4,10 @@ import os
 from routes import router
 from config import api_keys
 import openai
-from database import Database
-import utils
 import nltk
+import logs
+import utils
+from database import Database
 
 nltk.download('punkt')
 
@@ -28,7 +29,7 @@ WIP.
     version=version,
 )
 
-origins = "https://clang.goodai.com"
+origins = os.environ["ORIGINS"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,5 +38,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event('shutdown')
+def shutdown_event():
+    logs.Log('main', 'main.log').get_logger().debug('Shutting down server')
 
 app.include_router(router)

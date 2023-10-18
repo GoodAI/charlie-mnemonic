@@ -25,7 +25,8 @@ from jose.exceptions import JWTError
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-logger = logs.Log(__name__, 'full_log.log').get_logger()
+logger = logs.Log('routes', 'routes.log').get_logger()
+
 from config import api_keys
 
 router = APIRouter()
@@ -451,6 +452,63 @@ async def handle_message(request: Request, message: userMessage, background_task
         logger.info(f'user {message.username} reached daily limit')
         raise HTTPException(status_code=400, detail="You reached your daily limit. Please wait until tomorrow to continue using the service.")
     return await process_message(message.prompt, message.username, background_tasks, users_dir, message.display_name)
+
+@router.post("/message_with_image/",
+    tags=["Messaging"])
+async def handle_message_image(request: Request, image_file: UploadFile, prompt: str = Form(...)):
+    print(prompt)
+    session_token = request.cookies.get("session_token")
+    username = request.cookies.get("username")
+    auth = Authentication()
+    success = auth.check_token(username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    if count_tokens(prompt) > 1000:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+    with Database() as db:
+        total_tokens_used, total_cost = db.get_token_usage(username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
+        display_name = db.get_display_name(username)[0]
+        daily_limit = db.get_daily_limit()
+        has_access = db.get_user_access(username)
+    if not has_access or has_access == 'false' or has_access == 'False':
+        logger.info(f'user {username} does not have access')
+        raise HTTPException(status_code=400, detail="You do not have access yet, ask permission from the administrator or wait for your trial to start")
+    if total_daily_cost >= daily_limit:
+        logger.info(f'user {username} reached daily limit')
+        raise HTTPException(status_code=400, detail="You reached your daily limit. Please wait until tomorrow to continue using the service.")
+    # check the size of the image, if it's too big +5mb, return an error
+    if image_file.content_length > 5000000:
+        raise HTTPException(status_code=400, detail="Image is too big, please use an image that is less than 5mb")
+    # save the image to the user's directory
+    converted_name  = convert_name(username)
+    user_dir = os.path.join(users_dir, converted_name, 'data')
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+    image_path = os.path.join(user_dir, image_file.filename)
+    with open(image_path, 'wb') as f:
+        f.write(image_file.file.read())
+    # get the image description
+    # add the image as markdown to the prompt
+    url_encoded_image = urllib.parse.quote(image_file.filename)
+    prompt = '![image](data/' + url_encoded_image + ' "image")<p>' + prompt + '</p>'
+    result = await MessageParser.get_image_description(image_path, prompt, image_file.filename)
+    return await process_message(prompt, username, None, users_dir, display_name, result)
+
+@router.post("/get_recent_messages/")
+async def get_recent_messages(request: Request, message: UserName, background_tasks: BackgroundTasks = None):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(message.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    with Database() as db:
+        has_access = db.get_user_access(message.username)
+        recent_messages = MessageParser.get_recent_messages(message.username)
+    if not has_access or has_access == 'false' or has_access == 'False':
+        logger.info(f'user {message.username} does not have access')
+        raise HTTPException(status_code=400, detail="You do not have access yet, ask permission from the administrator or wait for your trial to start")
+    return recent_messages
 
 # openAI response route without modules
 @router.post("/message_no_modules/",
@@ -983,6 +1041,17 @@ async def google_login(request: UserGoogle, response: Response):
         return {'message': 'User logged in successfully'}
     else:
         raise HTTPException(status_code=401, detail="User login failed")
+    
+@router.post("/delete_recent_messages/")
+async def delete_recent_messages(request: Request, message: UserName):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(message.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    # remove all users recent messages
+    await BrainProcessor.delete_recent_messages(message.username)
+    return {'message': 'Recent messages deleted successfully'}
     
 
 def convert_name(name):

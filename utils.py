@@ -287,8 +287,8 @@ class OpenAIResponser:
 
             # Print the warning if above 50% of the rate limit
             if tokens_usage > 20 or requests_usage > 20:
-                logger.warning('WARNING: You have used more than 20% of your rate limit.')
-                await MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 20% of your rate limit."}}, "blue", self.username)
+                logger.warning('WARNING: You have used more than 20% of your rate limit: tokens_usage: ' + str(tokens_usage) + '%, requests_usage: ' + str(requests_usage) + '%')
+                await MessageSender.send_message({"type": "rate_limit", "content": {"warning": "WARNING: You have used more than 20% of your rate limit: tokens_usage: " + str(tokens_usage) + "%, requests_usage: " + str(requests_usage) + "%"}}, "blue", self.username)
 
             # Print the error if above rate limit
             if tokens_usage >= 100 or requests_usage >= 100:
@@ -341,8 +341,8 @@ class OpenAIResponser:
                     await MessageSender.update_token_usage(response, username, False, elapsed=elapsed)
                     return response
                 except asyncio.TimeoutError:
-                    logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
-                    await MessageSender.send_message({"error": f"Request timed out, retrying {i+1}/{max_retries}"}, "red", username)
+                    logger.error(f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}")
+                    await MessageSender.send_message({"error": f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"}, "red", username)
                 except Exception as e:
                     logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
                     await MessageSender.send_message({"error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"}, "red", username)
@@ -995,10 +995,10 @@ async def process_cot_messages(message, function_dict, function_metadata, userna
             function_call_name = response['function_call']['name']
             function_call_arguments = response['function_call']['arguments']
             response = await MessageParser.process_function_call(function_call_name, function_call_arguments, function_dict, function_metadata, message, og_message, username, process_cot_messages, False, users_dir, steps_string)
-            memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
+            await memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
             return response
         else:
-            memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
+            await memory.process_incoming_memory_assistant('active_brain', f"Result: {response}", username)
             await MessageSender.send_debug(f'{response}', 1, 'green', username)
             return response['content']
 

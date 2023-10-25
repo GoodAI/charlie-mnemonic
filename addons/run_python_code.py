@@ -4,8 +4,6 @@ from unidecode import unidecode
 import os
 from logs import Log
 
-logger = Log(__name__, 'full_log.log').get_logger()
-
 description = """This addon allows you to execute python code in a non persistant terminal, When opening files be sure to open from /data/filename.
 Always include print statements to track the progress or path and name(s) of generated files.
 Save any generated files in the /data/ directory with the format /data/filename.ext.
@@ -29,7 +27,6 @@ parameters = {
 }
 
 async def run_python_code(content, pip_packages=[], previous_content='', username=None):
-    logger.debug(f'running python code for user {username}')
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, sync_run_python_code, content, pip_packages, previous_content, username)
 
@@ -66,7 +63,6 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         # Remove existing container with the same name
         for c in client.containers.list(all=True):
             if c.name == username:
-                logger.debug(f'Removing existing container for user {username}')
                 c.remove(force=True)
 
         # Start a new container with the volume
@@ -77,10 +73,8 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         for package in pip_packages:
             pip_install_result = container.exec_run(f'pip install {package}')
             if pip_install_result.exit_code != 0:
-                logger.debug(f'Failed to install package: {package} for user {username}: {pip_install_result.output.decode("utf-8")}')
                 return {'error': 'Failed to install package: ' + pip_install_result.output.decode('utf-8')}
             else:
-                logger.debug(f'Successfully installed package: {package}')
                 pip_string += f'successfully installed package: {package}\n'
 
         # Execute the code in the container
@@ -100,7 +94,6 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         return response
 
     except Exception as e:
-        logger.error(f'Error running python code for user {username}: {str(e)}')
         return {'error': str(e)}
 
 def escape_string(s):

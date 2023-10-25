@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <title>Chatbot</title>
+    <title>GoodAI Agent {{version}}</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
@@ -18,7 +18,7 @@
 
 
     <script type="module" src="cl100k_base.js"></script>
-    <link rel="stylesheet" href="styles.css?v=0.45">
+    <link rel="stylesheet" href="styles.css?v=0.46`">
 
 
     <script>
@@ -319,11 +319,11 @@
                         edit_status('audio', 'voice_input', false);
                         $('#record').hide();
                         if (err.name === 'NotAllowedError') {
-                            alert('Permission to access microphone was denied. Please allow access to the microphone and try again.');
+                            showErrorModal('Permission to access microphone was denied. Please allow access to the microphone and try again.');
                         } else if (err.name === 'NotFoundError') {
-                            alert('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
+                            showErrorModal('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
                         } else {
-                            alert('Error occurred : ' + err.name);
+                            showErrorModal('Error occurred : ' + err.name);
                         }
                     });
                 
@@ -913,6 +913,13 @@
 
         };
 
+        function showErrorModal(errorMessage) {
+            var errorModal = document.getElementById('errorModal');
+            var errorModalBody = document.getElementById('errorModal-body');
+            errorModalBody.innerHTML = errorMessage;
+            $('#errorModal').modal('show');
+        }
+
         async function handleError(response) {
             if (!response.ok) {
                 let errorMessage = '';
@@ -924,7 +931,7 @@
                     case 400:
                         const data = await response.json();
                         errorMessage = data.detail;
-                        alert(errorMessage);
+                        showErrorModal(errorMessage);
                         throw new Error(`400: Bad Request - ${errorMessage}`);
                     case 401:
                         deleteCookies();
@@ -958,10 +965,7 @@
             addExternalMessage(msg);
         };
 
-        async function onResponse(msg){
-            var timestamp = new Date().toLocaleTimeString();
-            
-            // be sure the msg is converted to json
+        async function parseMessage(msg) {
             if (typeof msg === 'string') {
                 try {
                     msg = JSON.parse(msg);
@@ -969,107 +973,114 @@
                     console.error('Error parsing JSON: ', e);
                 }
             }
-            
             console.log(msg);
+            return msg;
+        }
 
-            // replace the occassional \n with in the openAI responses
-            let content = msg.content;
-
+        function formatContent(content) {
             if (content) {
-                content = content.replace(/\n/g,'').trim();
-
-                console.log('1 start msg');
-                // remove the spinner
-                var lastMessage = document.querySelector('.last-message');
-                if (lastMessage) {
-                    lastMessage.classList.remove('last-message');
-                    if(lastMessage.querySelector('.spinner') != null) {
-                        lastMessage.querySelector('.spinner').remove();
-                        document.getElementById('messages').lastChild.remove();
-                    }
-                }
-                tempReceived += msg.content;
-                tempFormatted = tempReceived;
-                // count the amount of ``` if there is none, use marked, if there is 1 do not use marked, if there are 2, use marked
-                var count = (tempReceived.match(/```/g) || []).length;
-                if (count > 0) {
-                    if (count % 2 == 0) {
-                        tempFormatted = marked(tempReceived);
-                    }
-                    else {
-                        // add ``` to the end of the message
-                        tempFormatted = tempReceived + '\n```';
-                        // format it
-                        tempFormatted = marked(tempFormatted);
-                    }
-                }
-                else {
-                    tempFormatted = marked(tempReceived);
-                }
-
-                if (settings.avatar.avatar) {
-                    // D-ID avatar
-                    var textToSay = tempReceived.replace(/\n/g, "");
-                    var videoDuration = 0;
-                    var videoPromise;
-                    await import('./d-id/streaming-client-api.js').then(
-                        did => { videoPromise = did.generateVideoStream(textToSay); });
-                    
-                    videoDuration = await videoPromise;
-                    if (videoDuration > 0) {
-                        var numCredits = Math.ceil(videoDuration / 15.0);
-                        var cost = 18.0 * numCredits / 120.0;
-                        console.log("video stream will start soon. duration: " + videoDuration + "; d-id credits: " +  numCredits + "; cost: " +  cost);
-
-                    // Sleep for 3s until the video is ready
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                    }
-                }
-                    
-                
-                audioElement = '';
-                if(settings.audio.voice_output) {
-                    var chatMessage = '<br><div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
-                    document.getElementById('messages').innerHTML += chatMessage;
-
-                    var playButtons = document.querySelectorAll('.play-button');
-                    var playButton = playButtons[playButtons.length - 1];
-                    playButton.addEventListener('click', async function() {
-                        // replace the play button with a loading icon
-                        this.classList.remove('fa-play');
-                        this.classList.add('fa-spinner');
-                        var audioSrc = await request_audio(msg.content);
-                        var audioElement = document.createElement('audio');
-                        audioElement.controls = true;
-                        audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-                        this.replaceWith(audioElement);
-                    });
-                } else {
-                    var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '</div>'; 
-                    document.getElementById('messages').innerHTML += chatMessage;
-                }
-                tempReceived = '';
-                tempFormatted = '';
-                var lastMessage = document.querySelector('.last-message');
-                if (lastMessage) {
-                    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-                }
-                content = '';
-                canSend = true;
-                canRecord = true;
-                isWaiting = false;
-                isRecording = false;
-                canSendMessage();
-                document.getElementById('message').placeholder = 'Type a message...';
+                return content.replace(/\n/g,'').trim();
             }
-            // enable the send button if the message received contains 'end': 'true'
+            return null;
+        }
+
+        function removeSpinner() {
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                lastMessage.classList.remove('last-message');
+                if(lastMessage.querySelector('.spinner') != null) {
+                    lastMessage.querySelector('.spinner').remove();
+                    document.getElementById('messages').lastChild.remove();
+                }
+            }
+        }
+
+        function formatTempReceived(tempReceived) {
+            var tempFormatted = tempReceived;
+            var count = (tempReceived.match(/```/g) || []).length;
+            console.log('count: ' + count);
+            if (count > 0) {
+                if (count % 2 == 0) {
+                    tempFormatted = marked(tempReceived);
+                } else {
+                    tempFormatted = tempReceived + '\n```';
+                    tempFormatted = marked(tempFormatted);
+                }
+            } else {
+                tempFormatted = marked(tempReceived);
+            }
+            return tempFormatted;
+        }
+
+        async function handleAvatar(settings, tempReceived) {
+            if (settings.avatar.avatar) {
+                var textToSay = tempReceived.replace(/\n/g, "");
+                var videoDuration = 0;
+                var videoPromise;
+                await import('./d-id/streaming-client-api.js').then(
+                    did => { videoPromise = did.generateVideoStream(textToSay); });
+                
+                videoDuration = await videoPromise;
+                if (videoDuration > 0) {
+                    var numCredits = Math.ceil(videoDuration / 15.0);
+                    var cost = 18.0 * numCredits / 120.0;
+                    console.log("video stream will start soon. duration: " + videoDuration + "; d-id credits: " +  numCredits + "; cost: " +  cost);
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
+            }
+        }
+
+        async function handleAudio(settings, timestamp, tempFormatted, msg) {
+            if(settings.audio.voice_output) {
+                var chatMessage = '<br><div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
+                document.getElementById('messages').innerHTML += chatMessage;
+
+                var playButtons = document.querySelectorAll('.play-button');
+                var playButton = playButtons[playButtons.length - 1];
+                playButton.addEventListener('click', async function() {
+                    this.classList.remove('fa-play');
+                    this.classList.add('fa-spinner');
+                    var audioSrc = await request_audio(msg.content);
+                    var audioElement = document.createElement('audio');
+                    audioElement.controls = true;
+                    audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+                    this.replaceWith(audioElement);
+                });
+            } else {
+                var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '</div>'; 
+                document.getElementById('messages').innerHTML += chatMessage;
+            }
+        }
+
+        function resetState() {
+            tempReceived = '';
+            tempFormatted = '';
+            var lastMessage = document.querySelector('.last-message');
+            if (lastMessage) {
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+            content = '';
+            canSend = true;
+            canRecord = true;
+            isWaiting = false;
+            isRecording = false;
+            canSendMessage();
+            document.getElementById('message').placeholder = 'Type a message...';
+        }
+
+        async function onResponse(msg) {
+            var timestamp = new Date().toLocaleTimeString();
+            msg = await parseMessage(msg);
+            let content = formatContent(msg.content);
+            removeSpinner();
+            tempReceived += msg.content;
+            tempFormatted = formatTempReceived(tempReceived);
+            await handleAvatar(settings, tempReceived);
+            await handleAudio(settings, timestamp, tempFormatted, msg);
+            resetState();
+
             if (msg && msg.end && msg.end === 'true') {
-                canSend = true;
-                canRecord = true;
-                isWaiting = false;
-                isRecording = false;
-                canSendMessage();
-                document.getElementById('message').placeholder = 'Type a message...';
+                resetState();
             }
         };
 
@@ -1095,7 +1106,23 @@
     <!-- Toasts -->
     <div class="toast-container position-fixed top-0 end-0 p-3">
     </div>
-      
+    <!-- Error Modal -->
+    <div id="errorModal" class="modal fade">
+        <div class="modal-dialog modal-confirm">
+            <div class="modal-content">
+                <div class="modal-header justify-content-center">
+                    <div class="icon-box">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="2em" viewBox="0 0 384 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. --><style>svg{fill:#ffffff}</style><path d="M376.6 84.5c11.3-13.6 9.5-33.8-4.1-45.1s-33.8-9.5-45.1 4.1L192 206 56.6 43.5C45.3 29.9 25.1 28.1 11.5 39.4S-3.9 70.9 7.4 84.5L150.3 256 7.4 427.5c-11.3 13.6-9.5 33.8 4.1 45.1s33.8 9.5 45.1-4.1L192 306 327.4 468.5c11.3 13.6 31.5 15.4 45.1 4.1s15.4-31.5 4.1-45.1L233.7 256 376.6 84.5z"/></svg>
+                    </div>
+                </div>
+                <div class="errorModal-body text-center">
+                    <h4>Ooops!</h4>	
+                    <p id="errorModal-body">Error.</p>
+                    <button class="btn btn-success" id="errorModalClose">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>     
     <!-- Login Modal -->
     <div class="modal" tabindex="-1" role="dialog" id="login-modal">
         <div class="modal-dialog" role="document">
@@ -1295,7 +1322,11 @@
 
     function addUserMessage(message) {
         var escaped_message = escapeHTML(message); 
-        var messageFormatted = escaped_message.replace(/\n/g, "<br>"); 
+        var messageFormatted = formatTempReceived(escaped_message);
+        var messageR = messageFormatted.replace(/\n/g, "<br>"); 
+        if (messageR.endsWith('<br>')) {
+            messageR = messageR.slice(0, -4);
+        }
         var timestamp = new Date().toLocaleTimeString();
         var lastMessage = document.querySelector('.last-message');
         if (lastMessage) {
@@ -1303,7 +1334,7 @@
         }
 
         var chatMessage = document.createElement('div');
-        chatMessage.innerHTML = '<div class="message user last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>';
+        chatMessage.innerHTML = '<div class="message user last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageR + '</div></div>';
         document.getElementById('messages').appendChild(chatMessage.firstChild);
 
         var lastMessage2 = document.querySelector('.last-message');
@@ -1336,13 +1367,16 @@
 
     function addCustomMessage(message, user, showLoading = false, replaceNewLines = false) {
         //var escaped_message = escapeHTML(message);
+        messageFormatted = formatTempReceived(message);
         if (replaceNewLines) {
-            var messageReplaced = message.replace(/\n/g, "<br>");
+            var messageReplaced = messageFormatted.replace(/\n/g, "<br>");
         }
         else {
-            var messageReplaced = message.replace(/\n/g, "");
+            var messageReplaced = messageFormatted.replace(/\n/g, "");
         }
-        messageFormatted = marked(messageReplaced);
+        if (messageReplaced.endsWith('<br>')) {
+            messageReplaced = messageReplaced.slice(0, -4);
+        }
         var timestamp = new Date().toLocaleTimeString();
         var lastMessage = document.querySelector('.last-message');
         if (lastMessage) {
@@ -1350,7 +1384,7 @@
         }
 
         var chatMessage = document.createElement('div');
-        chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageFormatted + '</div></div>';
+        chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageReplaced + '</div></div>';
         document.getElementById('messages').appendChild(chatMessage);
 
         var lastMessage2 = document.querySelector('.last-message');
@@ -1463,7 +1497,6 @@
                 body: JSON.stringify({'username': user_name}),
                 credentials: 'include'
             });
-
             const data = await response.blob();
             var downloadUrl = URL.createObjectURL(data);
             var a = document.createElement("a");
@@ -1725,7 +1758,7 @@
             })
             .catch(function(err) {
                 console.log('The following error occurred: ' + err);
-                alert('Error occurred : ' + err + '.\nDid you try turning it off and on again?\nYour microphone permissions might be disabled.');
+                showErrorModal('Error occurred : ' + err + '.\nDid you try turning it off and on again?\nYour microphone permissions might be disabled.');
                 // Reset the UI
                 document.getElementById('record').innerText = "Record";
                 document.getElementById('recordingIndicator').style.display = "none";
@@ -2093,6 +2126,10 @@
         }
     });
 
+    document.getElementById('errorModalClose').addEventListener('click', function() {
+        $('#errorModal').modal('hide');
+    });
+
     document.getElementById('clearMsgBtn').addEventListener('click', delete_recent_messages);
 
     document.getElementById('upload-image').addEventListener('click', function() {
@@ -2112,7 +2149,7 @@
         if (this.files.length > 0) {
             // check the size of the image, max 5MB
             if (this.files[0].size > 5000000) {
-                alert('The image is too large, max 5MB!');
+                showErrorModal('The image is too large, max 5MB!');
                 // clear the file input
                 this.value = '';
                 return;

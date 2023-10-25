@@ -679,7 +679,17 @@ async def handle_save_data(request: Request, user: UserName):
         shutil.move(os.path.join(users_dir, user.username, 'data.zip'), os.path.join(users_dir, user.username, zip_filename))
 
     # serve the zip file
-    return FileResponse(os.path.join(users_dir, user.username, zip_filename), media_type="application/zip", filename=zip_filename)
+    # return FileResponse(os.path.join(users_dir, user.username, zip_filename), media_type="application/zip", filename=zip_filename)
+
+    # todo: note that this method reads the entire file content into memory, which could cause issues for large files. If files are large, 
+    # we should stick with the FileResponse function and try to find out why it’s not setting the ‘Content-Disposition’ header correctly.
+    file_path = os.path.join(users_dir, user.username, zip_filename)
+    with open(file_path, 'rb') as file:
+        content = file.read()
+
+    response = Response(content, media_type="application/zip")
+    response.headers["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
+    return response
 
 
 @router.post("/delete_data/",

@@ -1,8 +1,5 @@
 FROM python:3.8
 
-WORKDIR /app
-COPY . /app
-
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libx264-dev \
@@ -24,7 +21,8 @@ RUN cd /usr/src && \
     make install
 
 RUN pip install Django Flask Pyramid Tornado Requests Beautifulsoup4 selenium Scrapy numpy pandas matplotlib scikit-learn keras nltk gensim numpy requests pillow imageio seaborn moviepy pandas scikit-image plotly opencv-python
-
+WORKDIR /app
+COPY . /app
 RUN mkdir /data
 
 CMD ["python3"]

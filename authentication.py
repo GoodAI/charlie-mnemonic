@@ -31,6 +31,12 @@ class Authentication:
         finally:
             self.db.close()
 
+    def delete_user(self, username):
+        self.db.open()
+        self.db.cursor.execute("DELETE FROM users WHERE username = %s", (username,))
+        self.db.conn.commit()
+        self.db.close()
+
     def login(self, username, password):
         self.db.open()
         self.db.cursor.execute("SELECT password FROM users WHERE username = %s", (username,))

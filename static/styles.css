@@ -34,13 +34,17 @@ h3{
     max-width: 80vw;
     min-width: 80vw;
     max-height: 80vh;
-    height: 800px;
+    height: 80vh;
     background: #fff;
     border-radius: 10px;
     box-shadow: 0px 11px 35px 2px rgba(0, 0, 0, 0.14);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+}
+
+table {
+    height: 80vh;
 }
 
 table tr {
@@ -72,6 +76,9 @@ table tr td {
     outline: none;
     min-height: 2lh;
     line-height: 1.5em;
+    box-shadow: 0px 11px 35px 2px rgba(0, 0, 0, 0.20);
+    border-radius: 10px;
+    margin-right: 10px;
 }
 
 .input-field button {
@@ -134,6 +141,12 @@ table tr td {
     justify-content: flex-start;
     align-items: center;
 }
+
+.message p {
+        margin-top: 0;
+        margin-bottom: 0;
+}
+
 
 .message span.timestamp {
     font-size: 0.7em;
@@ -203,13 +216,14 @@ table tr td {
 
 .message.user .bubble {
     background-color: #c3cfe2;
-    color: white;
+    color: #333;
     border-radius: 18px;
     padding: 10px 15px;
     display: inline-block;
-    max-width: 80%;
+    max-width: 80vh;
     word-wrap: break-word;
     align-self: flex-end;
+    min-width: 20vh;
 }
 
 .message.error .bubble {
@@ -238,11 +252,7 @@ pre {
     background-color: #f5f5f5; /* or any color you prefer */
     padding: 15px;
     border-radius: 5px;
-    white-space: pre-wrap;       /* Since CSS 2.1 */
-    white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
-    white-space: -pre-wrap;      /* Opera 4-6 */
-    white-space: -o-pre-wrap;    /* Opera 7 */
-    word-wrap: break-word;       /* Internet Explorer 5.5+ */
+    overflow: auto;
 }
 
 .language {
@@ -848,3 +858,77 @@ pre {
     border-radius: 50%;
 }
 
+.modal-confirm {		
+	color: #434e65;
+	width: 525px;
+}
+.modal-confirm .modal-content {
+	padding: 20px;
+	font-size: 16px;
+	border-radius: 5px;
+	border: none;
+}
+.modal-confirm .modal-header {
+	background: #df6969;
+	border-bottom: none;   
+	position: relative;
+	text-align: center;
+	margin: -20px -20px 0;
+	border-radius: 5px 5px 0 0;
+	padding: 35px;
+}
+.modal-confirm h4 {
+	text-align: center;
+	font-size: 36px;
+	margin: 10px 0;
+}
+.modal-confirm .form-control, .modal-confirm .btn {
+	min-height: 40px;
+	border-radius: 3px; 
+}
+.modal-confirm .close {
+	position: absolute;
+	top: 15px;
+	right: 15px;
+	color: #fff;
+	text-shadow: none;
+	opacity: 0.5;
+}
+.modal-confirm .close:hover {
+	opacity: 0.8;
+}
+.modal-confirm .icon-box {
+	color: #fff;		
+	width: 95px;
+	height: 95px;
+	display: inline-block;
+	border-radius: 50%;
+	z-index: 9;
+	border: 5px solid #fff;
+	padding: 26px;
+	text-align: center;
+}
+.modal-confirm .icon-box i {
+	font-size: 58px;
+	margin: -2px 0 0 -2px;
+}
+.modal-confirm.modal-dialog {
+	margin-top: 80px;
+}
+.modal-confirm .btn, .modal-confirm .btn:active {
+	color: #000;
+	border-radius: 4px;
+	background: #dcd2c0 !important;
+	text-decoration: none;
+	transition: all 0.4s;
+	line-height: normal;
+	border-radius: 30px;
+	margin-top: 10px;
+	padding: 6px 20px;
+	min-width: 150px;
+	border: none;
+}
+.modal-confirm .btn:hover, .modal-confirm .btn:focus {
+	background: #eda645 !important;
+	outline: none;
+}

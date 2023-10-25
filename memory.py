@@ -670,10 +670,10 @@ class OpenAIManager:
                     await utils.MessageSender.update_token_usage(response, username, brain=True, elapsed=elapsed)
                     return response
                 except asyncio.TimeoutError:
-                    logger.error(f"Request timed out, retrying {i+1}/{max_retries}")
+                    logger.error(f"OpenAI Request timed out, retrying {i+1}/{max_retries}")
                     await utils.MessageSender.send_message({"error": f"Request timed out, retrying {i+1}/{max_retries}"}, "red", username)
                 except Exception as e:
-                    logger.error(f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}")
+                    logger.error(f"Error from OpenAI: {str(e)}, retrying {i+1}/{max_retries}")
                     await utils.MessageSender.send_message({"error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"}, "red", username)
 
             logger.error("Max retries exceeded")

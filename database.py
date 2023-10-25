@@ -227,7 +227,7 @@ class Database:
         return json.dumps(rows, default=str)
 
     def get_total_statistics_pages(self, items_per_page):
-        self.cursor.execute("SELECT COUNT(*) FROM statistics")
+        self.cursor.execute("SELECT COUNT(*) FROM users")
         total_items = self.cursor.fetchone()[0]
         return math.ceil(total_items / float(items_per_page))
 

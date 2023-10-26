@@ -18,7 +18,7 @@
 
 
     <script type="module" src="cl100k_base.js"></script>
-    <link rel="stylesheet" href="styles.css?v=0.46`">
+    <link rel="stylesheet" href="styles.css?v={{version}}`">
 
 
     <script>
@@ -1255,15 +1255,21 @@
                     <p id="userStats"></p>
                 </div>
                 <div class="input-field">
-                    <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i><i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i>
-                    <textarea id="message" placeholder="Type a message..."></textarea>
-                    <input type="file" id="uploadImageInput" accept="image/*" hidden><br>
-                    <i class="fa fa-paperclip cogwheel" id="upload-image"></i>
+                    <div class="textarea-container">
+                        <div class="icon-container-left">
+                            <i class="fa fa-cog cogwheel" onclick="event.stopPropagation(); openNav()"></i>
+                            <i class="fas fa-terminal cogwheel" onclick="event.stopPropagation(); openDebugNav()"></i>
+                        </div>
+                        <textarea id="message" placeholder="Type a message..." rows="1"></textarea>
+                        <div class="icon-container-right">
+                            <input type="file" id="uploadImageInput" accept="image/*" hidden>
+                            <button id="upload-image" class="upload-button"><i class="fa fa-paperclip cogwheel"></i></button>
+                            <button id="record" class="record-button"><i class="fa fa-microphone"></i></button>
+                            <button id="send" class="send-button"><i class="fa fa-paper-plane"></i></button>
+                        </div>
+                    </div>
                     <div id="image-preview"></div>
-                    <button id="record" class="record-button">Record</button>
-                    <div id="recordingIndicator" style="display: none;">Recording...</div>
-                    <button id="send" class="send-button">Send</button>
-                </div>
+                </div>                         
             </div>
         </div>
     </td>
@@ -1351,7 +1357,7 @@
         // remove input text
         document.getElementById('message').value = '';
         var textarea = document.getElementById('message');
-        textarea.rows = 2;
+        textarea.rows = 1;
         // reset token count
         document.getElementById('tokenCount').textContent = 'Characters: 0, tokens: 0/' + max_message_tokens.toString() + ', cost: $0.0000';
         // change placeholder text
@@ -1720,7 +1726,7 @@
             // If we are, stop the recording and reset our data
             mediaRecorder.stop();
             chunks = [];
-            document.getElementById('record').innerText = "Record";
+            document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
             document.getElementById('recordingIndicator').style.display = "none";
             canSend = true;
             canRecord = true;
@@ -1752,7 +1758,7 @@
 
                     send_audio(file);
 
-                    document.getElementById('record').innerText = "Record";
+                    document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
                     document.getElementById('recordingIndicator').style.display = "none";
                 }
             })
@@ -1760,7 +1766,7 @@
                 console.log('The following error occurred: ' + err);
                 showErrorModal('Error occurred : ' + err + '.\nDid you try turning it off and on again?\nYour microphone permissions might be disabled.');
                 // Reset the UI
-                document.getElementById('record').innerText = "Record";
+                document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
                 document.getElementById('recordingIndicator').style.display = "none";
                 canSend = true;
                 canRecord = true;
@@ -1769,7 +1775,7 @@
                 canSendMessage();
             })
 
-            document.getElementById('record').innerText = "Stop";
+            document.getElementById('record').innerHTML = '<i class="fa fa-stop"></i>';
             document.getElementById('recordingIndicator').style.display = "block";
             canSend = false;
             canRecord = false;
@@ -2286,7 +2292,7 @@
     var lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
     var viewportHeight = window.innerHeight;
     var limit = Math.floor((viewportHeight * 0.7) / lineHeight); // max lines based on 70% of viewport height
-    var min = 2; // minimum number of lines
+    var min = 1; // minimum number of lines
 
     textarea.oninput = function() {
         var lines = textarea.value.split('\n');

@@ -10,6 +10,18 @@ body {
     flex-direction: column;
     margin-left: 0;
 }
+
+#body-profile {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    background-attachment: fixed;
+    display: block;
+    height: 100vh;
+    margin: 0;
+    margin-left: 0;
+    overflow: auto;
+}
+
 h1 {
     margin: 0 0 5px;
     text-align: center;
@@ -69,69 +81,187 @@ table tr td {
     align-items: center;
 }
 
-.input-field textarea {
+.textarea-container {
+    position: relative;
     flex: 1;
-    border: none;
-    padding: 10px;
-    outline: none;
-    min-height: 2lh;
-    line-height: 1.5em;
-    box-shadow: 0px 11px 35px 2px rgba(0, 0, 0, 0.20);
-    border-radius: 10px;
     margin-right: 10px;
 }
 
-.input-field button {
-    background: #c3cfe2;
-    color: white;
-    cursor: pointer;
-    transition: background 0.3s;
-    padding: 10px 20px;
-    border-radius: 5px;
+.icon-container-left, .icon-container-right {
+    display: flex;
+    align-items: center;
+    position: absolute;
+}
+
+.icon-container-left {
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+}
+
+.icon-container-right {
+    bottom: 50%;
+    right: 10px;
+    transform: translateY(50%);
+}
+
+.input-field textarea {
+    width: 100%;
     border: none;
-    margin-left: 10px;
+    padding: 18px 150px 18px 70px;
+    outline: none;
+    line-height: 1.5em;
+    box-shadow: 0px 11px 35px 2px rgba(0, 0, 0, 0.20);
+    border-radius: 10px;
+    vertical-align: middle;
+    resize: vertical;
+    max-height: 60vh;
+    min-height: 70px;
+}
+
+
+.input-field button {
+    background: none;
+    cursor: pointer;
+    padding: 10px 10px;
+    border: none;
 }
 
 .input-field button:disabled {
-    background: #e2c3c3;
-    color: white;
+    color: #e2c3c3;
     border: none;
-    padding: 10px 20px;
+    padding: 10px 10px;
     cursor: not-allowed !important;
     transition: background 0.3s;
 }
 
 .input-field button:hover {
-    background: #a6c1ee;
+    color: #a6c1ee;
 }
 
 .input-field button[disabled]:hover {
-    background: #e2c3c3;
+    color: #e2c3c3;
 }
 
 .input-field .send-button {
-    background: #c3cfe2;
-    color: white;
+    color: #c3cfe2;
     border: none;
-    padding: 10px 20px;
     cursor: pointer;
     transition: background 0.3s;
 }
 .input-field .send-button:disabled {
-    background: #e2c3c3;
-    color: white;
+    color: #e2c3c3;
     border: none;
-    padding: 10px 20px;
     cursor: not-allowed !important;
     transition: background 0.3s;
 }
 
 .input-field .send-button:hover {
-    background: #a6c1ee;
+    color: #a6c1ee;
 }
 
 .input-field .send-button[disabled]:hover {
-    background: #e2c3c3;
+    color: #e2c3c3;
+}
+
+.input-field .record-button {
+    color: #c3cfe2;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.input-field .record-button:disabled {
+    color: #e2c3c3;
+    border: none;
+    cursor: not-allowed !important;
+    transition: background 0.3s;
+}
+
+.input-field .record-button:hover {
+    color: #a6c1ee;
+}
+
+.input-field .record-button[disabled]:hover {
+    color: #e2c3c3;
+}
+ 
+.input-field i {
+    margin-right: 10px;
+  }
+  
+  .input-field .cogwheel {
+    color: #c3cfe2;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.input-field .upload-icon {
+    color: #c3cfe2;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.input-field .upload-button {
+    background: none;
+    cursor: pointer;
+    border: none;
+}
+
+.input-field .upload-button i {
+    color: #c3cfe2;
+    transition: color 0.3s;
+}
+
+.input-field .upload-button:hover i {
+    color: #a6c1ee;
+}
+
+.input-field .upload-button:disabled {
+    color: #e2c3c3;
+    border: none;
+    cursor: not-allowed !important;
+    transition: background 0.3s;
+}
+
+.input-field .upload-button:hover {
+    color: #a6c1ee;
+}
+
+.input-field .upload-button[disabled]:hover {
+    color: #e2c3c3;
+}
+
+#fileInfo {
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}
+
+#fileInfo #fileName {
+    margin-right: 10px;
+}
+
+#fileInfo #deleteFile {
+    background: #c3cfe2;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background 0.3s;
+    display: none;
+}
+#fileInfo #uploadFile {
+    background: #c3cfe2;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background 0.3s;
+    display: none;
+}
+
+#fileInfo #deleteFile:hover {
+    background: #a6c1ee;
 }
 
 .message {
@@ -446,66 +576,17 @@ pre {
     color: #c9c8c8;
 }
   
-  .openbtn {
+.openbtn {
     font-size: 20px;
     cursor: pointer;
     background-color: #111;
     color: white;
     padding: 10px 15px;
     border: none;
-  }
+}
   
-  .openbtn:hover {
+.openbtn:hover {
     background-color: #444;
-  }
-  
-  .input-field i {
-    margin-right: 10px;
-  }
-  
-  .input-field .cogwheel {
-    color: #c3cfe2;
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.input-field .upload-icon {
-    color: #c3cfe2;
-    font-size: 20px;
-    cursor: pointer;
-}
-
-#fileInfo {
-    display: flex;
-    align-items: center;
-    margin-right: 10px;
-}
-
-#fileInfo #fileName {
-    margin-right: 10px;
-}
-
-#fileInfo #deleteFile {
-    background: #c3cfe2;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: background 0.3s;
-    display: none;
-}
-#fileInfo #uploadFile {
-    background: #c3cfe2;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: background 0.3s;
-    display: none;
-}
-
-#fileInfo #deleteFile:hover {
-    background: #a6c1ee;
 }
 
 .preset-text-container {

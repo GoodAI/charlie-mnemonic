@@ -32,7 +32,9 @@ def export_memory_to_json(include_embeddings=True, username=None):
         collections_dict[collection_name] = []
 
         # Get all memories from the current collection
-        memories = get_memories(collection_name, include_embeddings=include_embeddings, username=username)
+        memories = get_memories(
+            collection_name, include_embeddings=include_embeddings, username=username
+        )
         for memory in memories:
             # Append each memory to its corresponding collection list
             collections_dict[collection_name].append(memory)
@@ -56,7 +58,7 @@ def export_memory_to_file(path="./memory.json", include_embeddings=True, usernam
     # Export the database to a dictionary
     collections_dict = export_memory_to_json(include_embeddings, username=username)
 
-    #print(collections_dict)
+    # print(collections_dict)
 
     # Write the dictionary to a JSON file
     with open(path, "w") as outfile:

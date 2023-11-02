@@ -3,7 +3,7 @@ import os
 import time
 import logs
 
-logger = logs.Log('agentmemory', 'agentmemory.log').get_logger()
+logger = logs.Log("agentmemory", "agentmemory.log").get_logger()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -16,6 +16,7 @@ from agentmemory.helpers import (
 
 
 from agentmemory.client import get_client
+
 
 def create_memory(category, text, metadata={}, embedding=None, id=None, username=None):
     """
@@ -42,8 +43,10 @@ def create_memory(category, text, metadata={}, embedding=None, id=None, username
     metadata["updated_at"] = datetime.datetime.now().timestamp()
 
     logger.debug(f"created_at: {metadata['created_at']}")
-    #convert to human readable format
-    formatted_date = datetime.datetime.fromtimestamp(metadata['created_at']).strftime('%Y-%m-%d %H:%M:%S')
+    # convert to human readable format
+    formatted_date = datetime.datetime.fromtimestamp(metadata["created_at"]).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
     logger.debug(f"formatted_date: {formatted_date}")
 
     # if no id is provided, generate one based on count of documents in collection
@@ -55,7 +58,11 @@ def create_memory(category, text, metadata={}, embedding=None, id=None, username
     # for each field in metadata...
     # if the field is a boolean, convert it to a string
     for key, value in metadata.items():
-        if isinstance(value, bool) or isinstance(value, dict) or isinstance(value, list):
+        if (
+            isinstance(value, bool)
+            or isinstance(value, dict)
+            or isinstance(value, list)
+        ):
             debug_log(f"WARNING: Boolean metadata field {key} converted to string")
             metadata[key] = str(value)
 
@@ -71,7 +78,9 @@ def create_memory(category, text, metadata={}, embedding=None, id=None, username
     return id
 
 
-def create_unique_memory(category, content, metadata={}, similarity=0.95, username=None):
+def create_unique_memory(
+    category, content, metadata={}, similarity=0.95, username=None
+):
     """
     Creates a new memory if there aren't any that are very similar to it
 
@@ -108,6 +117,7 @@ def create_unique_memory(category, content, metadata={}, similarity=0.95, userna
     create_memory(category, content, metadata=metadata, username=username)
     return id
 
+
 def search_memory_by_date(
     category,
     search_text,
@@ -127,7 +137,15 @@ def search_memory_by_date(
         if isinstance(filter_date, str):
             # List of date formats
             logger.debug(f"filter_date: {filter_date}")
-            date_formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%m/%d/%Y', '%d-%m-%Y', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']
+            date_formats = [
+                "%Y-%m-%d",
+                "%d/%m/%Y %H:%M:%S",
+                "%m/%d/%Y",
+                "%d-%m-%Y",
+                "%d/%m/%Y",
+                "%d-%m-%Y %H:%M:%S",
+                "%Y-%m-%d %H:%M:%S",
+            ]
 
             has_time = False  # Flag to track if the date format contains time
 
@@ -135,16 +153,28 @@ def search_memory_by_date(
             for date_format in date_formats:
                 try:
                     filter_date = datetime.datetime.strptime(filter_date, date_format)
-                    if '%H:%M:%S' in date_format and filter_date.time() != datetime.time(0, 0):  # Check if the date format contains time and it is not 00:00
+                    if (
+                        "%H:%M:%S" in date_format
+                        and filter_date.time() != datetime.time(0, 0)
+                    ):  # Check if the date format contains time and it is not 00:00
                         has_time = True
                     break
                 except ValueError:
                     continue
 
             # Calculate the timestamps for the start and end of filter_date
-            start_of_date = datetime.datetime(filter_date.year, filter_date.month, filter_date.day, filter_date.hour, filter_date.minute, filter_date.second)
+            start_of_date = datetime.datetime(
+                filter_date.year,
+                filter_date.month,
+                filter_date.day,
+                filter_date.hour,
+                filter_date.minute,
+                filter_date.second,
+            )
             logger.debug(f"start_of_date: {start_of_date}")
-            if has_time:  # If the date format contains time and it is not 00:00, add an hour
+            if (
+                has_time
+            ):  # If the date format contains time and it is not 00:00, add an hour
                 end_of_date = start_of_date + datetime.timedelta(hours=1)
                 logger.debug(f"end_of_date: {end_of_date}")
             else:  # Otherwise, add a day
@@ -155,12 +185,17 @@ def search_memory_by_date(
             logger.debug(f"start_timestamp: {start_timestamp}")
             logger.debug(f"end_timestamp: {end_timestamp}")
 
-            #filter_metadata = {'created_at': {'$gte': start_timestamp}}
-            #filter_metadata = {'created_at': {'$lte': end_timestamp}}
-            filter_metadata = {'$and': [{'created_at': {'$gt': start_timestamp}}, {'created_at': {'$lt': end_timestamp}}]}
+            # filter_metadata = {'created_at': {'$gte': start_timestamp}}
+            # filter_metadata = {'created_at': {'$lte': end_timestamp}}
+            filter_metadata = {
+                "$and": [
+                    {"created_at": {"$gt": start_timestamp}},
+                    {"created_at": {"$lt": end_timestamp}},
+                ]
+            }
         else:
             logger.error(f"filter_date must be a string")
-            return ValueError('filter_date must be a string')
+            return ValueError("filter_date must be a string")
         logger.debug(f"filter_metadata: {filter_metadata}")
 
     return search_memory(
@@ -174,8 +209,9 @@ def search_memory_by_date(
         max_distance=max_distance,
         min_distance=min_distance,
         novel=novel,
-        username=username
+        username=username,
     )
+
 
 def get_memory_by_date(
     category,
@@ -187,7 +223,15 @@ def get_memory_by_date(
         filter_date = str(filter_date)
         if isinstance(filter_date, str):
             # List of date formats
-            date_formats = ['%Y-%m-%d', '%d/%m/%Y %H:%M:%S', '%m/%d/%Y', '%d-%m-%Y', '%d/%m/%Y', '%d-%m-%Y %H:%M:%S', '%Y-%m-%d %H:%M:%S']
+            date_formats = [
+                "%Y-%m-%d",
+                "%d/%m/%Y %H:%M:%S",
+                "%m/%d/%Y",
+                "%d-%m-%Y",
+                "%d/%m/%Y",
+                "%d-%m-%Y %H:%M:%S",
+                "%Y-%m-%d %H:%M:%S",
+            ]
 
             has_time = False  # Flag to track if the date format contains time
 
@@ -195,14 +239,24 @@ def get_memory_by_date(
             for date_format in date_formats:
                 try:
                     filter_date = datetime.datetime.strptime(filter_date, date_format)
-                    if '%H:%M:%S' in date_format and filter_date.time() != datetime.time(0, 0):  # Check if the date format contains time
+                    if (
+                        "%H:%M:%S" in date_format
+                        and filter_date.time() != datetime.time(0, 0)
+                    ):  # Check if the date format contains time
                         has_time = True
                     break
                 except ValueError:
                     continue
 
             # Calculate the timestamps for the start and end of filter_date
-            start_of_date = datetime.datetime(filter_date.year, filter_date.month, filter_date.day, filter_date.hour, filter_date.minute, filter_date.second)
+            start_of_date = datetime.datetime(
+                filter_date.year,
+                filter_date.month,
+                filter_date.day,
+                filter_date.hour,
+                filter_date.minute,
+                filter_date.second,
+            )
             logger.debug(f"start_of_date: {start_of_date}")
             if has_time:  # If the date format contains time, add an hour
                 end_of_date = start_of_date + datetime.timedelta(hours=1)
@@ -219,21 +273,29 @@ def get_memory_by_date(
             # memories.get(where={'$and': [{'created_at': {'$gte': start_timestamp}}, {'created_at': {'$lt': int(end_timestamp)}}]})
             # print(f"memories: {memories}")
 
-            #filter_metadata = {'created_at': {'$gte': start_timestamp}}
-            #filter_metadata = {'created_at': {'$lte': end_timestamp}}
+            # filter_metadata = {'created_at': {'$gte': start_timestamp}}
+            # filter_metadata = {'created_at': {'$lte': end_timestamp}}
             memories = get_client(username=username).get_or_create_collection(category)
             for memory in memories:
-                #print(f"memory: {memory}")
+                # print(f"memory: {memory}")
                 pass
-            results = memories.get(where={'$and': [{'created_at': {'$gt': start_timestamp}}, {'created_at': {'$lt': end_timestamp}}]})
-            #print(f"memories: {results}")
+            results = memories.get(
+                where={
+                    "$and": [
+                        {"created_at": {"$gt": start_timestamp}},
+                        {"created_at": {"$lt": end_timestamp}},
+                    ]
+                }
+            )
+            # print(f"memories: {results}")
             query = flatten_arrays(results)
-            #print(f"query: {query}")
+            # print(f"query: {query}")
 
             # convert the query response to list and return
             result_list = chroma_collection_to_list(query)
-            #print(f"result_list: {result_list}")
+            # print(f"result_list: {result_list}")
             return result_list
+
 
 def search_memory(
     category,
@@ -444,7 +506,9 @@ def get_memories(
     return memories
 
 
-def update_memory(category, id, text=None, metadata=None, embedding=None, username=None):
+def update_memory(
+    category, id, text=None, metadata=None, embedding=None, username=None
+):
     """
     Update a memory with new text and/or metadata.
 
@@ -473,7 +537,11 @@ def update_memory(category, id, text=None, metadata=None, embedding=None, userna
     if metadata is not None:
         # for each key value in metadata -- if the type is boolean, convert it to string
         for key, value in metadata.items():
-            if isinstance(value, bool) or isinstance(value, dict) or isinstance(value, list):
+            if (
+                isinstance(value, bool)
+                or isinstance(value, dict)
+                or isinstance(value, list)
+            ):
                 debug_log(f"WARNING: Boolean metadata field {key} converted to string")
                 metadata[key] = str(value)
     else:
@@ -555,7 +623,9 @@ def delete_memories(category, document=None, metadata=None, username=None):
     return True
 
 
-def delete_similar_memories(category, content, similarity_threshold=0.95, username=None):
+def delete_similar_memories(
+    category, content, similarity_threshold=0.95, username=None
+):
     """
     Search for memories that are similar to the item that contains the content and removes it.
 
@@ -694,6 +764,7 @@ def wipe_all_memories(username=None):
         client.delete_collection(collection.name)
 
     debug_log("Wiped all memories", type="system")
+
 
 def stop_database(username=None):
     """

@@ -20,29 +20,33 @@ parameters = {
         "pip_packages": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "The list of pip packages to be installed before executing the code."
+            "description": "The list of pip packages to be installed before executing the code.",
         },
     },
-    "required": ['content'],
+    "required": ["content"],
 }
 
-async def run_python_code(content, pip_packages=[], previous_content='', username=None):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, sync_run_python_code, content, pip_packages, previous_content, username)
 
-def sync_run_python_code(content, pip_packages=[], previous_content='', username=None):
+async def run_python_code(content, pip_packages=[], previous_content="", username=None):
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        None, sync_run_python_code, content, pip_packages, previous_content, username
+    )
+
+
+def sync_run_python_code(content, pip_packages=[], previous_content="", username=None):
     # convert the email to a name without special characters to name our container
     # Convert non-ASCII characters to ASCII
     name = unidecode(username)
     # replace spaces and @ with underscores
-    name = name.replace(' ', '_')
-    name = name.replace('@', '_')
-    name = name.replace('.', '_')
+    name = name.replace(" ", "_")
+    name = name.replace("@", "_")
+    name = name.replace(".", "_")
     # lowercase the name
     username = name.lower()
 
-    if (previous_content != ''):
-        new_content = previous_content + '\n' + content
+    if previous_content != "":
+        new_content = previous_content + "\n" + content
     else:
         new_content = content
 
@@ -52,13 +56,13 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         client = docker.from_env()
 
         # Define the path where you want to store media on the host
-        host_path = os.path.join(os.getcwd(), 'users', username, 'data')
+        host_path = os.path.join(os.getcwd(), "users", username, "data")
 
         # Define the path inside the container where you will save media
-        container_path = '/data'
+        container_path = "/data"
 
         # Define the volume
-        volumes = {host_path: {'bind': container_path, 'mode': 'rw'}}
+        volumes = {host_path: {"bind": container_path, "mode": "rw"}}
 
         # Remove existing container with the same name
         for c in client.containers.list(all=True):
@@ -66,26 +70,31 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
                 c.remove(force=True)
 
         # Start a new container with the volume
-        container = client.containers.run("python-env", name=username, detach=True, tty=True, volumes=volumes)
+        container = client.containers.run(
+            "python-env", name=username, detach=True, tty=True, volumes=volumes
+        )
 
-        pip_string = ''
+        pip_string = ""
         # Install pip packages in the container
         for package in pip_packages:
-            pip_install_result = container.exec_run(f'pip install {package}')
+            pip_install_result = container.exec_run(f"pip install {package}")
             if pip_install_result.exit_code != 0:
-                return {'error': 'Failed to install package: ' + pip_install_result.output.decode('utf-8')}
+                return {
+                    "error": "Failed to install package: "
+                    + pip_install_result.output.decode("utf-8")
+                }
             else:
-                pip_string += f'successfully installed package: {package}\n'
+                pip_string += f"successfully installed package: {package}\n"
 
         # Execute the code in the container
         exec_result = container.exec_run(f'python3 -c "{new_content}"')
-        output = exec_result.output.decode('utf-8')[:2000]
-        
+        output = exec_result.output.decode("utf-8")[:2000]
+
         # Prepare the response
         response = {
-            'pip': pip_string,
-            'output': output, 
-            'exit_code': exec_result.exit_code
+            "pip": pip_string,
+            "output": output,
+            "exit_code": exec_result.exit_code,
         }
 
         # Remove the container
@@ -94,7 +103,8 @@ def sync_run_python_code(content, pip_packages=[], previous_content='', username
         return response
 
     except Exception as e:
-        return {'error': str(e)}
+        return {"error": str(e)}
+
 
 def escape_string(s):
     s = s.replace("\\", "\\\\")

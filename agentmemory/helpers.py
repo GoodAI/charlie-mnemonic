@@ -7,6 +7,7 @@ load_dotenv()
 
 DEBUG = os.getenv("DEBUG", "false") == "true" or os.getenv("DEBUG", "false") == "True"
 
+
 def strip_embeddings(value):
     if isinstance(value, dict):
         value = value.copy()
@@ -59,11 +60,10 @@ def chroma_collection_to_list(collection):
 
     dict_list = []
 
-
     # check if collection is a list
     if isinstance(collection, list):
         return collection
-    
+
     # If there are no embeddings, zip metadatas, documents and ids together
     if collection.get("embeddings", None) is None:
         for metadata, document, id in zip(

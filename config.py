@@ -17,5 +17,5 @@ api_keys = {
     "house_api_url": os.getenv("HOUSE_API_URL"),
     "house_api_key": os.getenv("HOUSE_API_KEY"),
     "elevenlabs": os.getenv("ELEVENLABS_API_KEY"),
-    "d-id": os.getenv("D_ID_API_KEY")
+    "d-id": os.getenv("D_ID_API_KEY"),
 }

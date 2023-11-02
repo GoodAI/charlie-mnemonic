@@ -2,16 +2,18 @@ import logging
 import os
 import codecs
 
+
 class SafeFileHandler(logging.FileHandler):
     def _open(self):
-        return codecs.open(self.baseFilename, self.mode, 'utf-8')
+        return codecs.open(self.baseFilename, self.mode, "utf-8")
 
     def emit(self, record):
         try:
             super().emit(record)
         except UnicodeEncodeError:
-            record.msg = record.msg.encode('utf-8', errors='replace').decode('utf-8')
+            record.msg = record.msg.encode("utf-8", errors="replace").decode("utf-8")
             super().emit(record)
+
 
 class Log:
     def __init__(self, logger_name, log_file):
@@ -22,7 +24,7 @@ class Log:
         self.logger.setLevel(logging.DEBUG)
 
         # Specify the directory where the log files will be saved
-        log_dir = 'logs'
+        log_dir = "logs"
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 
@@ -32,7 +34,9 @@ class Log:
         f_handler.setLevel(logging.DEBUG)
 
         # Create formatter and add it to handler
-        f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s - [%(filename)s:%(lineno)d]')
+        f_format = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s - [%(filename)s:%(lineno)d]"
+        )
         f_handler.setFormatter(f_format)
 
         # Add handler to the logger

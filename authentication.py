@@ -8,10 +8,11 @@ from database import Database
 import logs
 from unidecode import unidecode
 
-logger = logs.Log('authentication', 'authentication.log').get_logger()
+logger = logs.Log("authentication", "authentication.log").get_logger()
 
-DATABASE_URL = os.environ['DATABASE_URL']
-PRODUCTION = os.environ['PRODUCTION']
+DATABASE_URL = os.environ["DATABASE_URL"]
+PRODUCTION = os.environ["PRODUCTION"]
+
 
 class Authentication:
     def __init__(self):
@@ -23,7 +24,10 @@ class Authentication:
             hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
             hashed_password_str = hashed_password.decode("utf-8")
             session_token = binascii.hexlify(os.urandom(24)).decode()
-            self.db.cursor.execute("INSERT INTO users (username, password, session_token, display_name) VALUES (%s, %s, %s, %s)", (username, hashed_password_str, session_token, display_name))
+            self.db.cursor.execute(
+                "INSERT INTO users (username, password, session_token, display_name) VALUES (%s, %s, %s, %s)",
+                (username, hashed_password_str, session_token, display_name),
+            )
             self.db.conn.commit()
             return session_token
         except psycopg2.IntegrityError:
@@ -39,7 +43,9 @@ class Authentication:
 
     def login(self, username, password):
         self.db.open()
-        self.db.cursor.execute("SELECT password FROM users WHERE username = %s", (username,))
+        self.db.cursor.execute(
+            "SELECT password FROM users WHERE username = %s", (username,)
+        )
         result = self.db.cursor.fetchone()
 
         if result is None:
@@ -56,58 +62,88 @@ class Authentication:
         # If password is correct, generate a session token
         session_token = binascii.hexlify(os.urandom(24)).decode()
         # Store the session token in the database
-        self.db.cursor.execute("UPDATE users SET session_token = %s WHERE username = %s", (session_token, username))
+        self.db.cursor.execute(
+            "UPDATE users SET session_token = %s WHERE username = %s",
+            (session_token, username),
+        )
         self.db.conn.commit()
         self.db.close()
-        logger.debug(f'User: {username} - Session token: {session_token}')
+        logger.debug(f"User: {username} - Session token: {session_token}")
         # Return the session token
         return session_token
-    
+
     def convert_name(self, name):
         # Convert non-ASCII characters to ASCII
         name = unidecode(name)
         # replace spaces with underscores
-        name = name.replace(' ', '_')
+        name = name.replace(" ", "_")
         # lowercase the name
         return name.lower()
-    
+
     def google_login(self, id_info):
-        display_name, google_id, username = id_info['name'], id_info['sub'], id_info['email']
+        display_name, google_id, username = (
+            id_info["name"],
+            id_info["sub"],
+            id_info["email"],
+        )
         session_token = binascii.hexlify(os.urandom(24)).decode()
-        hashed_password_str = bcrypt.hashpw(session_token.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+        hashed_password_str = bcrypt.hashpw(
+            session_token.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
 
         self.db.open()
-        self.db.cursor.execute("SELECT username, id FROM users WHERE username = %s OR google_id = %s", (username, google_id))
+        self.db.cursor.execute(
+            "SELECT username, id FROM users WHERE username = %s OR google_id = %s",
+            (username, google_id),
+        )
         user = self.db.cursor.fetchone()
 
         if user is None:
             # If the user doesn't exist, create a new user
-            self.db.cursor.execute("""
+            self.db.cursor.execute(
+                """
                 INSERT INTO users (google_id, username, password, session_token, has_access, role, display_name)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (google_id, username, hashed_password_str, session_token, False, 'user', display_name))
+            """,
+                (
+                    google_id,
+                    username,
+                    hashed_password_str,
+                    session_token,
+                    False,
+                    "user",
+                    display_name,
+                ),
+            )
         else:
             # If the user exists, update the session token and google_id
-            self.db.cursor.execute("""
+            self.db.cursor.execute(
+                """
                 UPDATE users SET google_id = %s, session_token = %s, password = %s WHERE username = %s OR google_id = %s
-            """, (google_id, session_token, hashed_password_str, username, google_id))
+            """,
+                (google_id, session_token, hashed_password_str, username, google_id),
+            )
 
         self.db.conn.commit()
         self.db.close()
-        logger.debug(f'User: {username} - Session token: {session_token}')
+        logger.debug(f"User: {username} - Session token: {session_token}")
         return session_token
 
-        
     def logout(self, username, session_token):
         self.db.open()
-        self.db.cursor.execute("SELECT session_token FROM users WHERE username = %s", (username,))
+        self.db.cursor.execute(
+            "SELECT session_token FROM users WHERE username = %s", (username,)
+        )
         result = self.db.cursor.fetchone()
 
         if result is not None:
             stored_token = result[0]
             if stored_token == session_token:
                 # If the session token is correct, delete it from the database
-                self.db.cursor.execute("UPDATE users SET session_token = '' WHERE username = %s", (username,))
+                self.db.cursor.execute(
+                    "UPDATE users SET session_token = '' WHERE username = %s",
+                    (username,),
+                )
                 self.db.conn.commit()
                 self.db.close()
                 return True
@@ -117,10 +153,12 @@ class Authentication:
             return False
 
     def check_token(self, username, session_token):
-        if session_token == '':
+        if session_token == "":
             return False
         self.db.open()
-        self.db.cursor.execute("SELECT session_token FROM users WHERE username = %s", (username,))
+        self.db.cursor.execute(
+            "SELECT session_token FROM users WHERE username = %s", (username,)
+        )
         result = self.db.cursor.fetchone()
 
         if result is not None:
@@ -129,6 +167,7 @@ class Authentication:
             if stored_token == session_token:
                 return True
         return False
+
 
 if __name__ == "__main__":
     auth = Authentication()

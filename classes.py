@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -58,8 +58,8 @@ class noTokenMessage(BaseModel):
 class editSettings(BaseModel):
     username: str
     category: str
-    setting: str
-    value: Union[str, int, bool]
+    setting: Union[str, Dict[str, Any]]
+    value: Union[str, int, bool, None]
 
 
 class AsciiColors:

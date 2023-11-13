@@ -498,7 +498,12 @@ async def handle_update_settings(request: Request, user: editSettings):
     with open(settings_file, "r") as f:
         settings = json.load(f)
     if user.category in settings:
-        if user.setting in settings[user.category]:
+        if isinstance(user.setting, dict):
+            # iterate over the dictionary
+            for key, value in user.setting.items():
+                # update the settings
+                settings[user.category][key] = value
+        elif user.setting in settings[user.category]:
             if str(user.value).lower() == "true":
                 settings[user.category][user.setting] = True
             elif str(user.value).lower() == "false":
@@ -563,7 +568,7 @@ async def handle_message(
     success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    if count_tokens(message.prompt) > 1000:
+    if count_tokens(message.prompt) > 100000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     (
         total_tokens_used,
@@ -660,9 +665,7 @@ async def handle_message_image(
 
 
 @router.post("/get_recent_messages/")
-async def get_recent_messages(
-    request: Request, message: UserName, background_tasks: BackgroundTasks = None
-):
+async def get_recent_messages(request: Request, message: UserName):
     session_token = request.cookies.get("session_token")
     auth = Authentication()
     success = auth.check_token(message.username, session_token)
@@ -720,7 +723,7 @@ async def handle_message_no_modules(
         }
     ]
     response = await openai_response.get_response(messages)
-    return response["choices"][0]["message"]["content"]
+    return response.choices[0].message.content
 
 
 # message route with audio

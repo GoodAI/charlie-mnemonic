@@ -414,7 +414,12 @@ class MemoryManager:
         parts = self.process_category_query(subject)
 
         if len(parts) < 1:
-            logger.error("Error: parts does not contain the required elements")
+            logger.error(
+                "Error: parts does not contain the required elements: "
+                + str(parts)
+                + "query: "
+                + str(subject)
+            )
             process_dict["error"] = "parts does not contain the required elements"
         else:
             for part in parts:
@@ -615,9 +620,16 @@ class MemoryManager:
         return result
 
     async def note_taking(
-        self, content, message, user_dir, username, show=True, verbose=False
+        self,
+        content,
+        message,
+        user_dir,
+        username,
+        show=True,
+        verbose=False,
+        tokens_notes=1000,
     ):
-        max_tokens = 1000
+        max_tokens = tokens_notes
         process_dict = {
             "actions": [],
             "content": content,
@@ -759,21 +771,22 @@ class MemoryManager:
             and "content" in query["choices"][0]["message"]
         ):
             # parse the query as json
+            query_string = query["choices"][0]["message"]["content"].replace("\n", " ")
+            query_string = (
+                query_string.replace("```json", "").replace("```", "").strip()
+            )
             try:
-                query_string = query["choices"][0]["message"]["content"].replace(
-                    "\n", "\\n"
-                )
+                query_json = json.loads(query_string)
+            except json.JSONDecodeError:
                 if not query_string.startswith("["):
                     query_string = "[" + query_string
                 if not query_string.endswith("]"):
                     query_string = query_string + "]"
-                query_json = json.loads(query_string)
-            except:
-                logger.error(
-                    "Error: query is not valid json: "
-                    + query["choices"][0]["message"]["content"]
-                )
-                return actions
+                try:
+                    query_json = json.loads(query_string)
+                except:
+                    logger.error("Error: query is not valid json: " + query_string)
+                    return actions
 
             if isinstance(query_json, list):
                 for action_dict in query_json:

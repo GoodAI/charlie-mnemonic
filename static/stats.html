@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <title>Admin Panel</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
@@ -8,12 +9,14 @@
         .small-font {
             font-size: 0.5em;
         }
+
         #myChart {
             width: 100%;
             height: 20vh;
         }
     </style>
 </head>
+
 <body>
     <div class="container mt-4">
         <div class="card">
@@ -33,38 +36,43 @@
                         </thead>
                         <tbody>
                             <form method="post" action="/admin/update_controls">
-                            <tr>
+                                <tr>
                                     <td>
                                         <input type="hidden" name="id" value="{{ admin_controls.id }}">
-                                        <input type="text" name="daily_spending_limit" value="{{ admin_controls.daily_spending_limit }}">
+                                        <input type="text" name="daily_spending_limit"
+                                            value="{{ admin_controls.daily_spending_limit }}">
                                     </td>
                                     <td>
                                         <select name="allow_access">
-                                            <option value="yes" {% if admin_controls.allow_access == True %}selected{% endif %}>Yes</option>
-                                            <option value="no" {% if admin_controls.allow_access == False %}selected{% endif %}>No</option>
+                                            <option value="yes" {% if admin_controls.allow_access==True %}selected{%
+                                                endif %}>Yes</option>
+                                            <option value="no" {% if admin_controls.allow_access==False %}selected{%
+                                                endif %}>No</option>
                                         </select>
                                     </td>
                                     <td>
                                         <select name="maintenance">
-                                            <option value="yes" {% if admin_controls.maintenance == True %}selected{% endif %}>Yes</option>
-                                            <option value="no" {% if admin_controls.maintenance == False %}selected{% endif %}>No</option>
+                                            <option value="yes" {% if admin_controls.maintenance==True %}selected{%
+                                                endif %}>Yes</option>
+                                            <option value="no" {% if admin_controls.maintenance==False %}selected{%
+                                                endif %}>No</option>
                                         </select>
                                     </td>
                                     <td>
                                         <input type="submit" value="Reboot">
                                     </td>
-                            </tr>
-                            <tr>
-                                <td colspan="4">
-                                    <input type="submit" value="Update">
-                                </td>
-                            </tr>
-                        </form>
+                                </tr>
+                                <tr>
+                                    <td colspan="4">
+                                        <input type="submit" value="Update">
+                                    </td>
+                                </tr>
+                            </form>
                         </tbody>
                     </table>
                 </div>
             </div>
-            
+
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">Global Statistics</h5>
             </div>
@@ -130,13 +138,17 @@
                                 <td>
                                     <form method="post" action="/admin/update_user/{{ row.user_id }}">
                                         <select name="has_access">
-                                            <option value="true" {% if row.has_access == True %}selected{% endif %}>Yes</option>
-                                            <option value="false" {% if row.has_access == False %}selected{% endif %}>No</option>
+                                            <option value="true" {% if row.has_access==True %}selected{% endif %}>Yes
+                                            </option>
+                                            <option value="false" {% if row.has_access==False %}selected{% endif %}>No
+                                            </option>
                                         </select>
                                         <select name="role">
-                                            <option value="admin" {% if row.role == 'admin' %}selected{% endif %}>Admin</option>
-                                            <option value="mod" {% if row.role == 'mod' %}selected{% endif %}>Mod</option>
-                                            <option value="user" {% if row.role == 'user' %}selected{% endif %}>User</option>
+                                            <option value="admin" {% if row.role=='admin' %}selected{% endif %}>Admin
+                                            </option>
+                                            <option value="mod" {% if row.role=='mod' %}selected{% endif %}>Mod</option>
+                                            <option value="user" {% if row.role=='user' %}selected{% endif %}>User
+                                            </option>
                                         </select>
                                         <input type="submit" value="Update">
                                     </form>
@@ -151,16 +163,18 @@
                     <ul class="pagination">
                         <!-- Add buttons for previous page -->
                         <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                            <a class="page-link" href="{% if page > 1 %}{{ url_for('get_statistics', page=page-1) }}{% else %}#{% endif %}" tabindex="-1">Previous</a>
+                            <a class="page-link"
+                                href="{% if page > 1 %}{{ url_for('get_statistics', page=page-1) }}{% else %}#{% endif %}"
+                                tabindex="-1">Previous</a>
                         </li>
-                
+
                         <!-- Add page numbers -->
                         {% for i in range(1, total_pages + 1) %}
                         <li class="page-item {% if page == i %}active{% endif %}">
                             <a class="page-link" href="{{ url_for('get_statistics', page=i) }}">{{ i }}</a>
                         </li>
                         {% endfor %}
-                
+
                         <!-- Add buttons for next page -->
                         <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
                             <a class="page-link" href="{{ url_for('get_statistics', page=page+1) }}">Next</a>
@@ -173,8 +187,8 @@
     <script>
         var rawData = JSON.parse('{{ chart_data | safe }}'.replace(/\\"/g, '"'));
         var ctx = document.getElementById('myChart').getContext('2d');
-        var chartLabels = rawData.map(function(row) { return row.username; });
-        var chartData = rawData.map(function(row) { return row.amount_of_messages; });
+        var chartLabels = rawData.map(function (row) { return row.username; });
+        var chartData = rawData.map(function (row) { return row.amount_of_messages; });
         var myChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -188,42 +202,43 @@
             // rest of the code
         });
 
-        document.getElementById('amount_of_messages').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.amount_of_messages; });
+        document.getElementById('amount_of_messages').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.amount_of_messages; });
             myChart.data.datasets[0].label = 'Amount of Messages';
             myChart.update();
         });
 
-        document.getElementById('total_tokens_used').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.total_tokens_used; });
+        document.getElementById('total_tokens_used').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.total_tokens_used; });
             myChart.data.datasets[0].label = 'Total Tokens Used';
             myChart.update();
         });
 
-        document.getElementById('prompt_tokens').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.prompt_tokens; });
+        document.getElementById('prompt_tokens').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.prompt_tokens; });
             myChart.data.datasets[0].label = 'Prompt Tokens Used';
             myChart.update();
         });
 
-        document.getElementById('completion_tokens').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.completion_tokens; });
+        document.getElementById('completion_tokens').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.completion_tokens; });
             myChart.data.datasets[0].label = 'Completion Tokens Used';
             myChart.update();
         });
 
-        document.getElementById('voice_usage').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.voice_usage; });
+        document.getElementById('voice_usage').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.voice_usage; });
             myChart.data.datasets[0].label = 'Voice Usage';
             myChart.update();
         });
 
-        document.getElementById('total_spending_count').addEventListener('click', function() {
-            myChart.data.datasets[0].data = rawData.map(function(row) { return row.total_spending_count; });
+        document.getElementById('total_spending_count').addEventListener('click', function () {
+            myChart.data.datasets[0].data = rawData.map(function (row) { return row.total_spending_count; });
             myChart.data.datasets[0].label = 'Total Spending Count';
             myChart.update();
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
 </body>
+
 </html>

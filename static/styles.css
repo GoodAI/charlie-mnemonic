@@ -389,6 +389,7 @@ pre {
     padding: 15px;
     border-radius: 5px;
     overflow: auto;
+    color:#111;
 }
 
 .language {

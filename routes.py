@@ -568,7 +568,9 @@ async def handle_message(
     success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    if count_tokens(message.prompt) > 100000:
+    with open(os.path.join(users_dir, message.username, "settings.json"), "r") as f:
+        settings = json.load(f)
+    if count_tokens(message.prompt) > settings["memory"]["output"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     (
         total_tokens_used,

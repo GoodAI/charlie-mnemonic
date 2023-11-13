@@ -998,19 +998,6 @@ class SettingsManager:
         return settings
 
 
-async def start_reasoning(full_message, message, username, users_dir):
-    """Process a question and let the AGI work until it finds an answer"""
-    # 1. parse the full message and the message
-    messages = [
-        {"role": "system", "content": prompts.reasoning_system_prompt},
-        {"role": "user", "content": f"{full_message}"},
-    ]
-    # 2. ask the llm to find an answer and do it step by step
-    # 3. parse step 1 and 2 together and ask the AGI if it needs additional steps or information, ask it to fix errors if needed
-    # 4. repeat step 3 until the llm is done
-    # 5. return the answer
-
-
 async def process_message(
     og_message,
     username,
@@ -1055,8 +1042,6 @@ async def process_message(
 
     message = display_name + ": " + og_message
 
-    # old_kw_brain = await BrainProcessor.load_brain(username, users_dir)
-
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
     # If the user doesn't exist in the dictionary, add them
     if username not in last_messages:
@@ -1083,14 +1068,10 @@ async def process_message(
     else:
         last_messages_string = ""
 
-    # brainManager = BrainManager()
-    # results = await brainManager.run(message, last_messages_string, username, users_dir)
-
     # combine last messages to a string and add the current message to the end
     all_messages = last_messages_string + "\n" + message
 
     message_tokens = MessageParser.num_tokens_from_string(all_messages, "gpt-4")
-    # print(f"message_tokens: {message_tokens}")
     token_usage += message_tokens
     remaining_tokens = max_token_usage - token_usage
     logger.debug(f"1. remaining_tokens: {remaining_tokens}")
@@ -1217,7 +1198,6 @@ async def process_message(
         response = await start_chain_thoughts(
             full_message, og_message, username, users_dir, tokens_output
         )
-        # response = await start_AGI(full_message, og_message, username, users_dir)
     else:
         response = await generate_response(
             full_message, og_message, username, users_dir, tokens_output
@@ -1284,6 +1264,7 @@ async def start_chain_thoughts(
         function_metadata,
         username,
         users_dir,
+        max_tokens_allowed,
     )
     await MessageSender.send_debug(
         f"cot_response: {cot_response}", 1, "green", username
@@ -1329,6 +1310,7 @@ async def generate_response(
         function_metadata,
         username,
         users_dir,
+        max_allowed_tokens,
     )
     return final_response
 
@@ -1341,8 +1323,8 @@ async def process_chain_thoughts(
     function_metadata,
     username,
     users_dir,
+    max_allowed_tokens,
 ):
-    # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
     response = full_response["choices"][0]["message"]
     # if its a function call anyway, process it
     if "function_call" in response:
@@ -1437,12 +1419,14 @@ async def process_chain_thoughts(
             steps_string = f"Plan: {plan}\nresponse: {response_str}\n"
 
         return await summarize_cot_responses(
-            steps_string, message, og_message, username, users_dir
+            steps_string, message, og_message, username, users_dir, max_allowed_tokens
         )
 
     else:
         return final_response
-        # wait start_chain_thoughts(message, og_message, username, users_dir)
+        # return await summarize_cot_responses(
+        #     final_response, message, og_message, username, users_dir, max_allowed_tokens
+        # )
 
 
 async def process_cot_messages(
@@ -1512,7 +1496,7 @@ async def process_cot_messages(
 
 
 async def summarize_cot_responses(
-    steps_string, message, og_message, username, users_dir
+    steps_string, message, og_message, username, users_dir, max_allowed_tokens
 ):
     global COT_RETRIES
     global last_messages
@@ -1523,7 +1507,7 @@ async def summarize_cot_responses(
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
-    if COT_RETRIES[username] >= 1:
+    if COT_RETRIES[username] >= 2:
         await MessageSender.send_debug(
             f"Too many CoT retries, skipping...", 1, "red", username
         )
@@ -1544,7 +1528,7 @@ async def summarize_cot_responses(
         ]
 
     openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
+        openai_model, temperature, max_allowed_tokens, max_responses, username
     )
     response = await openai_response.get_response(
         username, messages, function_metadata=function_metadata
@@ -1560,7 +1544,7 @@ async def summarize_cot_responses(
     else:
         COT_RETRIES[username] += 1
         return await process_final_message(
-            message, og_message, response, username, users_dir
+            message, og_message, response, username, users_dir, max_allowed_tokens
         )
 
 
@@ -1616,7 +1600,9 @@ async def process_function_reply(
         return final_response
 
 
-async def process_final_message(message, og_message, response, username, users_dir):
+async def process_final_message(
+    message, og_message, response, username, users_dir, max_allowed_tokens
+):
     if response.startswith("YES: "):
         # remove the YES: part
         response = await response[5:]
@@ -1647,7 +1633,9 @@ async def process_final_message(message, og_message, response, username, users_d
     await MessageSender.send_debug(f"{full_message}", 1, "cyan", username)
 
     # response = generate_response(messages, function_dict, function_metadata)
-    response = await start_chain_thoughts(full_message, og_message, username, users_dir)
+    response = await start_chain_thoughts(
+        full_message, og_message, username, users_dir, max_allowed_tokens
+    )
 
     fc_check = None
     try:

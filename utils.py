@@ -15,7 +15,6 @@ import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
 from elevenlabs import generate, play, set_api_key
 from werkzeug.utils import secure_filename
-import routes
 from pathlib import Path
 from config import api_keys
 from database import Database
@@ -47,6 +46,9 @@ class MessageSender:
     @staticmethod
     async def send_debug(message, number, color, username):
         """Send a debug message to the user and print it to the console with a color"""
+        from importlib import import_module
+
+        routes = import_module("routes")
         if number <= 2:
             message = f"{'-' * 50}\n{message}\n{'-' * 50}"
             new_message = {"debug": number, "color": color, "message": message}
@@ -60,6 +62,9 @@ class MessageSender:
     @staticmethod
     async def send_message(message, color, username):
         """Send a message to the user and print it to the console with a color"""
+        from importlib import import_module
+
+        routes = import_module("routes")
         await routes.send_debug_message(username, json.dumps(message))
         # print the message to the console with the color
         # print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
@@ -179,6 +184,18 @@ class AddonManager:
             "system_prompt": {"system_prompt": "Not implemented yet"},
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
+            "memory": {
+                "functions": 500,
+                "ltm1": 1000,
+                "ltm2": 1000,
+                "episodic": 300,
+                "recent": 700,
+                "notes": 1000,
+                "input": 1000,
+                "output": 1000,
+                "max_tokens": 6500,
+                "min_tokens": 500,
+            },
         }
 
         name = unidecode(username)
@@ -981,19 +998,6 @@ class SettingsManager:
         return settings
 
 
-async def start_reasoning(full_message, message, username, users_dir):
-    """Process a question and let the AGI work until it finds an answer"""
-    # 1. parse the full message and the message
-    messages = [
-        {"role": "system", "content": prompts.reasoning_system_prompt},
-        {"role": "user", "content": f"{full_message}"},
-    ]
-    # 2. ask the llm to find an answer and do it step by step
-    # 3. parse step 1 and 2 together and ask the AGI if it needs additional steps or information, ask it to fix errors if needed
-    # 4. repeat step 3 until the llm is done
-    # 5. return the answer
-
-
 async def process_message(
     og_message,
     username,
@@ -1006,9 +1010,24 @@ async def process_message(
     global last_messages
     if display_name is None:
         display_name = username
-    # 1k tokens for the prompt, 1k tokens for the completion, 1k tokens for the permanent memory/notes, 100 tokens for preset prompts
-    max_token_usage = 4700
-    token_usage = 0
+
+    # load the setting for the user
+    settings = await SettingsManager.load_settings(users_dir, username)
+
+    # Retrieve memory settings
+    memory_settings = settings.get("memory", {})
+
+    # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
+    token_usage = 500
+    # Extract individual settings with defaults if not found
+    max_token_usage = 6500
+    tokens_active_brain = memory_settings.get("ltm1", 1000)
+    tokens_cat_brain = memory_settings.get("ltm2", 700)
+    tokens_episodic_memory = memory_settings.get("episodic", 650)
+    tokens_recent_messages = memory_settings.get("recent", 650)
+    tokens_notes = memory_settings.get("notes", 1000)
+    tokens_input = memory_settings.get("input", 1000)
+    tokens_output = memory_settings.get("output", 1000)
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(
@@ -1021,12 +1040,7 @@ async def process_message(
     logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
 
-    # load the setting for the user
-    settings = await SettingsManager.load_settings(users_dir, username)
-
     message = display_name + ": " + og_message
-
-    # old_kw_brain = await BrainProcessor.load_brain(username, users_dir)
 
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
     # If the user doesn't exist in the dictionary, add them
@@ -1042,49 +1056,57 @@ async def process_message(
     last_messages_tokens = MessageParser.num_tokens_from_string(
         last_messages_string, "gpt-4"
     )
-    logger.debug(f"last_messages_tokens: {last_messages_tokens}")
-    while last_messages_tokens > 1000:
-        last_messages[username].pop(0)
-        last_messages_string = "\n".join(last_messages[username][-10:])
-        last_messages_tokens = MessageParser.num_tokens_from_string(
-            last_messages_string, "gpt-4"
-        )
-        logger.debug(f"new last_messages_tokens: {last_messages_tokens}")
-
-    # brainManager = BrainManager()
-    # results = await brainManager.run(message, last_messages_string, username, users_dir)
+    if tokens_recent_messages > 100:
+        logger.debug(f"last_messages_tokens: {last_messages_tokens}")
+        while last_messages_tokens > tokens_recent_messages:
+            last_messages[username].pop(0)
+            last_messages_string = "\n".join(last_messages[username][-10:])
+            last_messages_tokens = MessageParser.num_tokens_from_string(
+                last_messages_string, "gpt-4"
+            )
+            logger.debug(f"new last_messages_tokens: {last_messages_tokens}")
+    else:
+        last_messages_string = ""
 
     # combine last messages to a string and add the current message to the end
     all_messages = last_messages_string + "\n" + message
 
     message_tokens = MessageParser.num_tokens_from_string(all_messages, "gpt-4")
-    # print(f"message_tokens: {message_tokens}")
     token_usage += message_tokens
     remaining_tokens = max_token_usage - token_usage
     logger.debug(f"1. remaining_tokens: {remaining_tokens}")
     verbose = settings.get("verbose").get("verbose")
     memory = _memory.MemoryManager()
-    (
-        kw_brain_string,
-        token_usage_active_brain,
-        unique_results1,
-    ) = await memory.process_active_brain(
-        f"{message}", username, all_messages, remaining_tokens, verbose
-    )
+    if tokens_active_brain > 100:
+        (
+            kw_brain_string,
+            token_usage_active_brain,
+            unique_results1,
+        ) = await memory.process_active_brain(
+            f"{message}", username, all_messages, tokens_active_brain, verbose
+        )
+    else:
+        kw_brain_string = ""
+        token_usage_active_brain = 0
+        unique_results1 = set()
 
     token_usage += token_usage_active_brain
     remaining_tokens = remaining_tokens - token_usage_active_brain
     logger.debug(f"2. remaining_tokens: {remaining_tokens}")
 
-    episodic_memory, timezone = await memory.process_episodic_memory(
-        f"{message}", username, all_messages, remaining_tokens, verbose
-    )
-    if episodic_memory is None or episodic_memory == "":
-        episodic_memory_string = ""
-    else:
-        episodic_memory_string = (
-            f"""Episodic Memory of {timezone}:\n{episodic_memory}\n"""
+    if tokens_episodic_memory > 100:
+        episodic_memory, timezone = await memory.process_episodic_memory(
+            f"{message}", username, all_messages, tokens_episodic_memory, verbose
         )
+        if episodic_memory is None or episodic_memory == "":
+            episodic_memory_string = ""
+        else:
+            episodic_memory_string = (
+                f"""Episodic Memory of {timezone}:\n{episodic_memory}\n"""
+            )
+    else:
+        episodic_memory_string = ""
+
     episodic_memory_tokens = MessageParser.num_tokens_from_string(
         episodic_memory_string, "gpt-4"
     )
@@ -1092,33 +1114,40 @@ async def process_message(
     remaining_tokens = remaining_tokens - episodic_memory_tokens
     logger.debug(f"3. remaining_tokens: {remaining_tokens}")
 
-    (
-        results,
-        token_usage_relevant_memory,
-        unique_results2,
-    ) = await memory.process_incoming_memory(
-        None, f"{message}", username, remaining_tokens, verbose
-    )
-    merged_results_dict = {
-        id: (document, distance, formatted_date)
-        for id, document, distance, formatted_date in unique_results1.union(
-            unique_results2
+    if tokens_cat_brain > 100:
+        (
+            results,
+            token_usage_relevant_memory,
+            unique_results2,
+        ) = await memory.process_incoming_memory(
+            None, f"{message}", username, tokens_cat_brain, verbose
         )
-    }
-    merged_results_list = [
-        (id, document, distance, formatted_date)
-        for id, (document, distance, formatted_date) in merged_results_dict.items()
-    ]
-    merged_results_list.sort(key=lambda x: int(x[0]))
+        merged_results_dict = {
+            id: (document, distance, formatted_date)
+            for id, document, distance, formatted_date in unique_results1.union(
+                unique_results2
+            )
+        }
+        merged_results_list = [
+            (id, document, distance, formatted_date)
+            for id, (document, distance, formatted_date) in merged_results_dict.items()
+        ]
+        merged_results_list.sort(key=lambda x: int(x[0]))
 
-    # Create the result string
-    merged_result_string = "\n".join(
-        f"({id}){formatted_date} - {document} (score: {distance})"
-        for id, document, distance, formatted_date in merged_results_list
-    )
+        # Create the result string
+        merged_result_string = "\n".join(
+            f"({id}){formatted_date} - {document} (score: {distance})"
+            for id, document, distance, formatted_date in merged_results_list
+        )
+    else:
+        results = ""
+        token_usage_relevant_memory = 0
+        merged_result_string = ""
+
     token_usage += token_usage_relevant_memory
     remaining_tokens = remaining_tokens - token_usage_relevant_memory
     logger.debug(f"4. remaining_tokens: {remaining_tokens}")
+    print(f"4. remaining_tokens: {remaining_tokens}")
 
     # process the results
     history_string = results
@@ -1128,13 +1157,17 @@ async def process_message(
         f"""{episodic_memory_string}\nObservations:\n{observations}\n"""
     )
 
-    notes = await memory.note_taking(
-        all_messages, message, users_dir, username, False, verbose
-    )
+    if tokens_notes > 100:
+        notes = await memory.note_taking(
+            all_messages, message, users_dir, username, False, verbose, tokens_notes
+        )
 
-    if notes is not None or notes != "":
-        notes_string = prompts.notes_string.format(notes)
-        instruction_string += notes_string
+        if notes is not None or notes != "":
+            notes_string = prompts.notes_string.format(notes)
+            instruction_string += notes_string
+    else:
+        notes = ""
+        notes_string = ""
 
     # kw_brain_string = old_kw_brain
 
@@ -1163,12 +1196,11 @@ async def process_message(
     logger.debug(f"is_cot_enabled: {is_cot_enabled}")
     if is_cot_enabled:
         response = await start_chain_thoughts(
-            full_message, og_message, username, users_dir
+            full_message, og_message, username, users_dir, tokens_output
         )
-        # response = await start_AGI(full_message, og_message, username, users_dir)
     else:
         response = await generate_response(
-            full_message, og_message, username, users_dir
+            full_message, og_message, username, users_dir, tokens_output
         )
 
     response = MessageParser.extract_content(response)
@@ -1199,7 +1231,9 @@ async def process_message(
     return response
 
 
-async def start_chain_thoughts(message, og_message, username, users_dir):
+async def start_chain_thoughts(
+    message, og_message, username, users_dir, max_tokens_allowed
+):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
@@ -1211,7 +1245,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     ]
 
     openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
+        openai_model, temperature, max_tokens_allowed, max_responses, username
     )
     response = await openai_response.get_response(
         username, messages, function_metadata=function_metadata
@@ -1230,6 +1264,7 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
         function_metadata,
         username,
         users_dir,
+        max_tokens_allowed,
     )
     await MessageSender.send_debug(
         f"cot_response: {cot_response}", 1, "green", username
@@ -1247,7 +1282,9 @@ async def start_chain_thoughts(message, og_message, username, users_dir):
     return cot_response
 
 
-async def generate_response(message, og_message, username, users_dir):
+async def generate_response(
+    message, og_message, username, users_dir, max_allowed_tokens
+):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
@@ -1258,7 +1295,7 @@ async def generate_response(message, og_message, username, users_dir):
     ]
 
     openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
+        openai_model, temperature, max_allowed_tokens, max_responses, username
     )
     response = await openai_response.get_response(
         username, messages, function_metadata=function_metadata
@@ -1273,6 +1310,7 @@ async def generate_response(message, og_message, username, users_dir):
         function_metadata,
         username,
         users_dir,
+        max_allowed_tokens,
     )
     return final_response
 
@@ -1285,8 +1323,8 @@ async def process_chain_thoughts(
     function_metadata,
     username,
     users_dir,
+    max_allowed_tokens,
 ):
-    # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
     response = full_response["choices"][0]["message"]
     # if its a function call anyway, process it
     if "function_call" in response:
@@ -1381,12 +1419,14 @@ async def process_chain_thoughts(
             steps_string = f"Plan: {plan}\nresponse: {response_str}\n"
 
         return await summarize_cot_responses(
-            steps_string, message, og_message, username, users_dir
+            steps_string, message, og_message, username, users_dir, max_allowed_tokens
         )
 
     else:
         return final_response
-        # wait start_chain_thoughts(message, og_message, username, users_dir)
+        # return await summarize_cot_responses(
+        #     final_response, message, og_message, username, users_dir, max_allowed_tokens
+        # )
 
 
 async def process_cot_messages(
@@ -1456,7 +1496,7 @@ async def process_cot_messages(
 
 
 async def summarize_cot_responses(
-    steps_string, message, og_message, username, users_dir
+    steps_string, message, og_message, username, users_dir, max_allowed_tokens
 ):
     global COT_RETRIES
     global last_messages
@@ -1467,7 +1507,7 @@ async def summarize_cot_responses(
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
-    if COT_RETRIES[username] >= 1:
+    if COT_RETRIES[username] >= 2:
         await MessageSender.send_debug(
             f"Too many CoT retries, skipping...", 1, "red", username
         )
@@ -1488,7 +1528,7 @@ async def summarize_cot_responses(
         ]
 
     openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
+        openai_model, temperature, max_allowed_tokens, max_responses, username
     )
     response = await openai_response.get_response(
         username, messages, function_metadata=function_metadata
@@ -1504,7 +1544,7 @@ async def summarize_cot_responses(
     else:
         COT_RETRIES[username] += 1
         return await process_final_message(
-            message, og_message, response, username, users_dir
+            message, og_message, response, username, users_dir, max_allowed_tokens
         )
 
 
@@ -1560,7 +1600,9 @@ async def process_function_reply(
         return final_response
 
 
-async def process_final_message(message, og_message, response, username, users_dir):
+async def process_final_message(
+    message, og_message, response, username, users_dir, max_allowed_tokens
+):
     if response.startswith("YES: "):
         # remove the YES: part
         response = await response[5:]
@@ -1591,7 +1633,9 @@ async def process_final_message(message, og_message, response, username, users_d
     await MessageSender.send_debug(f"{full_message}", 1, "cyan", username)
 
     # response = generate_response(messages, function_dict, function_metadata)
-    response = await start_chain_thoughts(full_message, og_message, username, users_dir)
+    response = await start_chain_thoughts(
+        full_message, og_message, username, users_dir, max_allowed_tokens
+    )
 
     fc_check = None
     try:

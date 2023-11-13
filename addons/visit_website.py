@@ -33,7 +33,9 @@ from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 
 
-def visit_website(url, include_links=True, include_images=True, username=None):
+def visit_website(
+    url, include_links=True, include_images=True, username=None, max_length=4000
+):
     try:
         options = Options()
         options.add_argument("--headless")
@@ -41,7 +43,7 @@ def visit_website(url, include_links=True, include_images=True, username=None):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
 
-        service = Service(ChromeDriverManager("116.0.5845.180").install())
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(url)
 
@@ -67,7 +69,7 @@ def visit_website(url, include_links=True, include_images=True, username=None):
 
         driver.quit()
 
-        return data[:4000]
+        return data[:max_length]
 
     except Exception as e:
         return str(e)

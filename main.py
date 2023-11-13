@@ -12,7 +12,6 @@ from database import Database
 nltk.download("punkt")
 
 version = utils.SettingsManager.get_version()
-
 # Load environment variables
 openai.api_key = api_keys["openai"]
 

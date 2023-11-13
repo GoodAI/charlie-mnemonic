@@ -3,7 +3,7 @@ import os
 import requests
 import config
 
-description = "Returns search results from google or YouTube. This does not display the content of the websites, only the url and a snippet. This is not your memory! Only use if explicitly asked!"
+description = "Returns search results from google or YouTube. This does not display the content of the websites, only the url and a snippet. So do a webvisit after using this. This is not your memory! Only use if explicitly asked!"
 
 parameters = {
     "type": "object",

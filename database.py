@@ -10,21 +10,20 @@ import math
 
 logger = logs.Log("database", "database.log").get_logger()
 
-DATABASE_URL = os.environ["DATABASE_URL"]
-PRODUCTION = os.environ["PRODUCTION"]
-
 
 class Database:
     def __init__(self):
+        self.DATABASE_URL = os.environ["DATABASE_URL"]
+        self.PRODUCTION = os.environ["PRODUCTION"]
         self.conn = None
         self.cursor = None
         self.migrations_dir = "migrations"
 
     def open(self):
-        if PRODUCTION == "false":
-            self.conn = psycopg2.connect(DATABASE_URL)
+        if self.PRODUCTION == "false":
+            self.conn = psycopg2.connect(self.DATABASE_URL)
         else:
-            self.conn = psycopg2.connect(DATABASE_URL, sslmode="require")
+            self.conn = psycopg2.connect(self.DATABASE_URL, sslmode="require")
         self.cursor = self.conn.cursor()
 
     def close(self):

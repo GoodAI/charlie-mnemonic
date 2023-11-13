@@ -87,7 +87,7 @@ class PostgresCollection:
         include=["metadatas", "documents"],
     ):
         # TODO: Mirrors Chroma API, but could be optimized a lot
-        
+
         category = self.category
         table_name = self.client._table_name(category)
         conditions = []
@@ -164,12 +164,12 @@ class PostgresCollection:
             return output
 
         # embeddings is an array, check if include includes "embeddings"
-        if 'embeddings' in include and result[0].get("embedding", None) is not None:
+        if "embeddings" in include and result[0].get("embedding", None) is not None:
             output["embeddings"] = [row["embedding"] for row in result]
             # transform from ndarray to list
             output["embeddings"] = [emb.tolist() for emb in output["embeddings"]]
 
-        if 'distances' in include and result[0].get("distance", None) is not None:
+        if "distances" in include and result[0].get("distance", None) is not None:
             output["distances"] = [row["distances"] for row in result]
             # transform to list
             output["distances"] = [dist.tolist() for dist in output["distances"]]

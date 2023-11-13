@@ -5,24 +5,24 @@ from bs4 import BeautifulSoup
 description = "Used to visit websites"
 
 parameters = {
-  "type": "object",
-  "properties": {
-    "url": {
-      "type": "string",
-      "description": "The URL of the website to visit.",
+    "type": "object",
+    "properties": {
+        "url": {
+            "type": "string",
+            "description": "The URL of the website to visit.",
+        },
+        "include_links": {
+            "type": "boolean",
+            "description": "Whether or not to include links in the scraped data.",
+            "default": True,
+        },
+        "include_images": {
+            "type": "boolean",
+            "description": "Whether or not to include images in the scraped data.",
+            "default": True,
+        },
     },
-    "include_links": {
-      "type": "boolean",
-      "description": "Whether or not to include links in the scraped data.",
-      "default": True
-    },
-    "include_images": {
-      "type": "boolean",
-      "description": "Whether or not to include images in the scraped data.",
-      "default": True
-    },
-  },
-  "required": ["url"],
+    "required": ["url"],
 }
 
 
@@ -32,40 +32,44 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 
-def visit_website(url, include_links=True, include_images=True, username=None):
+
+def visit_website(
+    url, include_links=True, include_images=True, username=None, max_length=4000
+):
     try:
         options = Options()
-        options.add_argument('--headless')
+        options.add_argument("--headless")
         options.add_argument("--disable-gpu")
-        options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
 
-        service = Service(ChromeDriverManager("116.0.5845.180").install())
+        service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=options)
         driver.get(url)
 
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        soup = BeautifulSoup(driver.page_source, "html.parser")
 
         for script in soup(["script", "style"]):
             script.decompose()
 
-        data = ''
+        data = ""
 
-        text = ' '.join(soup.stripped_strings)
-        data += 'Text: ' + text + '\n'
+        text = " ".join(soup.stripped_strings)
+        data += "Text: " + text + "\n"
 
         if include_links:
-            links = [link.get('href') for link in soup.find_all('a') if link.get('href')]
-            data += 'Links: ' + '\n'.join(links) + '\n'
+            links = [
+                link.get("href") for link in soup.find_all("a") if link.get("href")
+            ]
+            data += "Links: " + "\n".join(links) + "\n"
 
         if include_images:
-            images = [img.get('src') for img in soup.find_all('img') if img.get('src')]
-            data += 'Images: ' + '\n'.join(images) + '\n'
-
+            images = [img.get("src") for img in soup.find_all("img") if img.get("src")]
+            data += "Images: " + "\n".join(images) + "\n"
 
         driver.quit()
 
-        return data[:4000]
+        return data[:max_length]
 
     except Exception as e:
         return str(e)

@@ -8,22 +8,22 @@ import importlib
 import logs
 import math
 
-logger = logs.Log('database', 'database.log').get_logger()
+logger = logs.Log("database", "database.log").get_logger()
 
-DATABASE_URL = os.environ['DATABASE_URL']
-PRODUCTION = os.environ['PRODUCTION']
 
 class Database:
     def __init__(self):
+        self.DATABASE_URL = os.environ["DATABASE_URL"]
+        self.PRODUCTION = os.environ["PRODUCTION"]
         self.conn = None
         self.cursor = None
-        self.migrations_dir = 'migrations'
+        self.migrations_dir = "migrations"
 
     def open(self):
-        if PRODUCTION == 'false':
-            self.conn = psycopg2.connect(DATABASE_URL)
+        if self.PRODUCTION == "false":
+            self.conn = psycopg2.connect(self.DATABASE_URL)
         else:
-            self.conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+            self.conn = psycopg2.connect(self.DATABASE_URL, sslmode="require")
         self.cursor = self.conn.cursor()
 
     def close(self):
@@ -43,13 +43,16 @@ class Database:
         migrations = []
         filenames = sorted(os.listdir(self.migrations_dir))
         for filename in filenames:
-            if filename.endswith('.py'):
-                module = importlib.import_module(f'{self.migrations_dir}.{filename[:-3]}')
-                migrations.append({'name': module.name, 'query': module.query})
+            if filename.endswith(".py"):
+                module = importlib.import_module(
+                    f"{self.migrations_dir}.{filename[:-3]}"
+                )
+                migrations.append({"name": module.name, "query": module.query})
         return migrations
 
     def create_table(self):
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(255) UNIQUE NOT NULL,
@@ -57,35 +60,43 @@ class Database:
             session_token VARCHAR(255) NOT NULL,
             role VARCHAR(255) DEFAULT 'user'
         )
-        """)
+        """
+        )
         self.conn.commit()
 
     def create_migrations_table(self):
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
         CREATE TABLE IF NOT EXISTS migrations (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-        """)
+        """
+        )
         self.conn.commit()
 
     def log_migration(self, name):
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
         INSERT INTO migrations (name) VALUES (%s)
-        """, (name,))
+        """,
+            (name,),
+        )
         self.conn.commit()
 
     def has_migration_been_executed(self, migration_name):
-        self.cursor.execute("SELECT * FROM migrations WHERE name = %s", (migration_name,))
+        self.cursor.execute(
+            "SELECT * FROM migrations WHERE name = %s", (migration_name,)
+        )
         return self.cursor.fetchone() is not None
 
     def execute_migration(self, migration):
-        if not self.has_migration_been_executed(migration['name']):
+        if not self.has_migration_been_executed(migration["name"]):
             logger.info(f'Executing migration: {migration["name"]}')
-            self.cursor.execute(migration['query'])
+            self.cursor.execute(migration["query"])
             self.conn.commit()
-            self.log_migration(migration['name'])
+            self.log_migration(migration["name"])
         else:
             logger.info(f'Migration already executed: {migration["name"]}')
 
@@ -104,40 +115,48 @@ class Database:
     def get_user(self, username):
         self.cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         return self.cursor.fetchone()
-    
+
     def get_user_role(self, username):
         self.cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
         return self.cursor.fetchone()
-    
+
     def get_user_access(self, username):
-        self.cursor.execute("SELECT has_access FROM users WHERE username = %s", (username,))
+        self.cursor.execute(
+            "SELECT has_access FROM users WHERE username = %s", (username,)
+        )
         return self.cursor.fetchone()[0]
-    
+
     def get_username(self, user_id):
         self.cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
         return self.cursor.fetchone()
-    
+
     def get_user_id(self, username):
         self.cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
         return self.cursor.fetchone()
 
-    def add_user(self, username, password, session_token, role='user'):
-        self.cursor.execute("""
+    def add_user(self, username, password, session_token, role="user"):
+        self.cursor.execute(
+            """
         INSERT INTO users (username, password, session_token, role) 
         VALUES (%s, %s, %s, %s)
-        """, (username, password, session_token, role))
+        """,
+            (username, password, session_token, role),
+        )
         self.conn.commit()
 
     def update_user(self, user_id, access, role):
-        if access == 'true':
+        if access == "true":
             access = True
         else:
             access = False
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
             UPDATE users
             SET has_access = %s, role = %s
             WHERE id = %s
-        """, (access, role, user_id))
+        """,
+            (access, role, user_id),
+        )
         self.conn.commit()
 
     def delete_user(self, username):
@@ -149,9 +168,9 @@ class Database:
         dict_cursor.execute("SELECT * FROM admin_controls")
         rows = dict_cursor.fetchall()
         if not rows:
-            return json.dumps({'id': 1, 'daily_spending_limit': 10}, default=str)
+            return json.dumps({"id": 1, "daily_spending_limit": 10}, default=str)
         return json.dumps(rows[0], default=str)
-    
+
     def get_daily_limit(self):
         self.cursor.execute("SELECT daily_spending_limit FROM admin_controls")
         row = self.cursor.fetchone()
@@ -161,13 +180,17 @@ class Database:
             daily_limit = 1
         return daily_limit
 
-
-    def update_admin_controls(self, id, daily_spending_limit, allow_access, maintenance):
-        self.cursor.execute("""
+    def update_admin_controls(
+        self, id, daily_spending_limit, allow_access, maintenance
+    ):
+        self.cursor.execute(
+            """
             INSERT INTO admin_controls (id, daily_spending_limit, allow_access, maintenance)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (id) DO UPDATE SET daily_spending_limit = EXCLUDED.daily_spending_limit, allow_access = EXCLUDED.allow_access, maintenance = EXCLUDED.maintenance
-        """, (id, daily_spending_limit, allow_access, maintenance))
+        """,
+            (id, daily_spending_limit, allow_access, maintenance),
+        )
         self.conn.commit()
 
     def get_maintenance_mode(self):
@@ -179,17 +202,17 @@ class Database:
             maintenance = False
         return maintenance
 
-
     def get_global_statistics(self):
         """Get the global statistics.
-        
+
         returns: a dictionary containing the global statistics
         """
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute("SELECT SUM(amount_of_messages) as total_messages, SUM(total_tokens_used) as total_tokens, SUM(prompt_tokens) as total_prompt_tokens, SUM(completion_tokens) as total_completion_tokens, SUM(voice_usage) as total_voice_usage, SUM(total_spending_count) as total_spending, AVG(total_average_response_time) as average_response_time FROM statistics")
+        dict_cursor.execute(
+            "SELECT SUM(amount_of_messages) as total_messages, SUM(total_tokens_used) as total_tokens, SUM(prompt_tokens) as total_prompt_tokens, SUM(completion_tokens) as total_completion_tokens, SUM(voice_usage) as total_voice_usage, SUM(total_spending_count) as total_spending, AVG(total_average_response_time) as average_response_time FROM statistics"
+        )
         row = dict_cursor.fetchone()
         return json.dumps(row, default=str)
-
 
     def get_all_statistics(self):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
@@ -198,31 +221,37 @@ class Database:
 
         # replace the user_id with the username
         for row in rows:
-            row['username'] = self.get_username(row['user_id'])[0]
+            row["username"] = self.get_username(row["user_id"])[0]
         return json.dumps(rows, default=str)
-    
+
     def get_user_statistics(self, user_id):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute("SELECT * FROM daily_stats WHERE user_id = %s ORDER BY timestamp DESC", (user_id,))
+        dict_cursor.execute(
+            "SELECT * FROM daily_stats WHERE user_id = %s ORDER BY timestamp DESC",
+            (user_id,),
+        )
         rows = dict_cursor.fetchall()
         return json.dumps(rows, default=str)
-    
+
     def get_user_profile(self, username):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         dict_cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
         row = dict_cursor.fetchone()
         return json.dumps(row, default=str)
-    
+
     def get_statistics(self, page, items_per_page):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         offset = (page - 1) * items_per_page
-        dict_cursor.execute("""
+        dict_cursor.execute(
+            """
             SELECT users.id AS user_id, users.username, users.role, users.has_access, statistics.user_id as user_sid, statistics.amount_of_messages, statistics.total_tokens_used, statistics.prompt_tokens, statistics.completion_tokens, statistics.voice_usage, statistics.total_spending_count, statistics.total_average_response_time
             FROM users 
             LEFT JOIN statistics 
             ON users.id = statistics.user_id 
             ORDER BY users.id LIMIT %s OFFSET %s
-            """, (items_per_page, offset))
+            """,
+            (items_per_page, offset),
+        )
         rows = dict_cursor.fetchall()
         return json.dumps(rows, default=str)
 
@@ -234,7 +263,7 @@ class Database:
     def get_statistic(self, username):
         """Get the statistic for the given username.
         username: the name of the user
-        
+
         returns: a dictionary containing the statistic
         """
         user_id = self.get_user(username)[0]
@@ -245,24 +274,23 @@ class Database:
     def update_statistic(self, username, **kwargs):
         """Update the statistic for the given username.
         username: the name of the user
-        
+
         kwargs: a dictionary containing the rows update
 
         "id","user_id","message_characters","message_tokens","message_length","message_amount",
         "prompt_tokens","generation_tokens","brain_tokens","average_input_msg_tokens","spending_count",
         "average_response_time","time_per_session","time_between_calls","addons_used","settings_used",
         "timestamp","total_response_time","response_count"
-        
+
         Example usage:\n
         db.update_statistic(user_id, amount_of_messages=10, total_tokens_used=200)
         """
         user_id = self.get_user(username)[0]
-        set_clause = ', '.join([f"{k} = %s" for k in kwargs.keys()])
+        set_clause = ", ".join([f"{k} = %s" for k in kwargs.keys()])
         query = f"UPDATE statistics SET {set_clause} WHERE user_id = %s"
         params = (*kwargs.values(), user_id)
         self.cursor.execute(query, params)
         self.conn.commit()
-
 
     def delete_statistic(self, user_id):
         self.cursor.execute("DELETE FROM statistics WHERE user_id = %s", (user_id,))
@@ -271,7 +299,7 @@ class Database:
     def get_daily_stats(self, username):
         """Get the daily stats for the given username.
         username: the username of the user
-        
+
         returns: a dictionary containing the daily stats
         "message_characters",
         "message_tokens",
@@ -292,23 +320,29 @@ class Database:
         example usage:\n
         db.get_daily_stats(username)['average_response_time']
         """
-        
+
         user_id = self.get_user(username)[0]
         dict_cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # get the current date
         current_date = datetime.datetime.now().date()
 
         # execute the SQL query with the user_id and the current date
-        dict_cursor.execute("SELECT * FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = %s", (user_id, current_date))
+        dict_cursor.execute(
+            "SELECT * FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = %s",
+            (user_id, current_date),
+        )
         return dict_cursor.fetchone()
 
     def add_daily_stats(self, user_id, **kwargs):
-        columns = ', '.join(kwargs.keys())
-        values = ', '.join(['%s'] * len(kwargs))
-        self.cursor.execute(f"""
+        columns = ", ".join(kwargs.keys())
+        values = ", ".join(["%s"] * len(kwargs))
+        self.cursor.execute(
+            f"""
         INSERT INTO daily_stats (user_id, {columns}) 
         VALUES (%s, {values})
-        """, (user_id, *kwargs.values()))
+        """,
+            (user_id, *kwargs.values()),
+        )
         self.conn.commit()
 
     def update_daily_stats_token_usage(self, username, **kwargs):
@@ -340,20 +374,23 @@ class Database:
         current_timestamp = datetime.datetime.now()
 
         # check if a record for the current date exists
-        self.cursor.execute("SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            "SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         record_exists = self.cursor.fetchone() is not None
-        
+
         # update or insert the token usage in the daily stats table
         if record_exists:
-            set_clause = ', '.join([f"{k} = {k} + %s" for k in kwargs.keys()])
+            set_clause = ", ".join([f"{k} = {k} + %s" for k in kwargs.keys()])
             query = f"""
             UPDATE daily_stats SET {set_clause} 
             WHERE user_id = %s AND DATE(timestamp) = DATE(%s)
             """
             params = (*kwargs.values(), user_id, current_timestamp)
         else:
-            columns = ', '.join(kwargs.keys())
-            values = ', '.join(['%s'] * len(kwargs))
+            columns = ", ".join(kwargs.keys())
+            values = ", ".join(["%s"] * len(kwargs))
             query = f"""
             INSERT INTO daily_stats (user_id, {columns}) 
             VALUES (%s, {values})
@@ -364,10 +401,12 @@ class Database:
         self.conn.commit()
 
         # get the token usage
-        self.cursor.execute(f"SELECT {', '.join(kwargs.keys())} FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            f"SELECT {', '.join(kwargs.keys())} FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         return self.cursor.fetchone()
-    
-    
+
     def replace_daily_stats_token_usage(self, username, **kwargs):
         """Replace the token usage for the given username.
         username: the username of the user
@@ -397,20 +436,23 @@ class Database:
         current_timestamp = datetime.datetime.now()
 
         # check if a record for the current date exists
-        self.cursor.execute("SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            "SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         record_exists = self.cursor.fetchone() is not None
-        
+
         # update or insert the token usage in the daily stats table
         if record_exists:
-            set_clause = ', '.join([f"{k} = %s" for k in kwargs.keys()])
+            set_clause = ", ".join([f"{k} = %s" for k in kwargs.keys()])
             query = f"""
             UPDATE daily_stats SET {set_clause} 
             WHERE user_id = %s AND DATE(timestamp) = DATE(%s)
             """
             params = (*kwargs.values(), user_id, current_timestamp)
         else:
-            columns = ', '.join(kwargs.keys())
-            values = ', '.join(['%s'] * len(kwargs))
+            columns = ", ".join(kwargs.keys())
+            values = ", ".join(["%s"] * len(kwargs))
             query = f"""
             INSERT INTO daily_stats (user_id, {columns}) 
             VALUES (%s, {values})
@@ -421,7 +463,10 @@ class Database:
         self.conn.commit()
 
         # get the token usage
-        self.cursor.execute(f"SELECT {', '.join(kwargs.keys())} FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            f"SELECT {', '.join(kwargs.keys())} FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         return self.cursor.fetchone()
 
     def delete_daily_stats(self, user_id):
@@ -433,20 +478,26 @@ class Database:
         return self.cursor.fetchone()
 
     def add_admin_control(self, **kwargs):
-        columns = ', '.join(kwargs.keys())
-        values = ', '.join(['%s'] * len(kwargs))
-        self.cursor.execute(f"""
+        columns = ", ".join(kwargs.keys())
+        values = ", ".join(["%s"] * len(kwargs))
+        self.cursor.execute(
+            f"""
         INSERT INTO admin_controls ({columns}) 
         VALUES ({values})
-        """, (*kwargs.values(),))
+        """,
+            (*kwargs.values(),),
+        )
         self.conn.commit()
 
     def update_admin_control(self, id, **kwargs):
-        set_clause = ', '.join([f"{k} = %s" for k in kwargs.keys()])
-        self.cursor.execute(f"""
+        set_clause = ", ".join([f"{k} = %s" for k in kwargs.keys()])
+        self.cursor.execute(
+            f"""
         UPDATE admin_controls SET {set_clause} 
         WHERE id = %s
-        """, (*kwargs.values(), id))
+        """,
+            (*kwargs.values(), id),
+        )
         self.conn.commit()
 
     def delete_admin_control(self, id):
@@ -456,11 +507,11 @@ class Database:
     def update_token_usage(self, username, **kwargs):
         """Update the token usage for the given username.
         username: the username of the user
-        
+
         kwargs: a dictionary containing the rows update
-        
-        "total_tokens_used", 
-        "prompt_tokens", 
+
+        "total_tokens_used",
+        "prompt_tokens",
         "completion_tokens"
 
         Returns: total_tokens_used, prompt_tokens, completion_tokens
@@ -469,7 +520,7 @@ class Database:
         user_id = self.get_user(username)[0]
 
         # update or insert the token usage in the statistics table
-        set_clause = ', '.join([f"{k} = statistics.{k} + %s" for k in kwargs.keys()])
+        set_clause = ", ".join([f"{k} = statistics.{k} + %s" for k in kwargs.keys()])
         query = f"""
         INSERT INTO statistics (user_id, {', '.join(kwargs.keys())}) 
         VALUES (%s, {', '.join(['%s'] * len(kwargs))})
@@ -480,13 +531,16 @@ class Database:
         self.conn.commit()
 
         # get the token usage
-        self.cursor.execute("SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s", (user_id,))
+        self.cursor.execute(
+            "SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s",
+            (user_id,),
+        )
         return self.cursor.fetchone()
-    
+
     def get_display_name(self, username):
         """Get the display name for the given username.
         username: the username of the user
-        
+
         returns: a dictionary containing the display name
         """
         # get the user_id for the given username
@@ -495,24 +549,26 @@ class Database:
         # get the display name
         self.cursor.execute("SELECT display_name FROM users WHERE id = %s", (user_id,))
         return self.cursor.fetchone()
-    
+
     def update_display_name(self, username, display_name):
         """Update the display name for the given username.
         username: the username of the user
-        
+
         returns: a dictionary containing the display name
         """
         # get the user_id for the given username
         user_id = self.get_user(username)[0]
 
         # update the display name
-        self.cursor.execute("UPDATE users SET display_name = %s WHERE id = %s", (display_name, user_id))
+        self.cursor.execute(
+            "UPDATE users SET display_name = %s WHERE id = %s", (display_name, user_id)
+        )
         self.conn.commit()
-    
+
     def get_token_usage(self, username, daily=False):
         """Get the token usage for the given username.
         username: the username of the user
-        
+
         daily: if True, get the daily token usage, otherwise get the total token usage
 
         returns: a dictionary containing the token usage
@@ -527,35 +583,40 @@ class Database:
 
             # execute the SQL query with the user_id and the current date
             self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            self.cursor.execute("SELECT * FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = %s", (user_id, current_date))
+            self.cursor.execute(
+                "SELECT * FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = %s",
+                (user_id, current_date),
+            )
             row = self.cursor.fetchone()
             if row is None:
                 prompt_tokens = 0
                 completion_tokens = 0
                 total_cost = 0
             else:
-                prompt_tokens = row['prompt_tokens']
-                completion_tokens = row['generation_tokens']
-                total_cost = row['spending_count']
+                prompt_tokens = row["prompt_tokens"]
+                completion_tokens = row["generation_tokens"]
+                total_cost = row["spending_count"]
             return prompt_tokens + completion_tokens, round(total_cost, 5)
         else:
             # execute the SQL query with the user_id
             self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            self.cursor.execute("SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s", (user_id,))
+            self.cursor.execute(
+                "SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s",
+                (user_id,),
+            )
             row = self.cursor.fetchone()
             if row is None:
                 prompt_tokens = 0
                 completion_tokens = 0
                 total_tokens_used = 0
             else:
-                prompt_tokens = row['prompt_tokens']
-                completion_tokens = row['completion_tokens']
-                total_tokens_used = row['total_tokens_used']
+                prompt_tokens = row["prompt_tokens"]
+                completion_tokens = row["completion_tokens"]
+                total_tokens_used = row["total_tokens_used"]
             prompt_cost = round(prompt_tokens * 0.03 / 1000, 5)
             completion_cost = round(completion_tokens * 0.06 / 1000, 5)
             total_cost = round(prompt_cost + completion_cost, 5)
             return total_tokens_used, total_cost
-        
 
     def update_message_count(self, username):
         """Update the message count for the given username."""
@@ -566,7 +627,10 @@ class Database:
         current_timestamp = datetime.datetime.now()
 
         # check if a record for the current date exists
-        self.cursor.execute("SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            "SELECT 1 FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         record_exists = self.cursor.fetchone() is not None
 
         # update or insert the message count in the daily stats table
@@ -587,7 +651,10 @@ class Database:
         self.conn.commit()
 
         # get the daily message count
-        self.cursor.execute("SELECT message_amount FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)", (user_id, current_timestamp))
+        self.cursor.execute(
+            "SELECT message_amount FROM daily_stats WHERE user_id = %s AND DATE(timestamp) = DATE(%s)",
+            (user_id, current_timestamp),
+        )
         daily_messages_count = self.cursor.fetchone()
 
         # update or insert the message count in the statistics table
@@ -600,11 +667,13 @@ class Database:
         self.conn.commit()
 
         # get the total message count
-        self.cursor.execute("SELECT amount_of_messages FROM statistics WHERE user_id = %s", (user_id,))
+        self.cursor.execute(
+            "SELECT amount_of_messages FROM statistics WHERE user_id = %s", (user_id,)
+        )
         total_messages_count = self.cursor.fetchone()
 
         return daily_messages_count, total_messages_count
-    
+
     def add_voice_usage(self, username, text_lenght):
         """Add the voice usage for the given username to the statistics table."""
         # get the user_id for the given username
@@ -623,6 +692,7 @@ class Database:
         self.conn.commit()
 
         # get the voice usage
-        self.cursor.execute("SELECT voice_usage FROM statistics WHERE user_id = %s", (user_id,))
+        self.cursor.execute(
+            "SELECT voice_usage FROM statistics WHERE user_id = %s", (user_id,)
+        )
         return self.cursor.fetchone()
-

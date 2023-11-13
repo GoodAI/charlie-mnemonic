@@ -9,10 +9,9 @@ import logs
 import utils
 from database import Database
 
-nltk.download('punkt')
+nltk.download("punkt")
 
 version = utils.SettingsManager.get_version()
-
 # Load environment variables
 openai.api_key = api_keys["openai"]
 
@@ -39,8 +38,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event('shutdown')
+
+@app.on_event("shutdown")
 def shutdown_event():
-    logs.Log('main', 'main.log').get_logger().debug('Shutting down server')
+    logs.Log("main", "main.log").get_logger().debug("Shutting down server")
+
 
 app.include_router(router)

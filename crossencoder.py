@@ -4,18 +4,21 @@ import torch
 from typing import Dict, Any
 from chromadb.api.types import Documents, EmbeddingFunction, Embeddings
 
+
 class CrossEncoderEmbeddingFunction(EmbeddingFunction):
     models: Dict[str, Any] = {}
     tokenizers: Dict[str, Any] = {}
 
     def __init__(
         self,
-        model_name: str = 'nreimers/mmarco-mMiniLMv2-L12-H384-v1',
-        device: str = 'cpu',
+        model_name: str = "nreimers/mmarco-mMiniLMv2-L12-H384-v1",
+        device: str = "cpu",
         normalize_embeddings: bool = False,
     ):
         if model_name not in self.models:
-            self.models[model_name] = AutoModelForSequenceClassification.from_pretrained(model_name)
+            self.models[
+                model_name
+            ] = AutoModelForSequenceClassification.from_pretrained(model_name)
             self.tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
         self._model = self.models[model_name]
         self.tokenizer = self.tokenizers[model_name]
@@ -26,7 +29,9 @@ class CrossEncoderEmbeddingFunction(EmbeddingFunction):
 
     def __call__(self, texts: Documents) -> Embeddings:
         with torch.no_grad():
-            features = self.tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(self.device)
+            features = self.tokenizer(
+                texts, padding=True, truncation=True, return_tensors="pt"
+            ).to(self.device)
             embeddings = self._model(**features).logits
             if self._normalize_embeddings:
                 embeddings = embeddings / torch.norm(embeddings, dim=1, keepdim=True)

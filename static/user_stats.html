@@ -1,56 +1,59 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <title>User Statistics</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
 </head>
+
 <body>
     <div class="table-responsive">
         <table class="table table-striped table-bordered">
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>Message Amount</th>
-                <th>Prompt Tokens</th>
-                <th>Generation Tokens</th>
-                <th>Brain Tokens</th>
-                <th>Average Input Msg Tokens</th>
-                <th>Spending Count</th>
-                <th>Average Response Time</th>
-                <th>Time Per Session</th>
-                <th>Time Between Calls</th>
-                <th>Addons Used</th>
-                <th>Settings Used</th>
-                <th>Total Response Time</th>
-                <th>Response Count</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for row in rows %}
-            <tr>
-                <td>{{ row.timestamp }}</td>
-                <td>{{ row.message_amount }}</td>
-                <td>{{ row.prompt_tokens }}</td>
-                <td>{{ row.generation_tokens }}</td>
-                <td>{{ row.brain_tokens }}</td>
-                <td>{{ row.average_input_msg_tokens }}</td>
-                <td>{{ row.spending_count }}</td>
-                <td>{{ row.average_response_time }}</td>
-                <td>{{ row.time_per_session }}</td>
-                <td>{{ row.time_between_calls }}</td>
-                <td>{{ row.addons_used }}</td>
-                <td>{{ row.settings_used }}</td>
-                <td>{{ row.total_response_time }}</td>
-                <td>{{ row.response_count }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-<nav>
-    <ul class="pagination">
-        <!-- Pagination links go here -->
-    </ul>
-</nav>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Message Amount</th>
+                    <th>Prompt Tokens</th>
+                    <th>Generation Tokens</th>
+                    <th>Brain Tokens</th>
+                    <th>Average Input Msg Tokens</th>
+                    <th>Spending Count</th>
+                    <th>Average Response Time</th>
+                    <th>Time Per Session</th>
+                    <th>Time Between Calls</th>
+                    <th>Addons Used</th>
+                    <th>Settings Used</th>
+                    <th>Total Response Time</th>
+                    <th>Response Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row.timestamp }}</td>
+                    <td>{{ row.message_amount }}</td>
+                    <td>{{ row.prompt_tokens }}</td>
+                    <td>{{ row.generation_tokens }}</td>
+                    <td>{{ row.brain_tokens }}</td>
+                    <td>{{ row.average_input_msg_tokens }}</td>
+                    <td>{{ row.spending_count }}</td>
+                    <td>{{ row.average_response_time }}</td>
+                    <td>{{ row.time_per_session }}</td>
+                    <td>{{ row.time_between_calls }}</td>
+                    <td>{{ row.addons_used }}</td>
+                    <td>{{ row.settings_used }}</td>
+                    <td>{{ row.total_response_time }}</td>
+                    <td>{{ row.response_count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <nav>
+        <ul class="pagination">
+            <!-- Pagination links go here -->
+        </ul>
+    </nav>
 </body>
+
 </html>

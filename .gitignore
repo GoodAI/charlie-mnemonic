@@ -124,3 +124,6 @@ data/user/
 waypoints/
 logs/
 static/data/
+
+# Pycharm
+.idea/

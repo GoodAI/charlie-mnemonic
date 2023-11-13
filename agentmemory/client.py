@@ -30,9 +30,16 @@ def get_client(client_type=None, username=None, *args, **kwargs):
             raise EnvironmentError(
                 "Postgres connection string not set in environment variables!"
             )
-        client = PostgresClient(POSTGRES_CONNECTION_STRING, model_name=POSTGRES_MODEL_NAME)
+        client = PostgresClient(
+            POSTGRES_CONNECTION_STRING, model_name=POSTGRES_MODEL_NAME
+        )
     else:
-        user_memory_path = os.path.join('users', username)
-        client = chromadb.PersistentClient(settings=Settings(anonymized_telemetry=False, allow_reset=True), path=user_memory_path, *args, **kwargs)
+        user_memory_path = os.path.join("users", username)
+        client = chromadb.PersistentClient(
+            settings=Settings(anonymized_telemetry=False, allow_reset=True),
+            path=user_memory_path,
+            *args,
+            **kwargs
+        )
 
     return client

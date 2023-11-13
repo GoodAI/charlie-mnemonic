@@ -4,6 +4,7 @@ import tarfile
 from pathlib import Path
 from tqdm import tqdm
 
+
 def _download(url: str, fname: Path, chunk_size: int = 1024) -> None:
     resp = requests.get(url, stream=True)
     total = int(resp.headers.get("content-length", 0))
@@ -18,12 +19,16 @@ def _download(url: str, fname: Path, chunk_size: int = 1024) -> None:
             size = file.write(data)
             bar.update(size)
 
+
 default_model_path = str(Path.home() / ".cache" / "onnx_models")
 
-def check_model(model_name = "all-MiniLM-L6-v2", model_path = default_model_path) -> str:
+
+def check_model(model_name="all-MiniLM-L6-v2", model_path=default_model_path) -> str:
     DOWNLOAD_PATH = Path(model_path) / model_name
     ARCHIVE_FILENAME = "onnx.tar.gz"
-    MODEL_DOWNLOAD_URL = f"https://chroma-onnx-models.s3.amazonaws.com/{model_name}/onnx.tar.gz"
+    MODEL_DOWNLOAD_URL = (
+        f"https://chroma-onnx-models.s3.amazonaws.com/{model_name}/onnx.tar.gz"
+    )
 
     # Check if model is not downloaded yet
     if not os.path.exists(DOWNLOAD_PATH / ARCHIVE_FILENAME):
@@ -35,6 +40,7 @@ def check_model(model_name = "all-MiniLM-L6-v2", model_path = default_model_path
 
     return str(DOWNLOAD_PATH / "onnx")
 
+
 import importlib
 import numpy as np
 from tokenizers import Tokenizer
@@ -42,12 +48,16 @@ import onnxruntime
 import numpy.typing as npt
 from typing import List
 
+
 def _normalize(v: npt.NDArray) -> npt.NDArray:
     norm = np.linalg.norm(v, axis=1)
     norm[norm == 0] = 1e-12
     return v / norm[:, np.newaxis]
 
-def infer_embeddings(documents: List[str], model_path: str, batch_size: int = 32) -> npt.NDArray:
+
+def infer_embeddings(
+    documents: List[str], model_path: str, batch_size: int = 32
+) -> npt.NDArray:
     # Load the tokenizer and model
     tokenizer = Tokenizer.from_file(model_path + "/tokenizer.json")
     tokenizer.enable_truncation(max_length=256)

@@ -239,37 +239,38 @@ async function delete_user_data() {
 }
 
 async function upload_user_data(file) {
+    
+    const overlay = document.getElementById('overlay_msg');
+    const overlayMessage = document.getElementById('overlay-message');
+    overlayMessage.textContent = "Uploading Data...";
+    overlay.style.display = 'flex';
+
+    const formData = new FormData();
+    formData.append('username', user_name);
+    formData.append('data_file', file);
     try {
-        const overlay = document.getElementById('overlay_msg');
-        const overlayMessage = document.getElementById('overlay-message');
-        overlayMessage.textContent = "Uploading Data...";
-        overlay.style.display = 'flex';
-
-        const formData = new FormData();
-        formData.append('username', user_name);
-        formData.append('data_file', file);
-
         const response = await fetch(API_URL + '/upload_data/', {
             method: 'POST',
             body: formData,
             credentials: 'include'
         });
-
-        handleError(response);
-        const data = await response.json();
-        console.log(data.message);
-        overlayMessage.textContent = data.message;
-
+        if (response.ok) {
+            const data = await response.json();
+            console.log(data.message);
+            overlayMessage.textContent = data.message;
+        } 
+        else
+        {
+            await handleError(response);
+        }
         // Hide the overlay after a delay to let the user see the message
         setTimeout(() => {
             overlay.style.display = 'none';
         }, 2000);
         get_settings(user_name);
-
     } catch (error) {
-        await handleError(error);
-        console.error('Failed to upload data: ', error);
-
+        console.log('Failed to upload data: ', error);
+        await handleError(response);
         // Hide the overlay in case of error
         overlay.style.display = 'none';
     }
@@ -325,7 +326,7 @@ async function send_image(image_file, prompt) {
         reader.onloadend = function () {
             var base64data = reader.result;
             // ![The San Juan Mountains are beautiful!](/assets/images/san-juan-mountains.jpg "San Juan Mountains")
-            var fullmessage = '![image!](' + base64data + ' "image")<p>' + message + '</p>';
+            var fullmessage = '![image](' + base64data + ' "image")<p>' + message + '</p>';
             fullmessage = marked(fullmessage);
             addCustomMessage(fullmessage, 'user', true);
         }

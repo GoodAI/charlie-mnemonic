@@ -18,7 +18,9 @@ from agentmemory.helpers import (
 from agentmemory.client import get_client
 
 
-def create_memory(category, text, metadata={}, embedding=None, id=None, username=None):
+def create_memory(
+    category, text, metadata={}, embedding=None, id=None, username=None, mUsername=None
+):
     """
     Create a new memory in a collection.
 
@@ -34,13 +36,15 @@ def create_memory(category, text, metadata={}, embedding=None, id=None, username
     Example:
     >>> create_memory('sample_category', 'sample_text', id='sample_id', metadata={'sample_key': 'sample_value'})
     """
-
     # get or create the collection
     memories = get_client(username=username).get_or_create_collection(category)
 
     # add timestamps to metadata
     metadata["created_at"] = datetime.datetime.now().timestamp()
     metadata["updated_at"] = datetime.datetime.now().timestamp()
+
+    # add username to metadata
+    metadata["username"] = mUsername if mUsername is not None else "assistant"
 
     logger.debug(f"created_at: {metadata['created_at']}")
     # convert to human readable format
@@ -269,15 +273,8 @@ def get_memory_by_date(
             logger.debug(f"start_timestamp: {start_timestamp}")
             logger.debug(f"end_timestamp: {end_timestamp}")
 
-            # memories = get_client(username=username).get_or_create_collection(category)
-            # memories.get(where={'$and': [{'created_at': {'$gte': start_timestamp}}, {'created_at': {'$lt': int(end_timestamp)}}]})
-            # print(f"memories: {memories}")
-
-            # filter_metadata = {'created_at': {'$gte': start_timestamp}}
-            # filter_metadata = {'created_at': {'$lte': end_timestamp}}
             memories = get_client(username=username).get_or_create_collection(category)
             for memory in memories:
-                # print(f"memory: {memory}")
                 pass
             results = memories.get(
                 where={
@@ -287,13 +284,9 @@ def get_memory_by_date(
                     ]
                 }
             )
-            # print(f"memories: {results}")
             query = flatten_arrays(results)
-            # print(f"query: {query}")
-
             # convert the query response to list and return
             result_list = chroma_collection_to_list(query)
-            # print(f"result_list: {result_list}")
             return result_list
 
 

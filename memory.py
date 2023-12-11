@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import os
+import re
 import secrets
 import time
 import aiohttp
@@ -27,7 +28,8 @@ from agentmemory import (
 )
 import utils
 from dateutil.parser import parse
-import nltk
+import textwrap
+from nltk.tokenize import sent_tokenize
 import config
 import logs
 
@@ -42,9 +44,13 @@ class MemoryManager:
         self.model_used = config.api_keys["memory_model"]
         pass
 
-    async def create_memory(self, category, document, metadata={}, username=None):
+    async def create_memory(
+        self, category, document, metadata={}, username=None, mUsername=None
+    ):
         """Create a new memory and return the ID."""
-        return create_memory(category, document, metadata, username=username)
+        return create_memory(
+            category, document, metadata, username=username, mUsername=mUsername
+        )
 
     async def create_unique_memory(
         self, category, content, metadata={}, similarity=0.15, username=None
@@ -141,26 +147,52 @@ class MemoryManager:
         """Stop the database."""
         return stop_database(username=username)
 
-    async def split_text_into_chunks(self, text, max_chunk_len=150, overlap=25):
-        """Split the text into chunks of up to `max_chunk_len` tokens each, with `overlap` tokens of overlap."""
-        # Tokenize the text into sentences, then tokenize each sentence into words
-        # todo: smarter chunking, split on punctuation etc...
-        tokens = [
-            word
-            for sent in nltk.sent_tokenize(text)
-            for word in nltk.word_tokenize(sent)
-        ]
+    async def split_text_into_chunks(self, text, max_chunk_len=200):
+        """Split the text into chunks of up to `max_chunk_len`"""
+        # Tokenize the text into sentences, then count the number of tokens in each sentence and add them to a chunk until the chunk is full
+        sentences = sent_tokenize(text)
 
         chunks = []
-        current_chunk = []
+        chunk = []
+        token_count = 0
 
-        for i, token in enumerate(tokens):
-            current_chunk.append(token)
-            if (i + 1) % (max_chunk_len - overlap) == 0 or (i + 1) == len(tokens):
-                chunks.append(" ".join(current_chunk))
-                current_chunk = current_chunk[overlap:]
+        for sentence in sentences:
+            current_sentence_token_count = utils.MessageParser.num_tokens_from_string(
+                sentence
+            )
+            if token_count + current_sentence_token_count > max_chunk_len:
+                chunks.append(" ".join(chunk))
+                chunk = [sentence]
+                token_count = current_sentence_token_count
+            else:
+                chunk.append(sentence)
+                token_count += current_sentence_token_count
+
+        # add the last chunk
+        if chunk:
+            chunks.append(" ".join(chunk))
 
         return chunks
+
+    async def get_most_recent_messages(
+        self, category, username=None, n_results=100, chat_id=None
+    ):
+        """Return the most recent messages in the category."""
+        category = category.lower().replace(" ", "_")
+        if chat_id is None:
+            memories = get_memories(category, username=username, n_results=n_results)
+        else:
+            memories = get_memories(
+                category,
+                username=username,
+                n_results=n_results,
+                filter_metadata={"chat_id": chat_id},
+            )
+        memories.sort(key=lambda x: x["metadata"]["created_at"], reverse=False)
+        for memory in memories:
+            if memory["metadata"].get("username") == "user":
+                memory["document"].replace("User :", username + ":")
+        return memories[:n_results]
 
     async def process_episodic_memory(
         self,
@@ -229,15 +261,12 @@ class MemoryManager:
             episodic_messages = search_memory_by_date(
                 category, new_messages, username=username, filter_date=parsed_date
             )
-            # episodic_messages_get = get_memory_by_date(category, username=username, filter_date=filter_date)
             logger.debug(f"episodic_messages: {len(episodic_messages)}")
-            # print(f'episodic_messages_get: {len(episodic_messages_get)}')
             for memory in episodic_messages:
                 date = memory["metadata"]["created_at"]
                 formatted_date = datetime.datetime.fromtimestamp(date).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-                # print(f"{formatted_date} - {memory['document']} (score: {memory['distance']})")
                 results_string += f"{formatted_date} - {memory['document']} (score: {memory['distance']})\n"
             logger.debug(f"results_string:\n{results_string}")
 
@@ -262,122 +291,122 @@ class MemoryManager:
         all_messages=None,
         remaining_tokens=1000,
         verbose=False,
+        chat_id=None,
     ):
         category = "active_brain"
         process_dict = {"input": new_messages}
-        similar_messages = await self.search_memory(
-            category, new_messages, username, max_distance=0.15
-        )
         seen_ids = set()
 
-        if similar_messages:
-            process_dict["similar_messages"] = [
-                (m["document"], m["id"], m["distance"]) for m in similar_messages
-            ]
-            process_dict["created_new_memory"] = "no"
-        else:
-            chunks = await self.split_text_into_chunks(new_messages, 150, 25)
-            uid = secrets.token_hex(10)
-            for chunk in chunks:
-                # Create a memory for each chunk
-                await self.create_memory(
-                    category, chunk, username=username, metadata={"uid": uid}
-                )
-                logger.debug(f"adding memory: {chunk} to category: {category}")
-                process_dict["created_new_memory"] = "yes"
-
-        self.openai_manager.set_username(username)
-        subject_query = await self.openai_manager.ask_openai(
-            all_messages, "retriever", self.model_used, 100, 0.1, username=username
-        )
-        if (
-            "choices" in subject_query
-            and len(subject_query["choices"]) > 0
-            and "message" in subject_query["choices"][0]
-            and "content" in subject_query["choices"][0]["message"]
-        ):
-            subject = subject_query["choices"][0]["message"]["content"]
-        else:
-            process_dict[
-                "error"
-            ] = "subject_query does not contain the required elements"
-
-        if subject.lower() == "none":
-            subject = new_messages
-
-        process_dict[category] = {}
-        parsed_data = self.process_observation(subject)
-        results_list = []
-        process_dict[category]["query_results"] = {}
-        for data in parsed_data:
-            data_results = await self.search_memory(
+        chunks = await self.split_text_into_chunks(new_messages, 200)
+        uid = secrets.token_hex(10)
+        for chunk in chunks:
+            # Create a memory for each chunk
+            await self.create_memory(
                 category,
-                data,
-                username,
-                min_distance=0.0,
-                max_distance=2.0,
-                n_results=10,
+                chunk,
+                username=username,
+                metadata={"uid": uid, "chat_id": chat_id},
+                mUsername="user",
             )
-            # Initialize the list for this data item in the dictionary
-            process_dict[category]["query_results"][data] = []
-            for result in data_results:
-                if result.get("id") not in seen_ids:
-                    seen_ids.add(result.get("id"))
-                    id = result.get("id")
-                    id = id.lstrip("0") or "0"
-                    document = result.get("document")
-                    distance = round(result.get("distance"), 3)
-                    date = result["metadata"]["created_at"]
-                    formatted_date = datetime.datetime.fromtimestamp(date).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    )
-                    results_list.append((id, document, distance, formatted_date))
-                    # Add the result to the list for this data item
-                    process_dict[category]["query_results"][data].append(
-                        (id, document, distance, formatted_date)
-                    )
-
-        process_dict["results_list_before_token_check"] = results_list.copy()
-        result_string = ""
-        result_string = "\n".join(
-            f"({id}) {formatted_date} - {document} (score: {distance})"
-            for id, document, distance, formatted_date in results_list
-        )
-        token_count = utils.MessageParser.num_tokens_from_string(result_string)
-        while token_count > min(1000, remaining_tokens):
-            if len(results_list) > 1:
-                results_list.sort(key=lambda x: int(x[2]), reverse=True)
-                results_list.pop(0)
-                result_string = "\n".join(
-                    f"({id}) {formatted_date} - {document} (score: {distance})"
-                    for id, document, distance, formatted_date in results_list
-                )
+            logger.debug(
+                f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"
+            )
+            process_dict["created_new_memory"] = "yes"
+        if remaining_tokens > 100:
+            self.openai_manager.set_username(username)
+            subject_query = await self.openai_manager.ask_openai(
+                all_messages, "retriever", self.model_used, 100, 0.1, username=username
+            )
+            if (
+                "choices" in subject_query
+                and len(subject_query["choices"]) > 0
+                and "message" in subject_query["choices"][0]
+                and "content" in subject_query["choices"][0]["message"]
+            ):
+                subject = subject_query["choices"][0]["message"]["content"]
             else:
-                # If there's only one entry, shorten the document content
-                id, document, distance, formatted_date = results_list[0]
-                document = document[:-100]
-                result_string = (
-                    f"({id}) {formatted_date} - {document} (score: {distance})"
+                process_dict[
+                    "error"
+                ] = "subject_query does not contain the required elements"
+
+            if subject.lower() == "none":
+                subject = new_messages
+
+            process_dict[category] = {}
+            parsed_data = self.process_observation(subject)
+            results_list = []
+            process_dict[category]["query_results"] = {}
+            for data in parsed_data:
+                data_results = await self.search_memory(
+                    category,
+                    data,
+                    username,
+                    min_distance=0.0,
+                    max_distance=2.0,
+                    n_results=10,
                 )
-            token_count = utils.MessageParser.num_tokens_from_string(result_string)
+                # Initialize the list for this data item in the dictionary
+                process_dict[category]["query_results"][data] = []
+                for result in data_results:
+                    if result.get("id") not in seen_ids:
+                        seen_ids.add(result.get("id"))
+                        id = result.get("id")
+                        id = id.lstrip("0") or "0"
+                        document = result.get("document")
+                        distance = round(result.get("distance"), 3)
+                        date = result["metadata"]["created_at"]
+                        formatted_date = datetime.datetime.fromtimestamp(date).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        results_list.append((id, document, distance, formatted_date))
+                        # Add the result to the list for this data item
+                        process_dict[category]["query_results"][data].append(
+                            (id, document, distance, formatted_date)
+                        )
 
-        unique_results = set()  # Create a set to store unique results
-        for id, document, distance, formatted_date in results_list:
-            unique_results.add((id, document, distance, formatted_date))
-            results_list.sort(key=lambda x: int(x[0]))
-        result_string = "\n".join(
-            f"({id}) {formatted_date} - {document} (score: {distance})"
-            for id, document, distance, formatted_date in results_list
-        )
-
-        process_dict["results_list_after_token_check"] = results_list
-        process_dict["result_string"] = result_string
-        process_dict["token_count"] = token_count
-        if verbose:
-            await utils.MessageSender.send_message(
-                {"type": "relations", "content": process_dict}, "blue", username
+            process_dict["results_list_before_token_check"] = results_list.copy()
+            result_string = ""
+            result_string = "\n".join(
+                f"({id}) {formatted_date} - {document} (score: {distance})"
+                for id, document, distance, formatted_date in results_list
             )
-        return result_string, token_count, unique_results
+            token_count = utils.MessageParser.num_tokens_from_string(result_string)
+            while token_count > min(1000, remaining_tokens):
+                if len(results_list) > 1:
+                    results_list.sort(key=lambda x: int(x[2]), reverse=True)
+                    results_list.pop(0)
+                    result_string = "\n".join(
+                        f"({id}) {formatted_date} - {document} (score: {distance})"
+                        for id, document, distance, formatted_date in results_list
+                    )
+                else:
+                    # If there's only one entry, shorten the document content
+                    id, document, distance, formatted_date = results_list[0]
+                    document = document[:-100]
+                    result_string = (
+                        f"({id}) {formatted_date} - {document} (score: {distance})"
+                    )
+                token_count = utils.MessageParser.num_tokens_from_string(result_string)
+
+            unique_results = set()  # Create a set to store unique results
+            for id, document, distance, formatted_date in results_list:
+                unique_results.add((id, document, distance, formatted_date))
+                results_list.sort(key=lambda x: int(x[0]))
+            result_string = "\n".join(
+                f"({id}) {formatted_date} - {document} (score: {distance})"
+                for id, document, distance, formatted_date in results_list
+            )
+
+            process_dict["results_list_after_token_check"] = results_list
+            process_dict["result_string"] = result_string
+            process_dict["token_count"] = token_count
+            if verbose:
+                await utils.MessageSender.send_message(
+                    {"type": "relations", "content": process_dict}, "blue", username
+                )
+            return result_string, token_count, unique_results
+        else:
+            return "", 0, set()
 
     async def process_incoming_memory(
         self, category, content, username=None, remaining_tokens=1000, verbose=False
@@ -507,11 +536,15 @@ class MemoryManager:
             categories = self.process_category(category)
             uid = secrets.token_hex(10)
             for category in categories:
-                chunks = await self.split_text_into_chunks(content, 150, 25)
+                chunks = await self.split_text_into_chunks(content, 200)
                 for chunk in chunks:
                     # Create a memory for each chunk
                     await self.create_memory(
-                        category, chunk, username=username, metadata={"uid": uid}
+                        category,
+                        chunk,
+                        username=username,
+                        metadata={"uid": uid},
+                        mUsername="user",
                     )
                     logger.debug(f"adding memory: {chunk} to category: {category}")
             process_dict["created_new_memory"] = "yes, categories: " + ", ".join(
@@ -551,37 +584,24 @@ class MemoryManager:
                     process_dict.append((id, document, distance, formatted_date))
         return full_search_result, process_dict
 
-    async def process_incoming_memory_assistant(self, category, content, username=None):
+    async def process_incoming_memory_assistant(
+        self, category, content, username=None, chat_id=None
+    ):
         """Process the incoming memory and return the updated active brain data."""
         logger.debug(f"Processing incoming memory: {content}")
 
-        # search for the queries in the memory
-        full_search_result, not_needed = await self.search_queries(
-            category, [content], username, process_dict=[]
-        )
-
-        # Check if a similar message already exists
-        similar_messages = await self.search_memory(
-            category, content, username, max_distance=0.15
-        )
-
-        if similar_messages:
-            logger.debug("Message is similar to a previous message(s):")
-            for similar_message in similar_messages:
-                logger.debug(
-                    f"({similar_message['id']}) {similar_message['document']} - score: {similar_message['distance']}"
-                )
-        else:
-            # If no similar message, create a new memory
-            uid = secrets.token_hex(10)
-            chunks = await self.split_text_into_chunks(content, 150, 25)
-            for chunk in chunks:
-                # Create a memory for each chunk
-                await self.create_memory(
-                    category, chunk, username=username, metadata={"uid": uid}
-                )
-                logger.debug(f"adding memory: {chunk} to category: {category}")
-        # print(f"Search results: {full_search_result}")
+        # create a new memory
+        uid = secrets.token_hex(10)
+        chunks = await self.split_text_into_chunks(content, 200)
+        for chunk in chunks:
+            await self.create_memory(
+                category,
+                chunk,
+                username=username,
+                metadata={"uid": uid, "chat_id": chat_id},
+                mUsername="assistant",
+            )
+            logger.debug(f"adding memory: {chunk} to category: {category}")
         return
 
     def process_observation(self, string):
@@ -591,7 +611,6 @@ class MemoryManager:
         parts = [
             part.split(":", 1)[1].lstrip() if ":" in part else part for part in parts
         ]
-        # print(f"Queries: {parts}")
         return parts
 
     def process_category_query(self, string):
@@ -616,7 +635,20 @@ class MemoryManager:
         for line in lines:
             if not line.strip():
                 continue
-            result.append(line.lower().replace(" ", "_"))
+            line = line.lower().replace(" ", "_")
+            line = re.sub(r"[^a-z0-9-_]", "", line)  # Remove invalid characters
+            line = re.sub(
+                r"\.{2,}", ".", line
+            )  # Replace consecutive periods with a single one
+            line = re.sub(
+                r"^[^a-z0-9]*|[^a-z0-9]*$", "", line
+            )  # Remove leading/trailing invalid characters
+
+            # If line is still too long or too short, replace it with a default category
+            if len(line) < 3 or len(line) > 63:
+                line = "default"
+
+            result.append(line)
         return result
 
     async def note_taking(
@@ -723,6 +755,12 @@ class MemoryManager:
             process_dict["actions"] = actions
 
             for action, file, content in actions:
+                filepath = os.path.join(filedir, file)
+
+                # Check if the directory exists, if not, create it
+                if not os.path.isdir(filedir):
+                    os.makedirs(filedir, exist_ok=True)
+
                 if action == "create":
                     with open(f"{filedir}/{file}", "w") as f:
                         f.write(content)

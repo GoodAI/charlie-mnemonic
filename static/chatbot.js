@@ -1,5 +1,7 @@
 var currentActiveTab = 1;
 var categoryValues;
+
+var tempFullChunk = '';
 // populate the settings menu
 function populateSettingsMenu(settings) {
     var settingsMenu = document.getElementById("SidenavAddons");
@@ -163,7 +165,6 @@ function createAddonsTabContent(addons, tabId) {
                 return function (e) {
                     e.preventDefault();
                     edit_status('addons', addon, !addons[addon]);
-                    console.log('change_addon_status: ', addon, !addons[addon]);
                 };
             })(addon);
             tabContent.appendChild(menuItem);
@@ -192,7 +193,6 @@ function createDataTabContent(audio, tabId) {
                 return function (e) {
                     e.preventDefault();
                     edit_status('audio', audioItem, !audio[audioItem]);
-                    console.log('change_audio_status: ', audioItem, !audio[audioItem]);
                 };
             })(audioItem);
             tabContent.appendChild(menuItem);
@@ -219,7 +219,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
     avatarItem.onclick = function (e) {
         e.preventDefault();
         edit_status('avatar', 'avatar', !settings.avatar.avatar);
-        console.log('change_avatar_status: ', !settings.avatar.avatar);
     };
     tabContent.appendChild(avatarItem);
 
@@ -242,7 +241,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
     languageItem.value = settings.language.language;
     languageItem.onchange = function (e) {
         edit_status('language', 'language', e.target.value);
-        console.log('change_language_status: ', e.target.value);
     }
     tabContent.appendChild(languageItem);
 
@@ -257,7 +255,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
     displayNameItem.value = settings.display_name;
     displayNameItem.onchange = function (e) {
         edit_status('db', 'display_name', e.target.value);
-        console.log('change_display_name_status: ', e.target.value);
     }
     tabContent.appendChild(displayNameItem);
 
@@ -274,7 +271,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
     verboseItem.onclick = function (e) {
         e.preventDefault();
         edit_status('verbose', 'verbose', !settings.verbose.verbose);
-        console.log('change_verbose_status: ', !settings.verbose.verbose);
     }
     tabContent.appendChild(verboseItem);
 
@@ -286,7 +282,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
     cotItem.onclick = function (e) {
         e.preventDefault();
         edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
-        console.log('change_cot_status: ', !settings.cot_enabled.cot_enabled);
     }
     tabContent.appendChild(cotItem);
 
@@ -425,7 +420,6 @@ function saveMemoryConfiguration() {
     })
         .then(response => response.json())
         .then(data => {
-            console.log('Memory settings updated successfully');
             setSettings(data);
             overlay.style.display = 'none';
         })
@@ -461,7 +455,6 @@ function setSettings(newSettings) {
     const overlayMessage = document.getElementById('overlay-message');
     overlay.style.display = 'none';
     if (newSettings) {
-        console.log('received settings:', newSettings);
         // if no display name is set, use the username
         if (newSettings.display_name == null || newSettings.display_name == '') {
             newSettings.display_name = user_name;
@@ -581,53 +574,26 @@ function handleDebugMessage(msg) {
     }
 }
 
-function handleFunctionResponse(msg) {
-    var content = msg.message;
-    var timestamp = new Date().toLocaleTimeString();
-    console.log('function response');
-    console.log('content:', content);
-    tempchild = document.getElementById('messages').lastChild;
-    if (tempchild) {
-        if (tempchild.querySelector('.spinner') != null) {
-            tempchild.querySelector('.spinner').remove();
-            document.getElementById('messages').lastChild.remove();
-        }
-    }
+function handleUsage(msg) {
+    // update the userStats with the new usage
+    var userStats = document.getElementById('userStats');
+    userStats.innerHTML = '';
+    userStats.innerHTML += '<p>Lifetime: Tokens: ' + msg.usage.total_tokens + ', cost: $' + msg.usage.total_cost + '</p>';
 
-    var lastMessage = document.querySelector('.last-message');
-    if (lastMessage) {
-        lastMessage.classList.remove('last-message');
-    }
-
-    var chatMessage = document.createElement('div');
-    chatMessage.innerHTML = `
-        <div class="message fr">
-            <span class="timestamp">${timestamp}</span>
-            <div class="bubble">
-                <div class="expandable" onclick="this.classList.toggle('expanded')">
-                    <div class="title">Function response:<div class="arrow"></div></div>
-                    ${JSON.stringify(content, null, 2)}
-                </div>
-            </div>
-        </div>
-    `;
-    document.getElementById('messages').appendChild(chatMessage);
-
-    var botMessage = document.createElement('div');
-    botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-    document.getElementById('messages').appendChild(botMessage);
-
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-    content = '';
-    tempReceived = '';
-    tempFormatted = '';
 }
+
+function handleDailyUsage(msg) {
+    // update the userStats with the new usage
+    var dailyLimit = document.getElementById('dailyLimit');
+    dailyLimit.innerHTML = '';
+    dailyLimit.innerHTML += '<p>Daily limit: $' + msg.daily_usage.daily_cost.toFixed(5) + '/$' + daily_limit + '</p>';
+
+}
+
 
 function handlePlanMessage(msg) {
     var content = msg.content && msg.content.content;
     var timestamp = new Date().toLocaleTimeString();
-    console.log('PLAN response');
-    console.log('content:' + content);
     tempchild = document.getElementById('messages').lastChild;
     if (tempchild) {
         if (tempchild.querySelector('.spinner') != null) {
@@ -668,81 +634,31 @@ function handlePlanMessage(msg) {
     tempFormatted = '';
 }
 
-function handleUsage(msg) {
-    // update the userStats with the new usage
-    var userStats = document.getElementById('userStats');
-    userStats.innerHTML = '';
-    userStats.innerHTML += '<p>Lifetime: Tokens: ' + msg.usage.total_tokens + ', cost: $' + msg.usage.total_cost + '</p>';
-
-}
-
-function handleDailyUsage(msg) {
-    // update the userStats with the new usage
-    var dailyLimit = document.getElementById('dailyLimit');
-    dailyLimit.innerHTML = '';
-    dailyLimit.innerHTML += '<p>Daily limit: $' + msg.daily_usage.daily_cost.toFixed(5) + '/$' + daily_limit + '</p>';
-
-}
-
 function handleFunctionCall(msg) {
     var timestamp = new Date().toLocaleTimeString();
-    var content = msg.message;
-    console.log('using addon');
-    console.log('content:', content);
-    tempchild = document.getElementById('messages').lastChild;
-    if (tempchild) {
-        if (tempchild.querySelector('.spinner') != null) {
-            tempchild.querySelector('.spinner').remove();
-            document.getElementById('messages').lastChild.remove();
-        }
-    }
-    var addon = content.function;
-    var args = parseComplexJson(content.arguments);
+    var addon = msg.message.function;
+    var args = parseComplexJson(msg.message.arguments); // Assuming parseComplexJson is a function you have defined
 
-    var lastMessage = document.querySelector('.last-message');
-    if (lastMessage) {
-        lastMessage.classList.remove('last-message');
-    }
+    var callDetails = {
+        "Function": addon,
+        "Arguments": args
+    };
 
-    var argsString = '';
-    for (var key in args) {
-        if (args.hasOwnProperty(key)) {
-            argsString += `<div class="arg"><b>${key}:</b> ${escapeHTML(args[key])}</div>`;
-        }
-    }
+    // Call updateOrCreateDebugBubble to handle the display
+    updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
+}
 
-    var chatMessage = `
-        <div class="message system">
-            <span class="timestamp">${timestamp}</span>
-            <div class="bubble">
-                <div class="expandable" onclick="this.classList.toggle('expanded')">
-                    <div class="title">Using: ${addon}<div class="arrow"></div></div>
-                    ${argsString}
-                </div>
-            </div>
-        </div>
-    `;
+function handleFunctionResponse(msg) {
+    var timestamp = new Date().toLocaleTimeString();
+    var content = { "Response": msg.message }; // Wrap the response in an object
 
-    var chatMessageElement = document.createElement('div');
-    chatMessageElement.innerHTML = chatMessage;
-    document.getElementById('messages').appendChild(chatMessageElement);
-
-    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-    var botMessageElement = document.createElement('div');
-    botMessageElement.innerHTML = botMessage;
-    document.getElementById('messages').appendChild(botMessageElement);
-
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
-    content = '';
-    tempReceived = '';
-    tempFormatted = '';
+    // Call updateOrCreateDebugBubble to handle the display
+    updateOrCreateDebugBubble("Function Response", timestamp, content);
 }
 
 function handleErrorMessage(msg) {
     var timestamp = new Date().toLocaleTimeString();
     var content = msg;
-    console.log('error');
-    console.log('content:', content);
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
         var spinner = tempchild.querySelector('.spinner');
@@ -774,6 +690,90 @@ function handleErrorMessage(msg) {
     chatMessageElement.innerHTML = chatMessage;
     document.getElementById('messages').appendChild(chatMessageElement);
 }
+
+function handleTabDescription(msg) {
+    // update the corresponding button with the tab description
+    var tabId = msg.tab_id;
+    // trim to the first 5 words only
+    var tabDescription = msg.tab_description.split(' ').slice(0, 5).join(' ');
+    if (msg.tab_description.split(' ').length > 5) {
+        tabDescription += '...';
+    }
+    var tabButton = document.getElementById('chat-tab-' + tabId);
+    if (tabButton) {
+        tabButton.textContent = tabDescription;
+    }
+    // add the typewriter class to the tab button
+    tabButton.classList.add('typewriter-text');
+    // force the browser to reflow the element
+    tabButton.offsetWidth;
+}
+
+function handleStopMessage(msg) {
+    var lastMessage = document.querySelector('.last-message .bubble');
+    if (lastMessage) {
+        // Remove the typing indicator
+        removeTypingIndicator();
+
+        // Appending the new chunk to the existing content of the last message
+        lastMessage.innerHTML = formatTempReceived(tempFullChunk);
+    }
+    tempFullChunk = '';
+
+    // Function to remove the typing indicator
+    function removeTypingIndicator() {
+        var typingIndicator = document.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+}
+
+function handleChunkMessage(msg) {
+    // check if the last message is a chunk message or a debug message
+
+    var timestamp = new Date().toLocaleTimeString();
+    var chunkContent = msg.chunk_message;
+    tempFullChunk += chunkContent;
+
+    // remove the spinner from the last message
+    var tempchild = document.getElementById('messages').lastChild;
+    if (tempchild && tempchild.querySelector) {
+        var spinner = tempchild.querySelector('.spinner');
+        if (spinner != null) {
+            spinner.remove();
+            document.getElementById('messages').lastChild.remove();
+        }
+    }
+
+    var lastMessage = document.querySelector('.last-message .bubble');
+    if (lastMessage) {
+        // Appending the new chunk to the existing content of the last message
+        var tempcontent = tempFullChunk + createTypingIndicator();
+        lastMessage.innerHTML = formatTempReceived(tempcontent);
+
+    } else {
+        // If there is no last message, create a new message element for the chunk
+        var chatMessage = `
+            <div class="message bot last-message">
+                <span class="timestamp">${timestamp}</span>
+                <div class="bubble">${chunkContent + createTypingIndicator()}</div>
+            </div>
+        `;
+
+        var chatMessageElement = document.createElement('div');
+        chatMessageElement.innerHTML = chatMessage;
+        document.getElementById('messages').appendChild(chatMessageElement);
+    }
+    function createTypingIndicator() {
+        return '<div class="typing-indicator"><div class="dot"></div></div>';
+    }
+    resetState();
+
+    // Auto-scroll to the bottom of the chat
+    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+}
+
 
 function handleRateLimit(msg) {
     const toastContainer = document.querySelector('.toast-container');
@@ -811,13 +811,9 @@ function handleRateLimit(msg) {
     const myToast = new bootstrap.Toast(toastEl, { delay: 10000 });
     toastContainer.appendChild(toastEl);
     myToast.show();
-}
-
+}  
 
 function handleRelations(msg) {
-    var timestamp = new Date().toLocaleTimeString();
-    console.log('relations response');
-    console.log('content:', msg);
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
         var spinner = tempchild.querySelector('.spinner');
@@ -826,54 +822,12 @@ function handleRelations(msg) {
             document.getElementById('messages').lastChild.remove();
         }
     }
-    var content = `Input: ${msg.input} -> Stored in memory: ${msg.created_new_memory}<br/>`;
-
-    for (var category in msg) {
-        if (category != 'input' && category != 'created_new_memory' && category != 'result_string' && category != 'token_count' && category != 'similar_messages' && category != 'results_list_after_token_check' && category != 'results_list_before_token_check') {
-            content += `<b>Category: ${category}</b><br/>`;
-            for (var query in msg[category]['query_results']) {
-                content += `<b>  Query: ${query}</b> -> <br/>`;
-                for (var result of msg[category]['query_results'][query]) {
-                    content += `    (${result[0]}) ${result[1]} (score: ${result[2]})<br/>`;
-                }
-            }
-        }
-    }
-
-    content += `<b>Merged results:</b><br/>${msg.result_string.replace(/\n/g, '<br/>')}`;
-
-    var lastMessage = document.querySelector('.last-message');
-    if (lastMessage) {
-        lastMessage.classList.remove('last-message');
-    }
-
-    var chatMessage = `
-        <div class="message debug">
-            <span class="timestamp">${timestamp}</span>
-            <div class="bubble">
-                <div class="expandable" onclick="this.classList.toggle('expanded')">
-                    <div class="title">Brain Logic:<div class="arrow"></div></div>
-                    <div class="description">${content}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    var chatMessageElement = document.createElement('div');
-    chatMessageElement.innerHTML = chatMessage;
-    document.getElementById('messages').appendChild(chatMessageElement);
-
-    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-    var botMessageElement = document.createElement('div');
-    botMessageElement.innerHTML = botMessage;
-    document.getElementById('messages').appendChild(botMessageElement);
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    var timestamp = new Date().toLocaleTimeString();
+    updateOrCreateDebugBubble("thinking...", timestamp, msg);
 }
 
 function handleNoteTaking(msg) {
     var timestamp = new Date().toLocaleTimeString();
-    console.log('note taking response');
-    console.log('content:', msg);
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
         var spinner = tempchild.querySelector('.spinner');
@@ -882,50 +836,107 @@ function handleNoteTaking(msg) {
             document.getElementById('messages').lastChild.remove();
         }
     }
-
-    var content = `<b>Current notes:</b> ${msg.files_content_string.replace(/\n/g, '<br/>')}<br/>`;
-    if (Array.isArray(msg.actions)) {
-        msg.actions.forEach(function (action, index) {
-            content += `<b>Action ${index + 1}:</b> ${action[0]}<br/><b>Category:</b> ${action[1]}<br/><b>Content:</b> ${action[2]}<br/>`;
-        });
-    } else {
-        content += `<b>Action:</b> ${msg.actions[0]}<br/><b>Category:</b> ${msg.actions[1]}<br/><b>Content:</b> ${msg.actions[2]}<br/>`;
-    }
-    if (msg.error) {
-        content += `<br/><b>OpenAI Response:</b> ${msg.note_taking_query}<br/><b>Error:</b> ${msg.error}<br/>`;
-    }
-
-    var lastMessage = document.querySelector('.last-message');
-    if (lastMessage) {
-        lastMessage.classList.remove('last-message');
-    }
-
-    var chatMessage = `
-        <div class="message debug">
-            <span class="timestamp">${timestamp}</span>
-            <div class="bubble">
-                <div class="expandable" onclick="this.classList.toggle('expanded')">
-                    <div class="title">Note Taking:<div class="arrow"></div></div>
-                    <div class="description">${content}</div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    var chatMessageElement = document.createElement('div');
-    chatMessageElement.innerHTML = chatMessage;
-    document.getElementById('messages').appendChild(chatMessageElement);
-
-    var botMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-    var botMessageElement = document.createElement('div');
-    botMessageElement.innerHTML = botMessage;
-    document.getElementById('messages').appendChild(botMessageElement);
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    updateOrCreateDebugBubble("exploring notes...", timestamp, msg);
 }
 
-async function get_recent_messages(username) {
+function updateOrCreateDebugBubble(message, timestamp, msg) {
+    var messagesContainer = document.getElementById('messages');
+    var lastMessageWrapper = messagesContainer.lastElementChild;
+    var lastMessage = lastMessageWrapper ? lastMessageWrapper.firstElementChild : null;
+    var isLastDebug = lastMessage && lastMessage.classList.contains('debug');
+
+    console.log(msg);
+
+    var formattedMsgContent = '';
+    for (var key in msg) {
+        if (msg.hasOwnProperty(key)) {
+            // Selectively display keys
+            if (["input", "created_new_memory", "active_brain", "error", "Function", "Arguments", "Response"].includes(key)) {
+                formattedMsgContent += `<b>${key}:</b> `;
+
+                if (key === 'active_brain' && typeof msg[key] === 'object') {
+                    // Summarize the contents of active_brain
+                    formattedMsgContent += 'Query Categories: ' + Object.keys(msg[key]).length + '<br/>';
+                } else {
+                    // Format other keys normally
+                    formattedMsgContent += `${formatContent(msg[key])}<br/>`;
+                }
+            }
+            
+        console.log("Formatted content for key", key, formattedMsgContent);
+        }
+    }
+    var expandableContent = `<div class="expandable-content" style="display: none;">${formattedMsgContent}</div>`;
+
+    if (isLastDebug) {
+        // Update existing debug bubble
+        let typewriterText = lastMessage.querySelector('.typewriter-text');
+        if (typewriterText) {
+            typewriterText.textContent = message;
+            typewriterText.classList.remove('typewriter-text'); // Remove class
+            void typewriterText.offsetWidth; // Trigger reflow
+            typewriterText.classList.add('typewriter-text'); // Add class back
+        }
+        var expandableContentElement = lastMessageWrapper.querySelector('.expandable-content');
+        if (expandableContentElement) {
+            expandableContentElement.innerHTML += formattedMsgContent; // Append new data
+        } else {
+            lastMessageWrapper.innerHTML += expandableContent;
+        }
+    } else {
+        // Create new debug bubble
+        let botMessage = `
+            <div class="message debug">
+                <span class="timestamp">${timestamp}</span>
+                <div class="bubble">
+                    <div class="typewriter-container">
+                        <div class="loading-icon"></div>
+                        <div class="typewriter-text">${message}</div>
+                    </div>
+                </div>
+            </div>`;
+        let botMessageWrapper = document.createElement('div');
+        botMessageWrapper.innerHTML = botMessage + expandableContent;
+        messagesContainer.appendChild(botMessageWrapper);
+    }
+}
+
+function formatContent(value) {
+    if (typeof value === 'object') {
+        if (Array.isArray(value)) {
+            // Format array elements
+            return value.map(item => formatContent(item)).join('<br/>');
+        } else {
+            // Format object properties
+            let formattedObjContent = '';
+            for (let key in value) {
+                if (value.hasOwnProperty(key)) {
+                    formattedObjContent += `<b>${key}:</b> ${formatContent(value[key])}<br/>`;
+                }
+            }
+            return formattedObjContent;
+        }
+    } else {
+        // Format non-object values (string, number, boolean)
+        return value.toString();
+    }
+}
+
+function formatSubContent(subKey, subContent) {
+    var result = `<b>${subKey}:</b> `;
+    if (Array.isArray(subContent)) {
+        result += subContent.map(item => formatContent(item)).join('<br/>');
+    } else if (typeof subContent === 'object') {
+        result += JSON.stringify(subContent, null, 2).replace(/\n/g, '<br/>');
+    } else {
+        result += subContent;
+    }
+    return result + '<br/>';
+}
+
+async function get_chat_tabs(username) {
     try {
-        const response = await fetch(API_URL + '/get_recent_messages/', {
+        const response = await fetch(API_URL + '/get_chat_tabs/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -934,27 +945,20 @@ async function get_recent_messages(username) {
             credentials: 'include'
         });
 
-        const data = await handleError(response);
-        console.log('recent messages:', data);
+        const full_data = await handleError(response);
+        active_tab_data = full_data.active_tab_data;
+        tabs_data = full_data.tab_data;
 
-        // data is an array with messages from the user and the assistant
-        let messages = [];
+        if (active_tab_data.chat_id != null) {
+            chat_id = active_tab_data.chat_id;
+        }
+        else {
+            addChatTab();
+            get_chat_tabs(username);
+        }
 
-        data.forEach(message => {
-            let user = message.split(':')[0];
-            let text = message.split(': ').slice(1).join(': ');
-
-            if (user === 'assistant') {
-                messages.push({ text: text, user: 'bot' });
-            } else {
-                messages.push({ text: text, user: 'user' });
-            }
-        });
-
-        // Process the messages in the order they were received
-        messages.forEach(message => {
-            addCustomMessage(message.text, message.user, false, true);
-        });
+        populateChatTabs(tabs_data);
+        
 
     } catch (error) {
         console.error('Failed to send message: ', error);
@@ -963,10 +967,140 @@ async function get_recent_messages(username) {
 }
 
 
+function setChat(id) {
+    chat_id = id;
+
+    // Update active state for chat tabs
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var tabs = chatTabs.getElementsByClassName('chat-tab');
+    for (var i = 0; i < tabs.length; i++) {
+        tabs[i].classList.remove('active');
+    }
+    // set the active tab
+    var targetTab = document.getElementById('chat-tab-' + id);
+    targetTab.classList.add('active');
+    swap_tab();
+    get_recent_messages(user_name, chat_id);
+}
+
+// Random UUID generator
+// The purpose of this function is to conform to the standard UUID format (8-4-4-4-12), 
+// where the 13th character (represented by ‘y’) is always 8, 9, A, or B.
+const uuid = () => {
+	return `CLANGxxx-xxxx-xxxx-yxxx-${Date.now().toString(16)}`.replace(
+		/[xy]/g,
+		function(c) {
+			var r = (Math.random() * 16) | 0,
+				v = c == "x" ? r : (r & 0x3) | 0x8;
+			return v.toString(16);
+		}
+	);
+};
+
+function addChatTab(id) {
+    if (id == undefined) {
+        id = uuid();
+    }
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var newTab = document.createElement('button');
+    newTab.className = 'chat-tab';
+    newTab.innerText = 'New Chat';
+    newTab.id = 'chat-tab-' + id;
+    newTab.onclick = function() {
+        setChat(id);
+    };
+    chatTabs.appendChild(newTab);
+    setChat(id);
+}
+
+function deleteChatTab() {
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var targetTab = document.getElementById('chat-tab-' + chat_id);
+    if (!targetTab) {
+        return; // Exit if the target tab is not found
+    }
+
+    var newActiveTab = targetTab.nextElementSibling || targetTab.previousElementSibling;
+    
+    // Remove the target tab
+    chatTabs.removeChild(targetTab);
+
+    // Select new active tab
+    if (newActiveTab) {
+        var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
+        setChat(newActiveTabId);
+    } else {
+        addChatTab();
+    }
+
+    // Send the delete request
+    fetch(API_URL + '/delete_chat_tab/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 'username': user_name, 'chat_id': chat_id }),
+        credentials: 'include'
+    })
+        .then(response => response.json())
+        .catch(console.error);
+}
+
+
+async function get_recent_messages(username, chat_id) {
+    try {
+        const response = await fetch(API_URL + '/get_recent_messages/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'username': username, 'chat_id': chat_id }),
+            credentials: 'include'
+        });
+
+        const full_data = await handleError(response);
+
+        data = full_data.recent_messages;
+
+        // data is an array with messages from the user and the assistant
+        let messages = [];
+
+        data.forEach(message => {
+            
+            var text = message.document;
+            var user = message.metadata.username;
+            var timestamp = message.metadata.updated_at;
+            
+            // if no username is set get the username from the message (trying some backwards compatibility here)
+            if (user == undefined || (user.toLowerCase() != 'user' && user.toLowerCase() != 'assistant') && text.includes(': ')) {
+                user = text.split(':')[0].trim().toLowerCase();
+                text = text.split(': ').slice(1).join(': ');
+            }
+
+            if (user.toLowerCase() === 'assistant') {
+                messages.push({ text: text, user: 'bot', timestamp: timestamp });
+            }
+            else if (user.toLowerCase() === 'user') {
+                messages.push({ text: text, user: 'user', timestamp: timestamp });
+            } else {
+                messages.push({ text: text, user: 'bot', timestamp: timestamp });
+            }
+        });
+
+        // Process the messages in the order they were received
+        messages.forEach(message => {
+            addCustomMessage(message.text, message.user, false, true, message.timestamp);
+        });
+
+    } catch (error) {
+        console.error('Failed to send message: ', error);
+        showErrorMessage('Failed to send message: ' + error);
+    }
+}
+
 function get_settings(username) {
     var timestamp = new Date().toLocaleTimeString();
     prefix = production ? 'wss://' : 'ws://';
-    console.log('connecting to: ' + prefix + document.domain + ':' + location.port + '/ws/' + username);
     var socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
 
     var reconnectInterval = null;
@@ -998,7 +1132,6 @@ function get_settings(username) {
     };
 
     socket.addEventListener('message', function (event) {
-        console.log('Message from server: ', event.data);
         // TODO: proper parsing for all of the next messages
         let msg = JSON.parse(event.data);
 
@@ -1033,6 +1166,15 @@ function get_settings(username) {
         }
         else if (msg.error) {
             handleErrorMessage(msg);
+        }
+        else if (msg.chunk_message) {
+            handleChunkMessage(msg);
+        }
+        else if (msg.stop_message) {
+            handleStopMessage(msg);
+        }
+        else if (msg.tab_description) {
+            handleTabDescription(msg);
         }
 
 
@@ -1125,7 +1267,6 @@ async function handleError(response) {
 };
 
 function externalMessage(msg) {
-    console.log('External message received: ', msg);
     addExternalMessage(msg);
 };
 
@@ -1137,15 +1278,7 @@ async function parseMessage(msg) {
             console.error('Error parsing JSON: ', e);
         }
     }
-    console.log(msg);
     return msg;
-}
-
-function formatContent(content) {
-    if (content) {
-        return content.replace(/\n/g, '').trim();
-    }
-    return null;
 }
 
 function removeSpinner() {
@@ -1161,12 +1294,13 @@ function removeSpinner() {
 
 function formatTempReceived(tempReceived) {
     var tempFormatted = tempReceived;
-    var count = (tempReceived.match(/```/g) || []).length;
-    console.log('count: ' + count);
+    var count = (tempReceived.match(/(`\s*`\s*`)|(```)/g) || []).length;
+    tempReceived = tempReceived.replace(/(`\s*`\s*`)/g, '```');
     if (count > 0) {
         if (count % 2 == 0) {
             tempFormatted = marked(tempReceived);
         } else {
+            tempReceived = tempReceived.replace('<div class="typing-indicator"><div class="dot"><\/div><\/div>', '');
             tempFormatted = tempReceived + '\n```';
             tempFormatted = marked(tempFormatted);
         }
@@ -1235,7 +1369,6 @@ function resetState() {
 async function onResponse(msg) {
     var timestamp = new Date().toLocaleTimeString();
     msg = await parseMessage(msg);
-    let content = formatContent(msg.content);
     removeSpinner();
     tempReceived += msg.content;
     tempFormatted = formatTempReceived(tempReceived);

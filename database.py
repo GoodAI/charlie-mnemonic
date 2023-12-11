@@ -126,6 +126,109 @@ class Database:
         )
         return self.cursor.fetchone()[0]
 
+    def get_tab_data(self, user_id):
+        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        dict_cursor.execute(
+            "SELECT * FROM chat_tabs WHERE user_id = %s ORDER BY id", (user_id,)
+        )
+        rows = dict_cursor.fetchall()
+        return rows
+
+    def get_tab_count(self, user_id):
+        self.cursor.execute(
+            "SELECT COUNT(*) FROM chat_tabs WHERE user_id = %s", (user_id,)
+        )
+        return self.cursor.fetchone()[0]
+
+    def get_tab_description(self, tab_id):
+        self.cursor.execute(
+            "SELECT chat_name FROM chat_tabs WHERE tab_id = %s", (tab_id,)
+        )
+        return self.cursor.fetchone()[0]
+
+    def get_active_tab_data(self, user_id):
+        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
+        dict_cursor.execute(
+            "SELECT * FROM chat_tabs WHERE user_id = %s AND is_active = true LIMIT 1",
+            (user_id,),
+        )
+        row = dict_cursor.fetchone()
+        return row
+
+    def insert_tab_data(self, user_id, chat_id, chat_name, tab_id, is_active):
+        self.cursor.execute(
+            """
+        INSERT INTO chat_tabs (user_id, chat_id, chat_name, tab_id, is_active) 
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+            (user_id, chat_id, chat_name, tab_id, is_active),
+        )
+        self.conn.commit()
+
+    def update_tab_data(self, user_id, chat_name, tab_id, is_active):
+        self.cursor.execute(
+            """
+            UPDATE chat_tabs
+            SET chat_name = %s, tab_id = %s, is_active = %s
+            WHERE user_id = %s
+        """,
+            (chat_name, tab_id, is_active, user_id),
+        )
+        self.conn.commit()
+
+    def update_tab_description(self, tab_id, chat_name):
+        self.cursor.execute(
+            """
+            UPDATE chat_tabs
+            SET chat_name = %s
+            WHERE tab_id = %s
+        """,
+            (chat_name, tab_id),
+        )
+        self.conn.commit()
+
+    def set_active_tab(self, user_id, tab_id):
+        # Convert user_id and tab_id to integers if they are not already
+        try:
+            # set the active tab to false for all other tabs except
+            self.cursor.execute(
+                """
+                UPDATE chat_tabs
+                SET is_active = false
+                WHERE user_id = %s AND chat_id != %s
+                """,
+                (user_id, tab_id),
+            )
+            self.conn.commit()
+
+            # set the active tab to true for the given tab_id
+            self.cursor.execute(
+                """
+                UPDATE chat_tabs
+                SET is_active = true
+                WHERE user_id = %s AND chat_id = %s
+                """,
+                (user_id, tab_id),
+            )
+            self.conn.commit()
+        except Exception as e:
+            logger.error(e)
+
+    def delete_tab_data(self, user_id):
+        self.cursor.execute("DELETE FROM chat_tabs WHERE user_id = %s", (user_id,))
+        self.conn.commit()
+
+    def disable_tab(self, user_id, tab_id):
+        self.cursor.execute(
+            """
+            UPDATE chat_tabs
+            SET is_enabled = false
+            WHERE user_id = %s AND chat_id = %s
+        """,
+            (user_id, tab_id),
+        )
+        self.conn.commit()
+
     def get_username(self, user_id):
         self.cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
         return self.cursor.fetchone()

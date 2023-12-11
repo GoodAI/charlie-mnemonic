@@ -3,6 +3,7 @@
 
 <head>
     <title>GoodAI Agent {{version}}</title>
+    <link href='https://fonts.googleapis.com/css?family=Lexend' rel='stylesheet'>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
     <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
@@ -57,6 +58,7 @@
         var isWaiting = false;
         var isRecording = false;
         var daily_limit = '{{ daily_limit }}';
+        var chat_id = 0;
 
         var mediaRecorder;
         var chunks = [];
@@ -89,6 +91,8 @@
             },
             renderer: renderer,
         });
+
+
         
     </script>
     <script src="chatbot.js"></script>
@@ -97,7 +101,7 @@
 <body>
     <!-- Socket Info -->
     <div id="socketStatus"
-        style="position: fixed; top: 10px; left: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
+        style="position: fixed; top: 10px; left: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); z-index: 10;">
         <p id="username" style="margin: 0; font-weight: bold;"></p>
         <p id="connectionStatus" style="margin: 0;"></p>
     </div>
@@ -246,8 +250,23 @@
             </div>
         </div>
     </div>
-    <h1>GoodAI Agent {{version}}</h1>
-    <h2>Personal assistant with long-term memory</h2>
+    <!-- Side Navigation -->
+    <div id="sideNav" class="sidenav">
+        <div id="chat-buttons" class="chat-buttons">
+            <div id="chat-buttons" class="chat-buttons">
+                    
+                <div id="control-buttons-container" class="control-buttons-container">
+                    <button id="add-tab" class="control-tab" onclick="addChatTab()">+</button>
+                    <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button>
+                </div>
+                <div id="chat-tabs-container" class="chat-tabs-container">
+                    <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="main_title">GoodAI Agent {{version}}</div>
+    <div class="sub_title">Personal assistant with long-term memory</div>
     <div id="overlay">
         <div class="text">Code copied to clipboard</div>
     </div>
@@ -260,42 +279,46 @@
     <table>
         <tr>
             <td>
-                <div id="chat-container" class="chat-container">
-                    <div id="messages"></div>
-                    <div class="message-container">
-                        <!-- <div class="preset-text-container">
-                    <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
-                    <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
-                    <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
-                    <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
-                </div> -->
-                        <div id="statsWindow" class="statsWindow">
-                            <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
-                            <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
-                            <p id="userStats"></p>
-                        </div>
-                        <div class="input-field">
-                            <div class="textarea-container">
-                                <div class="icon-container-left">
-                                    <i class="fa fa-cog cogwheel" onclick="openNav()"></i>
-                                    <i class="fas fa-terminal cogwheel"
-                                        onclick="event.stopPropagation(); openDebugNav()"></i>
-                                </div>
-                                <textarea id="message" placeholder="Type a message..." rows="1"></textarea>
-                                <div class="icon-container-right">
-                                    <input type="file" id="uploadImageInput" accept="image/*" hidden>
-                                    <button id="upload-image" class="upload-button"><i
-                                            class="fa fa-paperclip cogwheel"></i></button>
-                                    <button id="record" class="record-button"><i class="fa fa-microphone"></i></button>
-                                    <button id="send" class="send-button"><i class="fa fa-paper-plane"></i></button>
-                                </div>
+                <button id="toggle-chat-tabs" class="toggle-chat-tabs" onclick="closeTabs()">⯇</button>
+                <div class="chat-interface">
+                    <!-- Toggle Button for Side Navigation -->
+                    <div id="chat-container" class="chat-container">
+                        <div id="messages"></div>
+                        <div class="message-container">
+                            <!-- <div class="preset-text-container">
+                        <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
+                        <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
+                        <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
+                        <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
+                    </div> -->
+                            <div id="statsWindow" class="statsWindow">
+                                <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
+                                <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
+                                <p id="userStats"></p>
                             </div>
-                            <div id="image-preview" style="display: none;">
-                                <div class="image-wrapper">
-                                    <img id="preview-image" alt="uploaded image">
-                                    <div class="hover-text">
-                                        <i class="fa fa-times-circle"></i>
-                                        <p>Delete</p>
+                            <div class="input-field">
+                                <div class="textarea-container">
+                                    <div class="icon-container-left">
+                                        <i class="fa fa-cog cogwheel" onclick="openNav()"></i>
+                                        <i class="fas fa-terminal cogwheel"
+                                            onclick="event.stopPropagation(); openDebugNav()"></i>
+                                    </div>
+                                    <textarea id="message" placeholder="Type a message..." rows="1"></textarea>
+                                    <div class="icon-container-right">
+                                        <input type="file" id="uploadImageInput" accept="image/*" hidden>
+                                        <button id="upload-image" class="upload-button"><i
+                                                class="fa fa-paperclip cogwheel"></i></button>
+                                        <button id="record" class="record-button"><i class="fa fa-microphone"></i></button>
+                                        <button id="send" class="send-button"><i class="fa fa-paper-plane"></i></button>
+                                    </div>
+                                </div>
+                                <div id="image-preview" style="display: none;">
+                                    <div class="image-wrapper">
+                                        <img id="preview-image" alt="uploaded image">
+                                        <div class="hover-text">
+                                            <i class="fa fa-times-circle"></i>
+                                            <p>Delete</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

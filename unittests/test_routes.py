@@ -49,7 +49,6 @@ def test_login():
     user = LoginUser(username="testuser", password="a!w@e$ewrwA")
     response = client.post("/login/", json=user.dict())
     assert response.status_code == 200
-    print(response.json())
     assert "message" in response.json()
     assert response.json()["message"] == "User logged in successfully"
     assert "session_token" in response.cookies

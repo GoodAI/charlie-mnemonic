@@ -1,6 +1,7 @@
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Lexend', 'Poppins', sans-serif;
     background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    /* background: #111; */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -12,7 +13,7 @@ body {
 }
 
 #body-profile {
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Lexend', 'Poppins', sans-serif;
     background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
     background-attachment: fixed;
     display: block;
@@ -22,27 +23,91 @@ body {
     overflow: auto;
 }
 
-h1 {
+.main_title {
     margin: 0 0 5px;
     text-align: center;
     color: #4c4c4c;
+    font-family: 'Lexend', 'Mulish', sans-serif;
+    font-size: 2.5em;
 }
 
-h2 {
+.sub_title {
     margin: 0 0 50px;
     text-align: center;
     color: #4c4c4c;
     font-size: 18px;
+    font-family: 'Lexend', 'Mulish', sans-serif;
+    font-size: 1.16em;
 }
 
-h3 {
+.sub_title_2 {
     margin: 0 0 10px;
     text-align: center;
     color: #4c4c4c;
     font-size: 20px;
 }
 
+.control-buttons-container {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.chat-interface {
+    position: relative;
+    display: flex;
+}
+
+#toggle-chat-tabs {
+    position: absolute;
+    left: 15vw;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    z-index: 3;
+}
+
+.control-tab {
+    display: block;
+    background-color: #c3cfe2;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 5px;
+    text-align: center;
+    align-items: flex-start;
+}
+
+.chat-tabs-container {
+    flex-shrink: 0;
+}
+
+.chat-tab, .control-tab {
+    display: block;
+    margin-bottom: 5px;
+    background-color: #c3cfe200;
+    color: rgb(0, 0, 0);
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: left;
+    font-size: smaller;
+}
+
+.chat-tab.active {
+    background-color: #a6c1ee;
+    font-size: smaller;
+}
+
 .chat-container {
+    flex-grow: 1;
     max-width: 80vw;
     min-width: 80vw;
     max-height: 80vh;
@@ -53,6 +118,12 @@ h3 {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    margin-left: 10vw;
+}
+
+.chat-tab.active {
+    background-color: #5084d8;
+    color: white;
 }
 
 table {
@@ -129,7 +200,7 @@ table tr td {
 }
 
 .input-field button:disabled {
-    color: #e2c3c3;
+    color: #d54747;
     border: none;
     padding: 10px 10px;
     cursor: not-allowed !important;
@@ -137,22 +208,22 @@ table tr td {
 }
 
 .input-field button:hover {
-    color: #a6c1ee;
+    color: #184386;
 }
 
 .input-field button[disabled]:hover {
-    color: #e2c3c3;
+    color: #d54747;
 }
 
 .input-field .send-button {
-    color: #c3cfe2;
+    color: #184386;
     border: none;
     cursor: pointer;
     transition: background 0.3s;
 }
 
 .input-field .send-button:disabled {
-    color: #e2c3c3;
+    color: #d54747;
     border: none;
     cursor: not-allowed !important;
     transition: background 0.3s;
@@ -163,18 +234,18 @@ table tr td {
 }
 
 .input-field .send-button[disabled]:hover {
-    color: #e2c3c3;
+    color: #d54747;
 }
 
 .input-field .record-button {
-    color: #c3cfe2;
+    color: #184386;
     border: none;
     cursor: pointer;
     transition: background 0.3s;
 }
 
 .input-field .record-button:disabled {
-    color: #e2c3c3;
+    color: #d54747;
     border: none;
     cursor: not-allowed !important;
     transition: background 0.3s;
@@ -185,7 +256,7 @@ table tr td {
 }
 
 .input-field .record-button[disabled]:hover {
-    color: #e2c3c3;
+    color: #d54747;
 }
 
 .input-field i {
@@ -193,13 +264,13 @@ table tr td {
 }
 
 .input-field .cogwheel {
-    color: #c3cfe2;
+    color: #184386;
     font-size: 20px;
     cursor: pointer;
 }
 
 .input-field .upload-icon {
-    color: #c3cfe2;
+    color: #184386;
     font-size: 20px;
     cursor: pointer;
 }
@@ -211,7 +282,7 @@ table tr td {
 }
 
 .input-field .upload-button i {
-    color: #c3cfe2;
+    color: #184386;
     transition: color 0.3s;
 }
 
@@ -220,7 +291,7 @@ table tr td {
 }
 
 .input-field .upload-button:disabled {
-    color: #e2c3c3;
+    color: #d54747;
     border: none;
     cursor: not-allowed !important;
     transition: background 0.3s;
@@ -279,6 +350,7 @@ table tr td {
 .message p {
     margin-top: 0;
     margin-bottom: 0;
+    display: inline;
 }
 
 
@@ -288,12 +360,16 @@ table tr td {
     padding-right: 5px;
 }
 
+.bubble {
+    display: inline;
+}
+
 .message.bot .bubble {
     background-color: #ddd;
     color: #333;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
@@ -303,7 +379,7 @@ table tr td {
     color: #333;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
@@ -313,17 +389,15 @@ table tr td {
     color: #333;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
 
 .message.debug .bubble {
-    background-color: #c0dcd1;
     color: #333;
     border-radius: 6px;
-    padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
@@ -333,7 +407,7 @@ table tr td {
     color: #333;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
@@ -343,7 +417,7 @@ table tr td {
     color: #333;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80%;
     word-wrap: break-word;
 }
@@ -353,11 +427,20 @@ table tr td {
     color: #fff;
     border-radius: 6px;
     padding: 10px 15px;
-    display: inline-block;
+    display: inline;
     max-width: 80vh;
     word-wrap: break-word;
     align-self: flex-end;
     min-width: 20vh;
+}
+
+.message.user .bubble a {
+    color:#eef1f7;
+    text-decoration: underline;
+}
+.message.user .bubble a:hover {
+    color:#eef1f7;
+    text-decoration: none;
 }
 
 .message.error .bubble {
@@ -479,7 +562,6 @@ pre {
     transition: max-height 0.3s ease-in-out;
     overflow: hidden;
     max-height: 35px;
-    /* initial collapsed height */
 }
 
 .expandable .arrow {
@@ -524,16 +606,17 @@ pre {
 
 .sidenav {
     height: 100%;
-    width: 0;
+    width: 15vw;
     position: fixed;
     z-index: 1;
     top: 0;
     left: 0;
-    background-color: #111;
+    /* background-color: #111; */
     overflow-x: hidden;
     transition: 0.5s;
     padding-top: 60px;
     color: #c9c8c8;
+    padding-top: 15vh;
 }
 
 .sidenav a {
@@ -551,7 +634,7 @@ pre {
 
 .sidenav .closebtn {
     position: absolute;
-    top: 0;
+    top: 10vh;
     right: 25px;
     font-size: 36px;
     margin-left: 50px;
@@ -884,10 +967,8 @@ pre {
     color: grey;
 }
 
-/* added css from here */
-
 body * {
-    font-family: 'Mulish', sans-serif;
+    font-family: 'Lexend', 'Mulish', sans-serif;
 }
 
 #content {
@@ -1184,4 +1265,74 @@ body * {
 .nav {
     margin-bottom: 30px;
     justify-content: space-around;
+}
+
+.typewriter-container {
+    display: flex;
+    align-items: center;
+}
+
+.loading-icon, .other-icon {
+    margin-right: 10px;
+}
+
+.typewriter-text {
+    overflow: hidden;
+    white-space: nowrap;
+    animation: typing 1.5s steps(30, end)}
+
+@keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+}
+
+.expandable-content {
+    display: none;
+    background-color: #f1f1f1;
+    padding: 10px;
+    border-radius: 6px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+.message.debug:hover .expandable-content {
+    display: block;
+}
+
+.message.debug:after {
+    content: "";
+    position: relative;
+    top: 0;
+    right: -10px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: transparent transparent transparent #333;
+}
+
+.typing-indicator {
+    display: inline;
+    vertical-align: middle;
+    margin-left: 7px;
+    margin-bottom: 2px;
+
+}
+
+.dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #000;
+    animation: pulse 1s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.5);
+    }
 }

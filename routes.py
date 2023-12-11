@@ -39,6 +39,7 @@ from utils import (
 from authentication import Authentication
 from classes import (
     LoginUser,
+    RecentMessages,
     User,
     UserCheckToken,
     UserName,
@@ -96,6 +97,40 @@ async def read_did(file: str):
         return FileResponse(f"d-id/{file}")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
+
+
+# @router.get("/", response_class=HTMLResponse)
+# async def read_root(request: Request):
+#     version = SettingsManager.get_version()
+#     daily_limit = 0
+#     with Database() as db:
+#         daily_limit = db.get_daily_limit()
+#         maintenance_mode = db.get_maintenance_mode()
+
+#     if (
+#         maintenance_mode == "true"
+#         or maintenance_mode == "True"
+#         or maintenance_mode == True
+#     ):
+#         return templates.TemplateResponse(
+#             "maintenance.html",
+#             {
+#                 "request": request,
+#                 "version": version,
+#                 "daily_limit": daily_limit,
+#                 "production": PRODUCTION,
+#             },
+#         )
+#     else:
+#         return templates.TemplateResponse(
+#             "landing.html",
+#             {
+#                 "request": request,
+#                 "version": version,
+#                 "daily_limit": daily_limit,
+#                 "production": PRODUCTION,
+#             },
+#         )
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -560,9 +595,7 @@ async def handle_update_settings(request: Request, user: editSettings):
         },
     },
 )
-async def handle_message(
-    request: Request, message: userMessage, background_tasks: BackgroundTasks = None
-):
+async def handle_message(request: Request, message: userMessage):
     session_token = request.cookies.get("session_token")
     auth = Authentication()
     success = auth.check_token(message.username, session_token)
@@ -588,6 +621,19 @@ async def handle_message(
         display_name = db.get_display_name(message.username)
         daily_limit = db.get_daily_limit()
         has_access = db.get_user_access(message.username)
+        user_id = db.get_user_id(message.username)[0]
+        tab_data = db.get_tab_data(user_id)
+        active_tab_data = db.get_active_tab_data(user_id)
+        # if no active tab, set chat_id to 0
+        if active_tab_data is None:
+            message.chat_id = 0
+            # put the data in the database
+            db.insert_tab_data(
+                user_id, message.chat_id, "new chat", message.chat_id, True
+            )
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            message.chat_id = active_tab_data["chat_id"]
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {message.username} does not have access")
         raise HTTPException(
@@ -603,17 +649,20 @@ async def handle_message(
     return await process_message(
         message.prompt,
         message.username,
-        background_tasks,
         users_dir,
         message.display_name,
+        chat_id=message.chat_id,
     )
 
 
 @router.post("/message_with_image/", tags=["Messaging"])
 async def handle_message_image(
-    request: Request, image_file: UploadFile, prompt: str = Form(...)
+    request: Request,
+    image_file: UploadFile,
+    prompt: str = Form(...),
+    username: str = Form(...),
+    chat_id: str = Form(...),
 ):
-    print(prompt)
     session_token = request.cookies.get("session_token")
     username = request.cookies.get("username")
     auth = Authentication()
@@ -628,6 +677,17 @@ async def handle_message_image(
         display_name = db.get_display_name(username)[0]
         daily_limit = db.get_daily_limit()
         has_access = db.get_user_access(username)
+        user_id = db.get_user_id(username)[0]
+        tab_data = db.get_tab_data(user_id)
+        active_tab_data = db.get_active_tab_data(user_id)
+        # if no active tab, set chat_id to 0
+        if active_tab_data is None:
+            chat_id = 0
+            # put the data in the database
+            db.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            chat_id = active_tab_data["chat_id"]
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {username} does not have access")
         raise HTTPException(
@@ -641,10 +701,10 @@ async def handle_message_image(
             detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
         )
     # check the size of the image, if it's too big +5mb, return an error
-    if image_file.size > 5000000:
+    if image_file.size > 20000000:
         raise HTTPException(
             status_code=400,
-            detail="Image is too big, please use an image that is less than 5mb",
+            detail="Image is too big, please use an image that is less than 20mb",
         )
     # save the image to the user's directory
     converted_name = convert_name(username)
@@ -662,12 +722,45 @@ async def handle_message_image(
         image_path, prompt, image_file.filename
     )
     return await process_message(
-        prompt, username, None, users_dir, display_name, result
+        prompt, username, "users", display_name, result, chat_id
     )
 
 
+@router.post("/get_chat_tabs/")
+async def get_chat_tabs(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    with Database() as db:
+        user_id = db.get_user_id(user.username)[0]
+        tab_data = db.get_tab_data(user_id) or []
+        active_tab_data = db.get_active_tab_data(user_id) or {}
+        processed_tab_data = [tab for tab in tab_data if tab["is_enabled"]]
+        if active_tab_data is None:
+            active_tab_data = {}
+        return {
+            "tab_data": processed_tab_data,
+            "active_tab_data": active_tab_data,
+        }
+
+
+@router.post("/delete_chat_tab/")
+async def delete_chat_tab(request: Request, user: RecentMessages):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    with Database() as db:
+        user_id = db.get_user_id(user.username)[0]
+        db.disable_tab(user_id, user.chat_id)
+        return {"message": "Tab deleted successfully"}
+
+
 @router.post("/get_recent_messages/")
-async def get_recent_messages(request: Request, message: UserName):
+async def get_recent_messages(request: Request, message: RecentMessages):
     session_token = request.cookies.get("session_token")
     auth = Authentication()
     success = auth.check_token(message.username, session_token)
@@ -675,14 +768,39 @@ async def get_recent_messages(request: Request, message: UserName):
         raise HTTPException(status_code=401, detail="Token is invalid")
     with Database() as db:
         has_access = db.get_user_access(message.username)
-        recent_messages = MessageParser.get_recent_messages(message.username)
-    if not has_access or has_access == "false" or has_access == "False":
+        user_id = db.get_user_id(message.username)[0]
+        tab_data = db.get_tab_data(user_id)
+        active_tab_data = db.get_active_tab_data(user_id) or {}
+
+        # check if the db has a row with message.chat_id
+        tab_exists = False
+        for tab in tab_data:
+            if tab["chat_id"] == message.chat_id:
+                tab_exists = True
+                break
+        if not tab_exists:
+            # if not, insert a new row
+            db.insert_tab_data(
+                user_id,
+                message.chat_id,
+                f"New Chat",
+                message.chat_id,
+                False,
+            )
+        if message.chat_id != active_tab_data.get("chat_id"):
+            db.set_active_tab(user_id, message.chat_id)
+        active_tab_data = db.get_active_tab_data(user_id)
+
+        recent_messages = await MessageParser.get_recent_messages(
+            message.username, message.chat_id
+        )
+    if not has_access or has_access in ["false", "False"]:
         logger.info(f"user {message.username} does not have access")
         raise HTTPException(
             status_code=400,
             detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
         )
-    return recent_messages
+    return {"recent_messages": recent_messages}
 
 
 # openAI response route without modules
@@ -752,9 +870,7 @@ async def handle_message_no_modules(
         },
     },
 )
-async def handle_message_audio(
-    request: Request, audio_file: UploadFile, background_tasks: BackgroundTasks = None
-):
+async def handle_message_audio(request: Request, audio_file: UploadFile):
     session_token = request.cookies.get("session_token")
     username = request.cookies.get("username")
     auth = Authentication()
@@ -762,9 +878,7 @@ async def handle_message_audio(
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
 
-    result = await AudioProcessor.upload_audio(
-        users_dir, username, audio_file, background_tasks
-    )
+    result = await AudioProcessor.upload_audio(users_dir, username, audio_file)
 
     return result
 
@@ -915,6 +1029,10 @@ async def handle_delete_data(request: Request, user: UserName):
     stop_database(user.username)
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(user.username)
+    # remove chat tabs from the database
+    with Database() as db:
+        user_id = db.get_user_id(user.username)[0]
+        db.delete_tab_data(user_id)
     # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
     shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
     return {"message": "User data deleted successfully"}

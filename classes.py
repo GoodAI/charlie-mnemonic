@@ -21,6 +21,11 @@ class UserName(BaseModel):
     username: str
 
 
+class RecentMessages(BaseModel):
+    username: str
+    chat_id: str
+
+
 class UserCheckToken(BaseModel):
     username: str
     session_token: str
@@ -30,6 +35,7 @@ class userMessage(BaseModel):
     prompt: str
     username: str
     display_name: str
+    chat_id: str
 
 
 class userImageMessage(BaseModel):

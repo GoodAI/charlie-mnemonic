@@ -105,8 +105,24 @@ function closeNav() {
     $('#settingsModal').modal('hide');
 }
 
+function openTabs() {
+    document.getElementById("toggle-chat-tabs").style.left = "15vw";
+    document.getElementById("sideNav").style.width = "15vw";
+    document.getElementById("chat-container").style.marginLeft = "10vw";
+    document.getElementById("toggle-chat-tabs").innerHTML = "⯇";
+    document.getElementById("toggle-chat-tabs").onclick = closeTabs;
+}
+
+function closeTabs() {
+    document.getElementById("toggle-chat-tabs").style.left = "0";
+    document.getElementById("sideNav").style.width = "0";
+    document.getElementById("chat-container").style.marginLeft= "0";
+    document.getElementById("toggle-chat-tabs").innerHTML = "⯈";
+    document.getElementById("toggle-chat-tabs").onclick = openTabs;
+}
+
+
 function updateCounterDiv(message_lenght, tokens_used, max_message_tokens, cost) {
-    // function to replace this line countDiv.textContent = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
     const countDiv = document.getElementById("tokenCount");
     countDiv.innerHTML = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
 }

@@ -10,6 +10,7 @@ import time
 import uuid
 from tenacity import retry, stop_after_attempt, wait_fixed
 import aiohttp
+from termcolor import colored
 import memory as _memory
 import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
@@ -36,7 +37,6 @@ openai_model = api_keys["chatgpt_model"]
 max_responses = 1
 temperature = 0.2
 max_tokens = 1000
-last_messages = {}
 COT_RETRIES = {}
 
 
@@ -56,8 +56,6 @@ class MessageSender:
             new_message = {"message": message}
 
         await routes.send_debug_message(username, json.dumps(new_message))
-        # print the message to the console with the color
-        # print(f"{getattr(AsciiColors, color.upper())}{new_message}{AsciiColors.END}")
 
     @staticmethod
     async def send_message(message, color, username):
@@ -66,8 +64,6 @@ class MessageSender:
 
         routes = import_module("routes")
         await routes.send_debug_message(username, json.dumps(message))
-        # print the message to the console with the color
-        # print(f"{getattr(AsciiColors, color.upper())}{message}{AsciiColors.END}")
 
     @staticmethod
     async def update_token_usage(response, username, brain=False, elapsed=0):
@@ -443,61 +439,99 @@ class OpenAIResponser:
         session = aiohttp.ClientSession(trace_configs=[self.trace_config])
         openai.aiosession.set(session)
 
-        try:
-            for i in range(max_retries):
-                try:
-                    response = await asyncio.wait_for(
-                        openai.ChatCompletion.acreate(
-                            model=self.openai_model,
-                            temperature=self.temperature,
-                            max_tokens=self.max_tokens,
-                            n=self.max_responses,
-                            top_p=1,
-                            frequency_penalty=0,
-                            presence_penalty=0,
-                            messages=messages,
-                            stream=stream,
-                            functions=function_metadata,
-                            function_call=function_call,
-                        ),
-                        timeout=timeout,
-                    )
-                    elapsed = time.time() - now
-                    await MessageSender.update_token_usage(
-                        response, username, False, elapsed=elapsed
-                    )
-                    return response
-                except asyncio.TimeoutError:
-                    logger.error(
-                        f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
-                    )
-                    await MessageSender.send_message(
-                        {
-                            "error": f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
-                        },
-                        "red",
-                        username,
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
-                    )
-                    await MessageSender.send_message(
-                        {
-                            "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
-                        },
-                        "red",
-                        username,
-                    )
+        for i in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    openai.ChatCompletion.acreate(
+                        model=self.openai_model,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens,
+                        n=self.max_responses,
+                        top_p=1,
+                        frequency_penalty=0,
+                        presence_penalty=0,
+                        messages=messages,
+                        stream=stream,
+                        functions=function_metadata,
+                        function_call=function_call,
+                    ),
+                    timeout=timeout,
+                )
 
-            logger.error("Max retries exceeded")
-            await MessageSender.send_message(
-                {"error": "Max retries exceeded"}, "red", username
+            except asyncio.TimeoutError:
+                logger.error(
+                    f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
+                )
+                await MessageSender.send_message(
+                    {
+                        "error": f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
+                    },
+                    "red",
+                    username,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
+                )
+                await MessageSender.send_message(
+                    {
+                        "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
+                    },
+                    "red",
+                    username,
+                )
+
+        elapsed = time.time() - now
+        if stream:
+            func_call = {
+                "name": None,
+                "arguments": "",
+            }
+            collected_messages = []
+            async for chunk in response:
+                delta = chunk["choices"][0]["delta"]
+                if "content" in chunk["choices"][0]["delta"]:
+                    chunk_message = chunk["choices"][0]["delta"]["content"]
+                    collected_messages.append(chunk_message)
+                    await MessageSender.send_message(
+                        {"chunk_message": chunk_message}, "blue", username
+                    )
+                if chunk["choices"][0]["finish_reason"] == "stop":
+                    await MessageSender.send_message(
+                        {"stop_message": True}, "blue", username
+                    )
+                    await session.close()
+                    break
+                if "function_call" in delta:
+                    if "name" in delta.function_call:
+                        func_call["name"] = delta.function_call["name"]
+                    if "arguments" in delta.function_call:
+                        func_call["arguments"] += delta.function_call["arguments"]
+                if chunk.choices[0].finish_reason == "function_call":
+                    # convert the function call to an openai function call structure
+                    full_response = {
+                        "choices": [
+                            {
+                                "message": {
+                                    "function_call": {
+                                        "name": func_call["name"],
+                                        "arguments": func_call["arguments"],
+                                    }
+                                }
+                            }
+                        ],
+                    }
+                    await session.close()
+                    return full_response
+                if not delta.get("content", None):
+                    continue
+                response = "".join(collected_messages)
+        else:
+            await MessageSender.update_token_usage(
+                response, username, False, elapsed=elapsed
             )
-            raise HTTPException(503, self.error503)
-
-        finally:
-            await session.close()
+        await session.close()
+        return response
 
     # Todo: add a setting to enable/disable this feature and add the necessary code
     async def get_response_stream(self, messages):
@@ -512,9 +546,7 @@ class AudioProcessor:
     """This class contains functions to process audio"""
 
     @staticmethod
-    async def upload_audio(
-        user_dir, username, audio_file: UploadFile, background_tasks: BackgroundTasks
-    ):
+    async def upload_audio(user_dir, username, audio_file: UploadFile):
         # save the file to the user's folder
         userdir = os.path.join(user_dir, username)
         filename = secure_filename(audio_file.filename)
@@ -629,8 +661,7 @@ class BrainProcessor:
 
     @staticmethod
     async def delete_recent_messages(user):
-        global last_messages
-        last_messages[user] = []
+        print(f"Deleting recent messages for {user} !!!WIP!!!")
 
 
 class MessageParser:
@@ -647,15 +678,23 @@ class MessageParser:
         # The yorickvp/llava-13b model can stream output as it's running.
         # The predict method returns an iterator, and you can iterate over that output.
         full_response = "".join([item for item in output])
-        # prompt looks like this: image_description = "The user asked: '{}' for the attached image (/data/{})\nYour visual interpreter gave this description (don't mention 'based on the description', just say you can see) based on the prompt: '{}'\n"
         return prompts.image_description.format(prompt, file_name, full_response)
 
     @staticmethod
-    def get_recent_messages(username):
-        global last_messages
-        if username not in last_messages:
-            last_messages[username] = []
-        return last_messages[username]
+    async def get_recent_messages(username, chat_id):
+        memory = _memory.MemoryManager()
+        recent_messages = await memory.get_most_recent_messages(
+            "active_brain", username, chat_id=chat_id
+        )
+
+        return [
+            {
+                "document": message["document"],
+                "metadata": message["metadata"],
+                "id": message["id"],
+            }
+            for message in recent_messages
+        ]
 
     @staticmethod
     def get_message(type, parameters):
@@ -664,11 +703,7 @@ class MessageParser:
         """Parse the message based on the type and parameters"""
         if type == "start_message":
             return prompts.start_message.format(
-                display_name,
-                parameters["memory"],
-                parameters["last_messages_string"],
-                parameters["instruction_string"],
-                parameters["message"],
+                display_name, parameters["memory"], parameters["instruction_string"]
             )
         elif type == "keyword_generation":
             return prompts.keyword_generation.format(
@@ -688,6 +723,8 @@ class MessageParser:
                 arguments = ast.literal_eval(arguments)
             except (ValueError, SyntaxError):
                 try:
+                    arguments = re.sub(r"```.*?\n", "", arguments)
+                    arguments = re.sub(r"```", "", arguments)
                     arguments = re.sub(r"\.\.\.|\…", "", arguments)
                     arguments = re.sub(r"[\r\n]+", "", arguments)
                     arguments = re.sub(r"[^\x00-\x7F]+", "", arguments)
@@ -700,9 +737,6 @@ class MessageParser:
                             # ask openai to re-generate the message
                             message = prompts.invalid_json.format(arguments)
                             logger.exception(
-                                f"Invalid json: {arguments}, username: {username}, trying to re-generate the message..."
-                            )
-                            print(
                                 f"Invalid json: {arguments}, username: {username}, trying to re-generate the message..."
                             )
                             messages = [
@@ -731,10 +765,8 @@ class MessageParser:
                             logger.exception(
                                 f"Invalid json: {arguments}, username: {username}"
                             )
-                            print(f"Invalid json: {arguments}, username: {username}")
                             return None
-        # print(f"Arguments:\n{str(arguments)}")
-        return arguments
+        return arguments if isinstance(arguments, dict) else {}
 
     @staticmethod
     def handle_function_response(function, args):
@@ -768,7 +800,6 @@ class MessageParser:
         users_dir="users/",
         steps_string="",
         full_response=None,
-        background_tasks: BackgroundTasks = None,
     ):
         converted_function_call_arguments = (
             await MessageParser.convert_function_call_arguments(
@@ -795,7 +826,6 @@ class MessageParser:
                 "arguments": function_call_arguments,
             },
         }
-        # print(new_message)
         await MessageSender.send_message(new_message, "red", username)
         try:
             function = function_dict[function_call_name]
@@ -846,7 +876,6 @@ class MessageParser:
         og_message,
         username,
         process_message,
-        background_tasks,
         chat_history,
         chat_metadata,
         history_ids,
@@ -854,8 +883,8 @@ class MessageParser:
         last_messages_string,
         old_kw_brain,
         users_dir,
+        chat_id,
     ):
-        global last_messages
         if "function_call" in response:
             function_call_name = response["function_call"]["name"]
             function_call_arguments = response["function_call"]["arguments"]
@@ -872,7 +901,6 @@ class MessageParser:
                 "users/",
                 "",
                 None,
-                background_tasks,
             )
         else:
             await MessageSender.send_debug(f"{message}", 1, "green", username)
@@ -880,22 +908,12 @@ class MessageParser:
                 f"Assistant: {response['content']}", 1, "pink", username
             )
             if response["content"] is not None:
-                # chat_metadata.append({"role": "user"})
-                # chat_history.append(message)
                 with Database() as db:
                     display_name = db.get_display_name(username)[0]
-                last_messages[username].append(message)
-                # chat_metadata.append({"role": "assistant"})
-                # chat_history.append(str(response['content']))
-                last_messages[username].append("assistant: " + str(response["content"]))
-                # history_ids.append(str(uuid.uuid4()))
-                # history_ids.append(str(uuid.uuid4()))
-                # brainManager.add_to_collection(chat_history, chat_metadata, history_ids)
                 memory = _memory.MemoryManager()
                 await memory.process_incoming_memory_assistant(
-                    "active_brain", f"Assistant: {response['content']}", username
+                    "active_brain", response["content"], username, chat_id=chat_id
                 )
-                # background_tasks.add_task(BrainProcessor.keyword_generation, response['content'], username, history_string, last_messages_string, old_kw_brain, users_dir)
         return response
 
     @staticmethod
@@ -957,21 +975,13 @@ class MessageParser:
         num_tokens += 12
         return num_tokens
 
-    async def generate_full_message(
-        username,
-        merged_result_string,
-        last_messages_string,
-        instruction_string,
-        message,
-    ):
+    async def generate_full_message(username, merged_result_string, instruction_string):
         full_message = MessageParser.get_message(
             "start_message",
             {
                 "username": username,
                 "memory": merged_result_string,
-                "last_messages_string": last_messages_string,
                 "instruction_string": instruction_string,
-                "message": message,
             },
         )
         return full_message
@@ -998,16 +1008,25 @@ class SettingsManager:
         return settings
 
 
+def needsTabDescription(chat_id):
+    # get the tab description for the chat
+    with Database() as db:
+        tab_description = db.get_tab_description(chat_id)
+        if tab_description.startswith("New Chat"):
+            return True
+        else:
+            return False
+
+
 async def process_message(
     og_message,
     username,
-    background_tasks: BackgroundTasks,
     users_dir,
     display_name=None,
     image_prompt=None,
+    chat_id=None,
 ):
     """Process the message and generate a response"""
-    global last_messages
     if display_name is None:
         display_name = username
 
@@ -1040,36 +1059,78 @@ async def process_message(
     logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
 
-    message = display_name + ": " + og_message
-
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
-    # If the user doesn't exist in the dictionary, add them
-    if username not in last_messages:
-        last_messages[username] = []
 
-    if last_messages[username] != []:
-        last_messages_string = "\n".join(last_messages[username][-10:])
-    else:
-        last_messages_string = "No messages yet."
+    last_messages = await MessageParser.get_recent_messages(username, chat_id)
+    last_messages_string = "\n".join(
+        f"({message['metadata'].get('username')}: {message['document']}"
+        for message in last_messages[-100:]
+    )
 
     # keep the last messages below 1000 tokens, if it is above 1000 tokens, delete the oldest messages until it is below 1000 tokens
     last_messages_tokens = MessageParser.num_tokens_from_string(
         last_messages_string, "gpt-4"
     )
     if tokens_recent_messages > 100:
-        logger.debug(f"last_messages_tokens: {last_messages_tokens}")
+        logger.debug(
+            f"last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}"
+        )
         while last_messages_tokens > tokens_recent_messages:
-            last_messages[username].pop(0)
-            last_messages_string = "\n".join(last_messages[username][-10:])
+            last_messages.pop(0)
+            last_messages_string = "\n".join(
+                f"{message['metadata'].get('username')}: {message['document']}"
+                for message in last_messages[-100:]
+            )
             last_messages_tokens = MessageParser.num_tokens_from_string(
                 last_messages_string, "gpt-4"
             )
-            logger.debug(f"new last_messages_tokens: {last_messages_tokens}")
+            logger.debug(
+                f"new last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}"
+            )
     else:
         last_messages_string = ""
 
-    # combine last messages to a string and add the current message to the end
-    all_messages = last_messages_string + "\n" + message
+    all_messages = last_messages_string + "\n" + og_message
+
+    if needsTabDescription(chat_id) and len(last_messages) >= 2:
+        fakedata = [
+            {
+                "name": "none",
+                "description": "you have no available functions",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                },
+            }
+        ]
+
+        messages = [
+            {
+                "role": "system",
+                "content": "Give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it!",
+            },
+            {"role": "user", "content": all_messages},
+        ]
+        openai_response = OpenAIResponser(
+            openai_model, temperature, 30, max_responses, username
+        )
+        response = await openai_response.get_response(
+            username, messages, function_metadata=fakedata
+        )
+
+        with Database() as db:
+            db.update_tab_description(
+                chat_id, response["choices"][0]["message"]["content"]
+            )
+
+        await MessageSender.send_message(
+            {
+                "tab_id": chat_id,
+                "tab_description": response["choices"][0]["message"]["content"],
+            },
+            "blue",
+            username,
+        )
 
     message_tokens = MessageParser.num_tokens_from_string(all_messages, "gpt-4")
     token_usage += message_tokens
@@ -1077,18 +1138,18 @@ async def process_message(
     logger.debug(f"1. remaining_tokens: {remaining_tokens}")
     verbose = settings.get("verbose").get("verbose")
     memory = _memory.MemoryManager()
-    if tokens_active_brain > 100:
-        (
-            kw_brain_string,
-            token_usage_active_brain,
-            unique_results1,
-        ) = await memory.process_active_brain(
-            f"{message}", username, all_messages, tokens_active_brain, verbose
-        )
-    else:
-        kw_brain_string = ""
-        token_usage_active_brain = 0
-        unique_results1 = set()
+    (
+        kw_brain_string,
+        token_usage_active_brain,
+        unique_results1,
+    ) = await memory.process_active_brain(
+        f"{og_message}",
+        username,
+        all_messages,
+        tokens_active_brain,
+        verbose,
+        chat_id=chat_id,
+    )
 
     token_usage += token_usage_active_brain
     remaining_tokens = remaining_tokens - token_usage_active_brain
@@ -1096,7 +1157,7 @@ async def process_message(
 
     if tokens_episodic_memory > 100:
         episodic_memory, timezone = await memory.process_episodic_memory(
-            f"{message}", username, all_messages, tokens_episodic_memory, verbose
+            f"{og_message}", username, all_messages, tokens_episodic_memory, verbose
         )
         if episodic_memory is None or episodic_memory == "":
             episodic_memory_string = ""
@@ -1120,7 +1181,7 @@ async def process_message(
             token_usage_relevant_memory,
             unique_results2,
         ) = await memory.process_incoming_memory(
-            None, f"{message}", username, tokens_cat_brain, verbose
+            None, f"{og_message}", username, tokens_cat_brain, verbose
         )
         merged_results_dict = {
             id: (document, distance, formatted_date)
@@ -1147,7 +1208,6 @@ async def process_message(
     token_usage += token_usage_relevant_memory
     remaining_tokens = remaining_tokens - token_usage_relevant_memory
     logger.debug(f"4. remaining_tokens: {remaining_tokens}")
-    print(f"4. remaining_tokens: {remaining_tokens}")
 
     # process the results
     history_string = results
@@ -1159,7 +1219,7 @@ async def process_message(
 
     if tokens_notes > 100:
         notes = await memory.note_taking(
-            all_messages, message, users_dir, username, False, verbose, tokens_notes
+            all_messages, og_message, users_dir, username, False, verbose, tokens_notes
         )
 
         if notes is not None or notes != "":
@@ -1174,20 +1234,19 @@ async def process_message(
     # generate the full message
     if image_prompt is not None:
         full_message = await MessageParser.generate_full_message(
-            username,
-            merged_result_string,
-            last_messages_string,
-            instruction_string,
-            image_prompt,
+            username, merged_result_string, instruction_string
         )
     else:
         full_message = await MessageParser.generate_full_message(
-            username,
-            merged_result_string,
-            last_messages_string,
-            instruction_string,
-            message,
+            username, merged_result_string, instruction_string
         )
+
+    history_messages = []
+
+    for message in last_messages:
+        role = "assistant" if message["metadata"]["username"] == "assistant" else "user"
+        content = message["document"]
+        history_messages.append({"role": role, "content": content})
 
     await MessageSender.send_debug(f"[{full_message}]", 1, "gray", username)
 
@@ -1200,11 +1259,15 @@ async def process_message(
         )
     else:
         response = await generate_response(
-            full_message, og_message, username, users_dir, tokens_output
+            full_message,
+            og_message,
+            username,
+            users_dir,
+            tokens_output,
+            history_messages,
         )
-
     response = MessageParser.extract_content(response)
-    response = json.dumps({"content": response})
+    response = json.dumps({"content": response}, ensure_ascii=False)
     response = json.loads(response)
 
     # process the response
@@ -1212,11 +1275,10 @@ async def process_message(
         response,
         function_dict,
         function_metadata,
-        message,
+        og_message,
         og_message,
         username,
         process_message,
-        background_tasks,
         chat_history,
         chat_metadata,
         history_ids,
@@ -1224,6 +1286,7 @@ async def process_message(
         last_messages_string,
         kw_brain_string,
         users_dir,
+        chat_id=chat_id,
     )
 
     with Database() as db:
@@ -1282,29 +1345,68 @@ async def start_chain_thoughts(
     return cot_response
 
 
+def prettyprint(msg, color):
+    print(colored(msg, color))
+
+
 async def generate_response(
-    message, og_message, username, users_dir, max_allowed_tokens
+    memory_message,
+    og_message,
+    username,
+    users_dir,
+    max_allowed_tokens,
+    history_messages,
 ):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
     system_prompt = prompts.system_prompt
+
+    # add time in front of system prompt
+    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
+    system_prompt = current_date_time + "\n" + system_prompt
     messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"{message}"},
+        {"role": "system", "content": system_prompt + "\n" + memory_message},
     ]
+
+    for message in history_messages:
+        messages.append(
+            {"role": f"{message['role']}", "content": f"{message['content']}"}
+        )
+    messages.append({"role": "user", "content": f"{og_message}"})
+
+    # print the message in a different color in the terminal
+    # for message in messages:
+    #     if message["role"] == "user":
+    #         prettyprint(f"User: {message['content']}", "blue")
+    #     elif message["role"] == "assistant":
+    #         prettyprint(f"Assistant: {message['content']}", "yellow")
+    #     else:
+    #         prettyprint(f"System: {message['content']}", "green")
 
     openai_response = OpenAIResponser(
         openai_model, temperature, max_allowed_tokens, max_responses, username
     )
     response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata
+        username, messages, function_metadata=function_metadata, stream=True
     )
-
+    # check if the response is a stream or not
+    if (
+        isinstance(response, dict)
+        and "choices" in response
+        and isinstance(response["choices"], list)
+        and len(response["choices"]) > 0
+        and "function_call" in response["choices"][0].get("message", {})
+    ):
+        response = response
+    elif isinstance(response, str):
+        response = {"choices": [{"message": {"content": response}}]}
+    else:
+        response = await response.__anext__()
     await MessageSender.send_debug(f"response: {response}", 1, "green", username)
     final_response = await process_chain_thoughts(
         response,
-        message,
+        og_message,
         og_message,
         function_dict,
         function_metadata,
@@ -1589,15 +1691,18 @@ async def process_function_reply(
     openai_response = OpenAIResponser(
         openai_model, temperature, max_tokens, max_responses, username
     )
-    second_response = await openai_response.get_response(username, messages)
+    second_response = await openai_response.get_response(
+        username, messages, stream=True
+    )
+    return second_response
 
-    final_response = second_response["choices"][0]["message"]["content"]
+    # final_response = second_response["choices"][0]["message"]["content"]
 
-    final_message_string = f"Function {function_call_name} response: {str(function_response)}\n\n{final_response}"
-    if merge:
-        return final_message_string
-    else:
-        return final_response
+    # final_message_string = f"Function {function_call_name} response: {str(function_response)}\n\n{final_response}"
+    # if merge:
+    #     return final_message_string
+    # else:
+    #     return final_response
 
 
 async def process_final_message(

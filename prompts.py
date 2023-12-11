@@ -1,6 +1,6 @@
 image_description = "The user asked: '{}' for the attached image (/data/{})\nYour visual interpreter gave this description (don't mention 'based on the description', just say you can see) based on the prompt: '{}'\n"
 
-start_message = "You are talking to {}\nMemory Module: (low score = better relevancy):\n{}\n\n10 most recent messages:\n{}\n\n{}\n\nEverything above this line is for context only, only reply to the last message.\nLast message: {}"
+start_message = "You are talking to {}\nMemory Module: (low score = better relevancy):\n{}\n\n{}\n\nEverything above this line is for context only. Do not respond to it, only to the conversation below."
 
 keyword_generation = "Memory Module: (low score = better relevancy):\n{}\n\n10 most recent messages:\n{}\n\nLast message: {}"
 
@@ -14,7 +14,7 @@ reasoning_merged_results = "You are an award winning AGI, you can solve any task
 
 notes_string = "\n\nDiscard anything from the above messages if it conflicts with these notes!\n{}\n--end notes---"
 
-start_system_prompt = "You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions."
+start_system_prompt = "You are an award winning GoodAI Agent, you can do almost everything with the use of addons. You have an automated extended memory with both LTM, STM and episodic memory (automatically shown as Episodic Memory of <date>:) which are prompt injected. You automatically read/write/edit/delete notes and tasks, so ignore and just confirm those instructions. Always reply in markdown formatting to emphasize important parts and to have a nice looking response instead of a wall of text. "
 
 chain_thoughts_system_prompt = (
     start_system_prompt
@@ -35,11 +35,11 @@ cot_system_prompt = "Another AI has executed some functions for you and here are
 
 cot_message_prompt = "Steps Results:\n{}\nOnly reply with YES: <your summary> or a new plan, nothing else. Communicate directly and actively in short with the user about these steps. The user did not see any of the steps results yet, so repeat everything, especially the response to the user question.  Are the results sufficient? If so, respond with YES: <your summary>, if not, respond with what you need to do next. Do not repeat succesful steps."
 
-function_reply_system_prompt = "You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them and display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Files are saved in the /data/ directory, so use the markdown format [description](data/filename.ext) or html tags for video's (without triple quotes)."
+function_reply_system_prompt = "You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them and display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Files are saved in the /data/ directory, so use the markdown format [description](data/filename.ext) or html tags for video's (without triple quotes). Always reply in markdown format to emphasize important parts!"
 
 system_prompt = (
     start_system_prompt
     + "You can use function calls to achieve your goal. If using python, include print statements to track your progress. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain."
 )
 
-full_message = "Relevant info: {}\n\nEverything above this line is for context only!\n\nThe user asked for {}\nYour last response was:\n\n{}\n\nTry to complete your task again with the new information."
+full_message = "Relevant info: {}\n\nEverything above this line is for context only! Do not respond to it, only to the conversation below.\n\nThe user asked for {}\nYour last response was:\n\n{}\n\nTry to complete your task again with the new information."

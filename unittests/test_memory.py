@@ -211,7 +211,7 @@ class TestMemoryManager(unittest.TestCase):
             ):
                 # Call the function and check the return value
                 result = await self.memory_manager.split_text_into_chunks(
-                    "test_text", 3, 1
+                    "test_text", 3
                 )
                 self.assertEqual(result, ["word1 word2 word3", "word2 word3 word4"])
 
@@ -283,7 +283,7 @@ class TestMemoryManager(unittest.TestCase):
 
         # Check that the split_text_into_chunks function was called with the correct arguments
         self.memory_manager.split_text_into_chunks.assert_called_once_with(
-            "test_messages", 150, 25
+            "test_messages", 200
         )
 
         # Check that the create_memory function was called with the correct arguments

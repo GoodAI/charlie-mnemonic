@@ -88,6 +88,7 @@ document.getElementById('errorModalClose').addEventListener('click', function ()
     $('#errorModal').modal('hide');
 });
 
+let pastedImageFile;
 
 document.getElementById('upload-image').addEventListener('click', function () {
 
@@ -102,7 +103,7 @@ document.getElementById('upload-image').addEventListener('click', function () {
 });
 
 
-let pastedImageFile; // Variable to hold the pasted/dropped image file
+ // Variable to hold the pasted/dropped image file
 
 // check if the preview image was clicked, is so, remove it, show the upload-image button and clear the file input
 document.getElementById('image-preview').addEventListener('click', function () {
@@ -124,25 +125,12 @@ document.getElementById('uploadImageInput').addEventListener('change', function 
     if (this.files.length > 0) {
         // check the size of the image, max 20MB
         if (this.files[0].size > 20000000) {
-            showErrorModal('The image is too large, max 5MB!');
+            showErrorModal('The image is too large, max 20MB!');
             // clear the file input
             this.value = '';
             return;
         }
-        // set the image-preview innerhtml to the uploaded image
-        document.getElementById('preview-image').src = URL.createObjectURL(this.files[0]);
-
-        let imageWrapper = document.querySelector('.image-wrapper');
-        imageWrapper.addEventListener('mouseover', function () {
-            this.querySelector('.hover-text').style.display = 'block';
-        });
-        imageWrapper.addEventListener('mouseout', function () {
-            this.querySelector('.hover-text').style.display = 'none';
-        });
-        // show the image-preview
-        document.getElementById('image-preview').style.display = 'block';
-        // hide the upload-image button
-        document.getElementById('upload-image').style.display = 'none';
+        handleImageFile(this.files[0]);
     }
 });
 
@@ -228,7 +216,6 @@ document.getElementById('logout-button').addEventListener('click', async functio
     event.preventDefault();
     try {
         await logout();
-        console.log('User logged out successfully');
     } catch (error) {
         console.error('Logout failed: ', error);
     }
@@ -358,6 +345,19 @@ document.getElementById('register-form').addEventListener('submit', async functi
             console.error('Registration failed: ', error);
             // Display error message to the user
             document.getElementById('register-error').innerText = error.message;
+        }
+    }
+});
+
+document.getElementById('messages').addEventListener('click', function(e) {
+    if (e.target.classList.contains('debug') || e.target.parentNode.classList.contains('debug')) {
+        var expandableContent = e.target.querySelector('.expandable-content') || e.target.parentNode.querySelector('.expandable-content');
+        if (expandableContent) {
+            if (expandableContent.style.display === 'none') {
+                expandableContent.style.display = 'block';
+            } else {
+                expandableContent.style.display = 'none';
+            }
         }
     }
 });

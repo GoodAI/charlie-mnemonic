@@ -43,8 +43,10 @@ function addUserMessage(message) {
     canSendMessage();
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null) {
     //var escaped_message = escapeHTML(message);
+    // replace `` ` with ``` and ` `` with ``` etc
+    message = message.replace(/(`\s*`\s*`)/g, '```');
     messageFormatted = formatTempReceived(message);
     if (replaceNewLines) {
         var messageReplaced = messageFormatted.replace(/\n/g, "<br>");
@@ -55,7 +57,13 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
     if (messageReplaced.endsWith('<br>')) {
         messageReplaced = messageReplaced.slice(0, -4);
     }
-    var timestamp = new Date().toLocaleTimeString();
+    if (timestamp == null) {
+        timestamp = new Date().toLocaleTimeString();
+    }
+    else {
+        var date = new Date(timestamp * 1000);
+        timestamp = date.toLocaleTimeString();
+    }
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
         lastMessage.classList.remove('last-message');
@@ -126,12 +134,12 @@ async function sendMessageToServer(message) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 'prompt': message, 'username': user_name, 'display_name': display_name[0] }),
+            body: JSON.stringify({ 'prompt': message, 'username': user_name, 'display_name': display_name[0], chat_id: chat_id }),
             credentials: 'include'
         });
 
         const data = await handleError(response);
-        await onResponse(data);
+        //await onResponse(data);
 
     } catch (error) {
         console.error('Failed to send message: ', error);
@@ -220,7 +228,6 @@ async function delete_user_data() {
         });
 
         const data = await response.json();
-        console.log(data.message);
         overlayMessage.textContent = data.message;
 
         // Hide the overlay after a delay to let the user see the message
@@ -256,7 +263,6 @@ async function upload_user_data(file) {
         });
         if (response.ok) {
             const data = await response.json();
-            console.log(data.message);
             overlayMessage.textContent = data.message;
         } 
         else
@@ -293,13 +299,35 @@ async function delete_recent_messages() {
         });
 
         const data = await response.json();
-        console.log(data.message);
         overlayMessage.textContent = data.message;
 
         // Hide the overlay after a delay to let the user see the message
         setTimeout(() => {
             overlay.style.display = 'none';
-        }, 2000);
+        }, 200);
+        // clear the messages
+        document.getElementById('messages').innerHTML = '';
+
+    } catch (error) {
+        await handleError(error);
+        console.error('Failed to delete messages: ', error);
+
+        // Hide the overlay in case of error
+        overlay.style.display = 'none';
+    }
+}
+
+async function swap_tab() {
+    try {
+        const overlay = document.getElementById('overlay_msg');
+        const overlayMessage = document.getElementById('overlay-message');
+        overlayMessage.textContent = "Changing Tab...";
+        overlay.style.display = 'flex';
+
+        // Hide the overlay after a delay to let the user see the message
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 200);
         // clear the messages
         document.getElementById('messages').innerHTML = '';
 
@@ -343,17 +371,16 @@ async function send_image(image_file, prompt) {
         formData.append('username', user_name);
         formData.append('image_file', image_file);
         formData.append('prompt', message);
+        formData.append('chat_id', chat_id);
 
         const response = await fetch(API_URL + '/message_with_image/', {
             method: 'POST',
             body: formData,
             credentials: 'include'
         });
-        console.log(response);
         const data = await response.json();
-        console.log(data.content);
         //addCustomMessage(data.content, 'bot');
-        await onResponse(data);
+        //await onResponse(data);
 
     } catch (error) {
         await handleError(error);
@@ -379,7 +406,6 @@ function send_audio(file) {
     })
         .then(response => response.json())
         .then(data => {
-            console.log('received transcription: ' + data.transcription);
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
@@ -440,9 +466,7 @@ async function login(username, password) {
     }
     else {
         // set the session token
-        console.log('setting session token');
         session_token = getCookie('session_token');
-        console.log('session token: ' + session_token);
     }
 }
 
@@ -548,7 +572,7 @@ function getCookie(name) {
     return null;
 }
 
-function loadCookies() {
+async function loadCookies() {
     var sessionToken = getCookie('session_token');
     const overlay = document.getElementById('overlay_msg');
     const overlayMessage = document.getElementById('overlay-message');
@@ -557,12 +581,12 @@ function loadCookies() {
         user_name = getCookie('username');
         // remove possible double quotes from around the username
         user_name = user_name.replace(/"/g, '');
-        console.log('session token found, logging in as ' + user_name);
         overlayMessage.textContent = "Logging in...";
         overlay.style.display = 'flex';
         loginModal.hide();
         get_settings(user_name);
-        get_recent_messages(user_name);
+        await get_chat_tabs(user_name);
+        await get_recent_messages(user_name, chat_id);
 
     } else {
         // no session token, show the login modal
@@ -592,7 +616,6 @@ async function big_red_abort_button() {
         });
 
         const data = await response.json();
-        console.log(data.message);
 
     } catch (error) {
         await handleError(error);
@@ -638,3 +661,39 @@ function canSendMessage() {
 }
 
 canSendMessage();
+
+function populateChatTabs(tabs_data) {
+    // Get the chat tabs container
+    var chatTabs = document.getElementById('chat-tabs-container');
+
+    // Clear the current tabs
+    while (chatTabs.firstChild) {
+        chatTabs.removeChild(chatTabs.firstChild);
+    }
+
+    // Iterate over the tabs_data array
+    for (let i = 0; i < tabs_data.length; i++) {
+        // Create a new button for each tab
+        var newTab = document.createElement('button');
+        newTab.className = 'chat-tab';
+        newTab.id = 'chat-tab-' + tabs_data[i].tab_id;
+        // trim to the first 5 words only and add ... if there are more
+        newTab.innerText = tabs_data[i].chat_name.split(' ').slice(0, 5).join(' ');
+        if (tabs_data[i].chat_name.split(' ').length > 5) {
+            newTab.innerText += '...';
+        }
+        
+        // Set the onclick function to the setChat function with the chat id as parameter
+        newTab.onclick = function() {
+            setChat(tabs_data[i].chat_id);
+        };
+
+        // If the tab is active, add the 'active' class to the button
+        if (tabs_data[i].is_active) {
+            newTab.classList.add('active');
+        }
+
+        // Append the new tab to the chat tabs container
+        chatTabs.appendChild(newTab);
+    }
+}

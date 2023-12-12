@@ -23,7 +23,6 @@ from database import Database
 import tiktoken
 from pydub import audio_segment
 import logs
-import replicate
 import prompts
 from unidecode import unidecode
 
@@ -684,6 +683,7 @@ class MessageParser:
     @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
     async def get_image_description(image_url, prompt, file_name):
         """Get the description of an image using a LLAVA 1.5 API"""
+        import replicate
         output = replicate.run(
             "yorickvp/llava-13b:6bc1c7bb0d2a34e413301fee8f7cc728d2d4e75bfab186aa995f63292bda92fc",
             input={"image": open(image_url, "rb"), "prompt": prompt},
@@ -934,9 +934,10 @@ class MessageParser:
         """Returns the number of tokens in a text string."""
         try:
             encoding = tiktoken.encoding_for_model(model)
-        except KeyError:
+        except (KeyError, ValueError):
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
-            encoding = tiktoken.get_encoding("cl100k_base")
+            #encoding = tiktoken.get_encoding("cl100k_base")
+            return len(string)
         num_tokens = len(encoding.encode(string))
         return num_tokens
 
@@ -945,9 +946,10 @@ class MessageParser:
         """Return the number of tokens used by a list of functions."""
         try:
             encoding = tiktoken.encoding_for_model(model)
-        except KeyError:
+        except (KeyError, ValueError):
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
-            encoding = tiktoken.get_encoding("cl100k_base")
+            #encoding = tiktoken.get_encoding("cl100k_base")
+            return 0
 
         num_tokens = 0
         for function in functions:

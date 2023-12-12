@@ -20,9 +20,9 @@ class Database:
         self.conn = None
         self.cursor = None
         self.migrations_dir = "migrations"
-        if getattr(sys, 'frozen', False):
+        if getattr(sys, "frozen", False):
             # If the application is frozen (bundled)
-            sys.path.append(os.path.join(sys._MEIPASS, 'migrations'))
+            sys.path.append(os.path.join(sys._MEIPASS, "migrations"))
 
     def open(self):
         if self.PRODUCTION == "false":
@@ -289,7 +289,7 @@ class Database:
         return daily_limit
 
     def update_admin_controls(
-            self, id, daily_spending_limit, allow_access, maintenance
+        self, id, daily_spending_limit, allow_access, maintenance
     ):
         self.cursor.execute(
             """

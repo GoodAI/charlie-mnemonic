@@ -1,12 +1,16 @@
 version: '3'
 services:
   clang:
+    container_name: clang
+    hostname: clang
+    entrypoint: ["python", "launcher.py"]
     build:
       context: .
       dockerfile: Dockerfile
     image: clang:v1
     environment:
       - DEPLOY_ENV=local
+      - HOST=0.0.0.0
       - PORT=8002
     ports:
       - 8002:8002
@@ -14,3 +18,19 @@ services:
       - ./data/user:/app/users
     env_file:
       - .env
+
+  psdb:
+    image: postgres:14
+    container_name: psdb
+    hostname: psdb
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    environment:
+      - POSTGRES_NAME=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOSTNAME=psdb
+
+volumes:
+  postgres-data:

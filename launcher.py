@@ -1,3 +1,5 @@
+import os
+
 import uvicorn
 
 
@@ -51,6 +53,8 @@ def create_app():
     return app
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False, workers=1)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8002))
+    uvicorn.run(app, host=host, port=port, reload=False, workers=1)

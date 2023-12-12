@@ -684,6 +684,7 @@ class MessageParser:
     async def get_image_description(image_url, prompt, file_name):
         """Get the description of an image using a LLAVA 1.5 API"""
         import replicate
+
         output = replicate.run(
             "yorickvp/llava-13b:6bc1c7bb0d2a34e413301fee8f7cc728d2d4e75bfab186aa995f63292bda92fc",
             input={"image": open(image_url, "rb"), "prompt": prompt},
@@ -936,7 +937,7 @@ class MessageParser:
             encoding = tiktoken.encoding_for_model(model)
         except (KeyError, ValueError):
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
-            #encoding = tiktoken.get_encoding("cl100k_base")
+            # encoding = tiktoken.get_encoding("cl100k_base")
             return len(string)
         num_tokens = len(encoding.encode(string))
         return num_tokens
@@ -948,7 +949,7 @@ class MessageParser:
             encoding = tiktoken.encoding_for_model(model)
         except (KeyError, ValueError):
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
-            #encoding = tiktoken.get_encoding("cl100k_base")
+            # encoding = tiktoken.get_encoding("cl100k_base")
             return 0
 
         num_tokens = 0

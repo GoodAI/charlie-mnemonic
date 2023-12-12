@@ -1,9 +1,7 @@
-import importlib
-
 import uvicorn
 
 
-def start():
+def create_app():
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     import os
@@ -54,5 +52,5 @@ def start():
 
 
 if __name__ == '__main__':
-    app = start()
+    app = create_app()
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=False, workers=1)

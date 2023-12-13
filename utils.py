@@ -1242,17 +1242,15 @@ async def process_message(
         notes = ""
         notes_string = ""
 
-    # kw_brain_string = old_kw_brain
-
-    # generate the full message
     if image_prompt is not None:
-        full_message = await MessageParser.generate_full_message(
-            username, merged_result_string, instruction_string
+        image_prompt_injection = (
+            "Automatically generated image description:\n" + image_prompt
         )
-    else:
-        full_message = await MessageParser.generate_full_message(
-            username, merged_result_string, instruction_string
-        )
+        og_message += "\n" + image_prompt_injection
+
+    full_message = await MessageParser.generate_full_message(
+        username, merged_result_string, instruction_string
+    )
 
     history_messages = []
 

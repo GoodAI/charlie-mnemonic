@@ -196,7 +196,16 @@ document.getElementById('send').addEventListener('click', async function () {
     }
     if (pastedImageFile) {
         send_image(pastedImageFile);
-        //pastedImageFile = null; // Clear the pasted image file
+        // clear the file input
+        document.getElementById('uploadImageInput').value = '';
+        // clear the preview image
+        document.getElementById('preview-image').src = '';
+        // hide the preview image
+        document.getElementById('image-preview').style.display = 'none';
+        // show the upload-image button
+        document.getElementById('upload-image').style.display = 'block';
+        // clear the pastedImageFile variable
+        pastedImageFile = null;
         document.getElementById('message').value = '';
     } else {
         sendMessageToServer();

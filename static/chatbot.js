@@ -709,7 +709,7 @@ function handleTabDescription(msg) {
     tabButton.offsetWidth;
 }
 
-function handleStopMessage(msg) {
+async function handleStopMessage(msg) {
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
         // Remove the typing indicator
@@ -718,7 +718,6 @@ function handleStopMessage(msg) {
         // Appending the new chunk to the existing content of the last message
         lastMessage.innerHTML = formatTempReceived(tempFullChunk);
     }
-    tempFullChunk = '';
 
     // Function to remove the typing indicator
     function removeTypingIndicator() {
@@ -727,6 +726,29 @@ function handleStopMessage(msg) {
             typingIndicator.remove();
         }
     }
+    
+    if (settings.audio.voice_output) {
+        var playButtonCode = '<br><i class="fas fa-play play-button"></i>';
+        var lastMessage = document.querySelector('.last-message .bubble');
+        if (lastMessage) {
+            lastMessage.innerHTML += playButtonCode;
+        }
+        var playButtons = document.querySelectorAll('.play-button');
+        var playButton = playButtons[playButtons.length - 1];
+        playButton.addEventListener('click', async function () {
+            this.classList.remove('fa-play');
+            this.classList.add('fa-spinner');
+            var audioSrc = await request_audio(this);
+            var audioElement = document.createElement('audio');
+            audioElement.controls = true;
+            audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+            this.parentNode.appendChild(audioElement);
+            this.remove();
+        });
+    }
+    
+    tempFullChunk = '';
+    resetState();
 }
 
 function handleChunkMessage(msg) {
@@ -768,7 +790,7 @@ function handleChunkMessage(msg) {
     function createTypingIndicator() {
         return '<div class="typing-indicator"><div class="dot"></div></div>';
     }
-    resetState();
+    //resetState();
 
     // Auto-scroll to the bottom of the chat
     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
@@ -1001,6 +1023,7 @@ function addChatTab(id) {
     if (id == undefined) {
         id = uuid();
     }
+    chat_id = id;
     var chatTabs = document.getElementById('chat-tabs-container');
     var newTab = document.createElement('button');
     newTab.className = 'chat-tab';
@@ -1025,14 +1048,6 @@ function deleteChatTab() {
     // Remove the target tab
     chatTabs.removeChild(targetTab);
 
-    // Select new active tab
-    if (newActiveTab) {
-        var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
-        setChat(newActiveTabId);
-    } else {
-        addChatTab();
-    }
-
     // Send the delete request
     fetch(API_URL + '/delete_chat_tab/', {
         method: 'POST',
@@ -1043,6 +1058,15 @@ function deleteChatTab() {
         credentials: 'include'
     })
         .then(response => response.json())
+        .then(data => {
+            // Select new active tab
+            if (newActiveTab) {
+                var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
+                setChat(newActiveTabId);
+            } else {
+                addChatTab();
+            }
+        })
         .catch(console.error);
 }
 

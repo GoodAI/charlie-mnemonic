@@ -147,7 +147,10 @@ async function sendMessageToServer(message) {
     }
 }
 
-async function request_audio(message) {
+async function request_audio(button) {
+    // get the text from the div where the button is in
+    var message = button.parentElement.innerText;
+
     try {
         const response = await fetch(API_URL + '/generate_audio/', {
             method: 'POST',
@@ -353,7 +356,6 @@ async function send_image(image_file, prompt) {
         reader.readAsDataURL(image_file);
         reader.onloadend = function () {
             var base64data = reader.result;
-            // ![The San Juan Mountains are beautiful!](/assets/images/san-juan-mountains.jpg "San Juan Mountains")
             var fullmessage = '![image](' + base64data + ' "image")<p>' + message + '</p>';
             fullmessage = marked(fullmessage);
             addCustomMessage(fullmessage, 'user', true);
@@ -417,9 +419,9 @@ function send_audio(file) {
             if (fileInput.files.length > 0) {
                 send_image(fileInput.files[0], data.transcription);
                 // clear the file input
-                //fileInput.value = '';
+                fileInput.value = '';
                 // clear the image preview
-                //document.getElementById('image-preview').innerHTML = '';
+                document.getElementById('image-preview').innerHTML = '';
                 // clear the message input
                 document.getElementById('message').value = '';
             } else {
@@ -665,7 +667,11 @@ canSendMessage();
 function populateChatTabs(tabs_data) {
     // Get the chat tabs container
     var chatTabs = document.getElementById('chat-tabs-container');
-
+    // Remove the loader
+    var loader = document.querySelector('.loader');
+    if (loader) {
+        loader.remove();
+    }
     // Clear the current tabs
     while (chatTabs.firstChild) {
         chatTabs.removeChild(chatTabs.firstChild);

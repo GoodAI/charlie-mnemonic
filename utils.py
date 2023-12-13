@@ -8,6 +8,7 @@ import re
 import sys
 import time
 import uuid
+import requests
 from tenacity import retry, stop_after_attempt, wait_fixed
 import aiohttp
 from termcolor import colored
@@ -598,42 +599,35 @@ class AudioProcessor:
 
     @staticmethod
     async def generate_audio(text, username, users_dir):
-        # make sure the dir exists
+        # Make sure the directory exists
         audio_dir = os.path.join(users_dir, username, "audio")
         Path(audio_dir).mkdir(parents=True, exist_ok=True)
         audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
-        # find pairs of 3 backticks and strip the code inside them including the backticks
-        # because we don't want to generate audio for code blocks
-        code_blocks = []
-        code_block_start = 0
-        code_block_end = 0
-        for i in range(len(text)):
-            if text[i : i + 3] == "```":
-                if code_block_start == 0:
-                    code_block_start = i
+
+        # Strip code blocks from text
+        text = MessageParser.strip_code_blocks(text)
+
+        # Retry mechanism for audio generation
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                audio = generate(
+                    text=text,
+                    voice="ThT5KcBeYPX3keUQqHPh",
+                    model="eleven_multilingual_v1",
+                )
+                with open(audio_path, "wb") as f:
+                    f.write(audio)
+                return audio_path, audio
+            except requests.exceptions.ChunkedEncodingError as e:
+                if attempt < max_retries - 1:
+                    continue
                 else:
-                    code_block_end = i
-                    code_blocks.append(text[code_block_start : code_block_end + 3])
-                    code_block_start = 0
-                    code_block_end = 0
-        for code_block in code_blocks:
-            text = text.replace(code_block, "")
-
-        audio = generate(
-            text=text,
-            # Todo: add a choice for different voices
-            # change to a cheaper solution
-            voice="ThT5KcBeYPX3keUQqHPh",
-            model="eleven_multilingual_v1",
-        )
-        try:
-            with open(audio_path, "wb") as f:
-                f.write(audio)
-
-            return audio_path, audio
-
-        except Exception as e:
-            return logger.error(e)
+                    raise e
+            except Exception as e:
+                # Log other exceptions and re-raise
+                logger.error(e)
+                raise
 
 
 class BrainProcessor:
@@ -666,6 +660,25 @@ class BrainProcessor:
 
 class MessageParser:
     """This class contains functions to parse messages and generate responses"""
+
+    @staticmethod
+    def strip_code_blocks(text):
+        # Function to strip code blocks from text
+        code_blocks = []
+        code_block_start = 0
+        code_block_end = 0
+        for i in range(len(text)):
+            if text[i : i + 3] == "```":
+                if code_block_start == 0:
+                    code_block_start = i
+                else:
+                    code_block_end = i
+                    code_blocks.append(text[code_block_start : code_block_end + 3])
+                    code_block_start = 0
+                    code_block_end = 0
+        for code_block in code_blocks:
+            text = text.replace(code_block, "")
+        return text
 
     @staticmethod
     @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
@@ -1107,7 +1120,7 @@ async def process_message(
         messages = [
             {
                 "role": "system",
-                "content": "Give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it!",
+                "content": "You are a chat tab title generator. You will give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it!",
             },
             {"role": "user", "content": all_messages},
         ]

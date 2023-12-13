@@ -58,7 +58,7 @@
         var isWaiting = false;
         var isRecording = false;
         var daily_limit = '{{ daily_limit }}';
-        var chat_id = 0;
+        var chat_id = "0";
 
         var mediaRecorder;
         var chunks = [];
@@ -260,7 +260,8 @@
                     <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button>
                 </div>
                 <div id="chat-tabs-container" class="chat-tabs-container">
-                    <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button>
+                    <div class="loader"></div>
+                    <!-- <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button> -->
                 </div>
             </div>
         </div>

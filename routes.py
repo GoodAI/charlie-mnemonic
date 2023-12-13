@@ -626,7 +626,7 @@ async def handle_message(request: Request, message: userMessage):
         active_tab_data = db.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
-            message.chat_id = 0
+            message.chat_id = "0"
             # put the data in the database
             db.insert_tab_data(
                 user_id, message.chat_id, "new chat", message.chat_id, True
@@ -950,43 +950,57 @@ async def handle_save_data(request: Request, user: UserName):
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
 
-    # Export memory to a JSON file
+    # Paths for memory file and settings file
     json_file_path = os.path.join(users_dir, user.username, "memory.json")
-    export_memory_to_file(path=json_file_path, username=user.username)
-
-    # get the user's notes directory and settings file
-    user_notes_dir = os.path.join(users_dir, user.username, "notes")
     settings_file = os.path.join(users_dir, user.username, "settings.json")
 
-    # create a temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # copy the user's notes directory, settings file and memory file to the temporary directory
-        shutil.copytree(user_notes_dir, os.path.join(temp_dir, "notes"))
-        shutil.copy2(settings_file, os.path.join(temp_dir, "settings.json"))
-        shutil.copy2(json_file_path, os.path.join(temp_dir, "memory.json"))
+    # Check if the memory file exists
+    if not os.path.exists(json_file_path):
+        # todo: add an empty memory file
+        pass
 
-        # get current date
+    # Export memory to a JSON file if it exists
+    if os.path.exists(json_file_path):
+        export_memory_to_file(path=json_file_path, username=user.username)
+
+    # Get the user's notes directory
+    user_notes_dir = os.path.join(users_dir, user.username, "notes")
+
+    # Check if the notes directory exists, if not create an empty one
+    if not os.path.exists(user_notes_dir):
+        os.makedirs(user_notes_dir)
+
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Copy the user's notes directory
+        shutil.copytree(user_notes_dir, os.path.join(temp_dir, "notes"))
+
+        # Check and copy the settings file
+        if os.path.exists(settings_file):
+            shutil.copy2(settings_file, os.path.join(temp_dir, "settings.json"))
+
+        # Check and copy the memory file
+        if os.path.exists(json_file_path):
+            shutil.copy2(json_file_path, os.path.join(temp_dir, "memory.json"))
+
+        # Get current date
         current_date = datetime.now().strftime("%Y%m%d")
 
-        # create zip filename
+        # Create zip filename
         zip_filename = f"{user.username}_{current_date}_clang_data.zip"
 
-        # zip the temporary directory
+        # Zip the temporary directory
         shutil.make_archive(
             os.path.join(users_dir, user.username, "data"), "zip", temp_dir
         )
 
-        # rename the zip file
+        # Rename the zip file
         shutil.move(
             os.path.join(users_dir, user.username, "data.zip"),
             os.path.join(users_dir, user.username, zip_filename),
         )
 
-    # serve the zip file
-    # return FileResponse(os.path.join(users_dir, user.username, zip_filename), media_type="application/zip", filename=zip_filename)
-
-    # todo: note that this method reads the entire file content into memory, which could cause issues for large files. If files are large,
-    # we should stick with the FileResponse function and try to find out why it’s not setting the ‘Content-Disposition’ header correctly.
+    # Serve the zip file
     file_path = os.path.join(users_dir, user.username, zip_filename)
     with open(file_path, "rb") as file:
         content = file.read()

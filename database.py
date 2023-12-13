@@ -205,7 +205,7 @@ class Database:
             self.cursor.execute(
                 """
                 UPDATE chat_tabs
-                SET is_active = true
+                SET is_active = true, is_enabled = true
                 WHERE user_id = %s AND chat_id = %s
                 """,
                 (user_id, tab_id),

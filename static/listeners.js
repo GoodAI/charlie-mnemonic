@@ -29,19 +29,21 @@ textarea.oninput = function () {
 };
 let lastValidMessage = '';
 
-$('#voice-input, #voice-output').change(function () {
-    var settings = {
-        voice_input: $('#voice-input').prop('checked'),
-        voice_output: $('#voice-output').prop('checked')
-    };
+function playButtonHandler() {
+    this.classList.remove('fa-play');
+    this.classList.add('fa-spinner');
+    request_audio(this).then(audioSrc => {
+        var audioElement = document.createElement('audio');
+        audioElement.controls = true;
+        audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+        var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
+        this.closest('.bubble').appendChild(audioElement);
+        if (anchorTag) {
+            anchorTag.remove();
+        }
+    });
+}
 
-    // Show or hide the record button based on the voice input setting
-    if (settings.voice_input) {
-        $('#record').show();
-    } else {
-        $('#record').hide();
-    }
-});
 
 $('#avatar-checkbox').change(function () {
     var settings = {
@@ -117,6 +119,8 @@ document.getElementById('image-preview').addEventListener('click', function () {
     document.getElementById('uploadImageInput').value = '';
     // clear the pastedImageFile variable
     pastedImageFile = null;
+    // set the .icon-container-right padding to 25
+    document.querySelector('.icon-container-right').style.right = '25px';
 });
 
 
@@ -130,11 +134,23 @@ document.getElementById('uploadImageInput').addEventListener('change', function 
             this.value = '';
             return;
         }
-        handleImageFile(this.files[0]);
+        const file = this.files[0];
+        if (!file.type.startsWith('image/')) { // if the file is not an image
+            showErrorModal('Invalid file type. Please select an image file.');
+            this.value = ''; // reset the input
+        } else {
+            handleImageFile(file);
+        }
     }
 });
 
 function handleImageFile(imageFile) {
+    // Check if the file is an image
+    if (imageFile.type.indexOf('image') === -1) {
+        // If not, reject the file and return
+        showErrorMessage('Invalid file type. Please upload an image file.', true);
+        return;
+    }
     // create a new FileReader object
     let reader = new FileReader();
 
@@ -161,6 +177,9 @@ function handleImageFile(imageFile) {
 
     // Store the image file for later use
     pastedImageFile = imageFile;
+
+    // set the .icon-container-right padding to 60
+    document.querySelector('.icon-container-right').style.right = '60px';
 }
 
 window.addEventListener('paste', function (event) {
@@ -230,15 +249,17 @@ document.getElementById('logout-button').addEventListener('click', async functio
     }
 });
 
-
 document.getElementById('record').addEventListener('click', function () {
+    // Initialize the default CSS box shadow
+    var defaultBoxShadow = '0px 11px 35px 2px rgba(0, 0, 0, 0.20)';
+    document.getElementById('message').style.boxShadow = defaultBoxShadow;
+
     // Check if we're currently recording
     if (mediaRecorder && mediaRecorder.state == "recording") {
         // If we are, stop the recording and reset our data
         mediaRecorder.stop();
         chunks = [];
-        document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
-        //document.getElementById('recordingIndicator').style.display = "none";
+        document.getElementById('record').innerHTML = '<i id ="recordicon" class="fa fa-microphone"></i>';
         canSend = true;
         canRecord = true;
         isRecording = false;
@@ -248,6 +269,12 @@ document.getElementById('record').addEventListener('click', function () {
         // If we're not, start a new recording
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(function (stream) {
+                var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                var source = audioContext.createMediaStreamSource(stream);
+                var analyser = audioContext.createAnalyser();
+                source.connect(analyser);
+                var dataArray = new Uint8Array(analyser.frequencyBinCount);
+
                 mediaRecorder = new MediaRecorder(stream);
                 mediaRecorder.start();
                 canSend = false;
@@ -255,6 +282,9 @@ document.getElementById('record').addEventListener('click', function () {
                 isRecording = true;
                 isWaiting = false;
                 canSendMessage();
+
+                // change tooltip text
+                document.getElementById('record').setAttribute('data-tooltip', 'Stop recording');
 
                 mediaRecorder.ondataavailable = function (e) {
                     chunks.push(e.data);
@@ -269,16 +299,45 @@ document.getElementById('record').addEventListener('click', function () {
 
                     send_audio(file);
 
-                    document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
-                    //document.getElementById('recordingIndicator').style.display = "none";
+                    document.getElementById('record').innerHTML = '<i id ="recordicon" class="fa fa-microphone"></i>';
                 }
+
+                // Add this function to update the glow around the message div
+                function update() {
+                    analyser.getByteFrequencyData(dataArray);
+                    var values = 0;
+                    var length = dataArray.length;
+                    for (var i = 0; i < length; i++) {
+                        values += (dataArray[i]);
+                    }
+                    var average = values / length;
+
+                    // Lower threshold to make the red more sensitive
+                    if (average < 5) {
+                        document.getElementById('message').style.boxShadow = defaultBoxShadow;
+                    } else {
+                        // Increase the opacity of the red color as the sound level rises
+                        var intensity = Math.min(1, average / 64); // Adjust normalization range for more sensitivity
+                        var boxShadowColor = `rgba(255, 0, 0, ${intensity})`;
+                        document.getElementById('message').style.boxShadow = `0 0 ${10 + average}px ${boxShadowColor}`;
+                    }
+
+                    if(mediaRecorder && mediaRecorder.state == "recording") {
+                        requestAnimationFrame(update);
+                    } else {
+                        // Reset the glow around the message div
+                        document.getElementById('message').style.boxShadow = defaultBoxShadow;
+                        // change tooltip text
+                        document.getElementById('record').setAttribute('data-tooltip', 'Start recording');
+                    }
+                }
+                update();
             })
             .catch(function (err) {
                 console.log('The following error occurred: ' + err);
                 showErrorModal('Error occurred : ' + err + '.\nDid you try turning it off and on again?\nYour microphone permissions might be disabled.');
                 // Reset the UI
-                document.getElementById('record').innerHTML = '<i class="fa fa-microphone"></i>';
-                //document.getElementById('recordingIndicator').style.display = "none";
+                document.getElementById('record').innerHTML = '<i id="recordicon" class="fa fa-microphone"></i>';
                 canSend = true;
                 canRecord = true;
                 isRecording = false;
@@ -286,8 +345,7 @@ document.getElementById('record').addEventListener('click', function () {
                 canSendMessage();
             })
 
-        document.getElementById('record').innerHTML = '<i class="fa fa-stop"></i>';
-        //document.getElementById('recordingIndicator').style.display = "block";
+        document.getElementById('record').innerHTML = '<i id="recordicon" class="fa fa-stop"></i>';
         canSend = false;
         canRecord = false;
         isRecording = true;
@@ -369,4 +427,18 @@ document.getElementById('messages').addEventListener('click', function(e) {
             }
         }
     }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const themeToggle = document.getElementById('theme-toggle');
+    const currentTheme = localStorage.getItem('theme') || '';
+
+    if (currentTheme) {
+        document.body.classList.add(currentTheme);
+    }
+
+    themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark-theme');
+        localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark-theme' : '');
+    });
 });

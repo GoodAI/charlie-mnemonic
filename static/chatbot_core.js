@@ -148,8 +148,9 @@ async function sendMessageToServer(message) {
 }
 
 async function request_audio(button) {
-    // get the text from the div where the button is in
-    var message = button.parentElement.innerText;
+    // get the text from the p tag sibling of the button's grandparent
+    var messageContainer = button.closest('.play-button-wrapper').previousElementSibling;
+    var message = messageContainer.innerText;
 
     try {
         const response = await fetch(API_URL + '/generate_audio/', {
@@ -170,6 +171,7 @@ async function request_audio(button) {
         console.error('Failed to send message: ', error);
     }
 }
+
 
 async function save_user_data() {
     try {
@@ -238,6 +240,7 @@ async function delete_user_data() {
             overlay.style.display = 'none';
         }, 2000);
         get_settings(user_name);
+        get_chat_tabs(user_name);
 
     } catch (error) {
         await handleError(error);
@@ -411,7 +414,7 @@ function send_audio(file) {
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
-                showErrorMessage('Too low volume or no voice detected!');
+                showErrorMessage('Too low volume or no voice detected!', true);
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first

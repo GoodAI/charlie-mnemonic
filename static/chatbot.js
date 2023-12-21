@@ -380,6 +380,15 @@ function createMemoryTabContent(tabId) {
     container.appendChild(values);
     tabContent.appendChild(container);
 
+    // button to load default memory configuration
+    var resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset to Default';
+    resetButton.onclick = function () {
+        var defaultValues = [500, 1500, 2500, 2800, 3500, 4500, 5500, 6500];
+        slider.noUiSlider.set(defaultValues);
+    };
+    tabContent.appendChild(resetButton);
+
     var saveButton = document.createElement('button');
     saveButton.textContent = 'Save Memory Configuration';
     saveButton.onclick = saveMemoryConfiguration;
@@ -449,6 +458,22 @@ function edit_status(category, setting, value) {
         .catch(console.error);
 };
 
+function playButtonHandler() {
+    var playIcon = this.querySelector('.play-button');
+    playIcon.classList.remove('fa-play');
+    playIcon.classList.add('fa-spinner');
+    var messageBubble = this.parentElement.querySelector('p');
+    var clonedButton = playIcon.cloneNode(true);
+    messageBubble.appendChild(clonedButton);
+    request_audio(clonedButton).then(audioSrc => {
+        var audioElement = document.createElement('audio');
+        audioElement.controls = true;
+        audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+        this.closest('.bubble').appendChild(audioElement);
+        this.remove();
+    });
+}
+
 function setSettings(newSettings) {
     // import the settings and populate the settings menu
     const overlay = document.getElementById('overlay_msg');
@@ -485,6 +510,44 @@ function setSettings(newSettings) {
             $('#record').hide();
         }
 
+        var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
+
+        if (newSettings.audio.voice_output) {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (stream) {
+                    $('#record').show();
+        
+                    // Add play button to all existing chat bubbles of bot messages
+                    var allMessages = document.querySelectorAll('.message.bot .bubble');
+                    allMessages.forEach(function(message) {
+                        if (!message.querySelector('.play-button')) {
+                            message.innerHTML += playButtonCode;
+                            var playButton = message.querySelector('.play-button');
+                            playButton.addEventListener('click', playButtonHandler);
+                        }
+                    });
+                })
+                .catch(function (err) {
+                    edit_status('audio', 'voice_output', false);
+                    $('#record').hide();
+                    // Error handling code...
+                });
+        
+        } else {
+            $('#record').hide();
+        
+            // Remove play button from all existing chat bubbles of bot messages
+            var allPlayButtonWrappers = document.querySelectorAll('.message.bot .bubble .play-button-wrapper');
+            allPlayButtonWrappers.forEach(function(wrapper) {
+                wrapper.remove();
+            });
+            // Remove audio elements from all existing chat bubbles of bot messages
+            var allAudioElements = document.querySelectorAll('.message.bot .bubble audio');
+            allAudioElements.forEach(function(audio) {
+                audio.remove();
+            });
+        }
+
         if (newSettings.avatar.avatar) {
             $('#d-id-content').show();
             document.getElementById("chat-container").style.minWidth = "50vw";
@@ -502,8 +565,7 @@ function setSettings(newSettings) {
         }
     }
 };
-
-function showErrorMessage(message) {
+function showErrorMessage(message, instant) {
     var timestamp = new Date().toLocaleTimeString();
     var content = message;
     var tempchild = document.getElementById('messages').lastChild;
@@ -521,17 +583,28 @@ function showErrorMessage(message) {
     }
 
     var chatMessage = document.createElement('div');
-    chatMessage.innerHTML = `
-        <div class="message error">
-            <span class="timestamp">${timestamp}</span>
-            <div class="bubble">
-                <div class="expandable" onclick="this.classList.toggle('expanded')">
-                    <div class="title">Error:<div class="arrow"></div></div>
+    if (instant) {
+        chatMessage.innerHTML = `
+            <div class="message warning">
+                <span class="timestamp">${timestamp}</span>
+                <div class="bubble">
                     ${message}
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    } else {
+        chatMessage.innerHTML = `
+            <div class="message error">
+                <span class="timestamp">${timestamp}</span>
+                <div class="bubble">
+                    <div class="expandable" onclick="this.classList.toggle('expanded')">
+                        <div class="title">Error:<div class="arrow"></div></div>
+                        ${message}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     document.getElementById('messages').appendChild(chatMessage);
 
     // enable the send  and record button again
@@ -541,6 +614,8 @@ function showErrorMessage(message) {
     isRecording = false;
     canSendMessage();
     document.getElementById('message').placeholder = 'Type a message...';
+    // Auto-scroll to the bottom of the chat
+    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 };
 
 function try_reconnect(socket, username) {
@@ -728,7 +803,7 @@ async function handleStopMessage(msg) {
     }
     
     if (settings.audio.voice_output) {
-        var playButtonCode = '<br><i class="fas fa-play play-button"></i>';
+        var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
         var lastMessage = document.querySelector('.last-message .bubble');
         if (lastMessage) {
             lastMessage.innerHTML += playButtonCode;
@@ -742,8 +817,12 @@ async function handleStopMessage(msg) {
             var audioElement = document.createElement('audio');
             audioElement.controls = true;
             audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            this.parentNode.appendChild(audioElement);
-            this.remove();
+            
+            var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
+            this.closest('.bubble').appendChild(audioElement);
+            if (anchorTag) {
+                anchorTag.remove();
+            }
         });
     }
     
@@ -989,7 +1068,7 @@ async function get_chat_tabs(username) {
 }
 
 
-function setChat(id) {
+async function setChat(id) {
     chat_id = id;
 
     // Update active state for chat tabs
@@ -1002,7 +1081,10 @@ function setChat(id) {
     var targetTab = document.getElementById('chat-tab-' + id);
     targetTab.classList.add('active');
     swap_tab();
-    get_recent_messages(user_name, chat_id);
+    await get_recent_messages(user_name, chat_id);
+    if (settings != null) {
+        setSettings(settings);
+    }
 }
 
 // Random UUID generator
@@ -1359,14 +1441,21 @@ async function handleAudio(settings, timestamp, tempFormatted, msg) {
 
         var playButtons = document.querySelectorAll('.play-button');
         var playButton = playButtons[playButtons.length - 1];
+        var playButtons = document.querySelectorAll('.play-button');
+        var playButton = playButtons[playButtons.length - 1];
         playButton.addEventListener('click', async function () {
             this.classList.remove('fa-play');
             this.classList.add('fa-spinner');
-            var audioSrc = await request_audio(msg.content);
+            var audioSrc = await request_audio(this);
             var audioElement = document.createElement('audio');
             audioElement.controls = true;
             audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            this.replaceWith(audioElement);
+            
+            var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
+            this.closest('.bubble').appendChild(audioElement);
+            if (anchorTag) {
+                anchorTag.remove();
+            }
         });
     } else {
         var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '</div>';

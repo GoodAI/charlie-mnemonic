@@ -1,6 +1,59 @@
+/* Light Theme Variables */
+:root {
+    --background-color:linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    --chatbox-bg-color: #fff;
+    --text-color: #4c4c4c;
+    --bubble-bg-color: #ddd;
+    --user-bubble-color: #5084d8;
+    --user-bubble-text-color: #fff;
+    --bot-bubble-color: #ddd;
+    --bot-bubble-text-color: #333;
+    --modal-bg-color: #fff;
+    --button-bg-color: #7459fe;
+    --button-hover-bg-color: #9480ff;
+    --tooltip-bg-color: #5084d8;
+    --nav-bg-color: #111;
+    --nav-text-color: #c9c8c8;
+    --chat-tab-active-bg: #a6c1ee;
+    --chat-tab-bg: #c3cfe200;
+    --sidenav-bg-color: #111;
+    --debug-window-bg-color: #4b4b4b;
+    --socket-status-bg-color: #f2f2f2;
+    --socket-status-border-color: #ccc;
+    --socket-status-shadow-color: rgba(0,0,0,0.1);
+    --debug-stats-bg-color: #f2f2f2;
+}
+
+/* Dark Theme Variables */
+.dark-theme {
+    --background-color: linear-gradient(135deg, #222, #333);
+    --chatbox-bg-color: #333;
+    --text-color: #ddd;
+    --bubble-bg-color: #333;
+    --user-bubble-color: #184386;
+    --user-bubble-text-color: #eef1f7;
+    --bot-bubble-color: #595656;
+    --bot-bubble-text-color: #ddd;
+    --modal-bg-color: #222;
+    --button-bg-color: #333;
+    --button-hover-bg-color: #444;
+    --tooltip-bg-color: #333;
+    --nav-bg-color: #222;
+    --nav-text-color: #f1f1f1;
+    --chat-tab-active-bg: #333;
+    --chat-tab-bg: #22222200;
+    --sidenav-bg-color: #222;
+    --debug-window-bg-color: #333;
+    --socket-status-bg-color: #333;
+    --socket-status-border-color: #444;
+    --socket-status-shadow-color: rgba(0,0,0,0.3);
+    --debug-stats-bg-color: #595656;
+}
+
+
 body {
     font-family: 'Lexend', 'Poppins', sans-serif;
-    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    background: var(--background-color);
     /* background: #111; */
     display: flex;
     justify-content: center;
@@ -12,9 +65,32 @@ body {
     margin-left: 0;
 }
 
+.socket-status {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    padding: 10px;
+    background-color: var(--socket-status-bg-color);
+    border: 1px solid var(--socket-status-border-color);
+    border-radius: 5px;
+    font-family: Arial, sans-serif;
+    width: 200px;
+    box-shadow: 2px 2px 5px var(--socket-status-shadow-color);
+    z-index: 10;
+    color: var(--text-color);
+}
+
+.socket-status p {
+    margin: 0;
+}
+
+.socket-status p#username {
+    font-weight: bold;
+}
+
 #body-profile {
     font-family: 'Lexend', 'Poppins', sans-serif;
-    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    background: var(--background-color);
     background-attachment: fixed;
     display: block;
     height: 100vh;
@@ -26,7 +102,7 @@ body {
 .main_title {
     margin: 0 0 5px;
     text-align: center;
-    color: #4c4c4c;
+    color: var(--text-color);
     font-family: 'Lexend', 'Mulish', sans-serif;
     font-size: 2.5em;
 }
@@ -34,7 +110,7 @@ body {
 .sub_title {
     margin: 0 0 50px;
     text-align: center;
-    color: #4c4c4c;
+    color: var(--text-color);
     font-size: 18px;
     font-family: 'Lexend', 'Mulish', sans-serif;
     font-size: 1.16em;
@@ -43,7 +119,7 @@ body {
 .sub_title_2 {
     margin: 0 0 10px;
     text-align: center;
-    color: #4c4c4c;
+    color: var(--text-color);
     font-size: 20px;
 }
 
@@ -69,11 +145,21 @@ body {
     cursor: pointer;
     font-size: 18px;
     z-index: 3;
+    transition: left 0.5s, transform 0.5s;
+}
+
+#toggle-chat-tabs.open span {
+    display: inline-block;
+    transform: rotate(0deg);
+}
+#toggle-chat-tabs.closed span {
+    display: inline-block;
+    transform: rotate(60deg);
 }
 
 .control-tab {
     display: block;
-    background-color: #c3cfe2;
+    background-color: var(--chat-tab-bg);
     color: white;
     border: none;
     padding: 10px;
@@ -92,14 +178,19 @@ body {
 .chat-tab, .control-tab {
     display: block;
     margin-bottom: 5px;
-    background-color: #c3cfe200;
-    color: rgb(0, 0, 0);
+    background-color: var(--chat-tab-bg);
+    color: var(--text-color);
     border: none;
     padding: 10px;
     border-radius: 5px;
     cursor: pointer;
     text-align: left;
-    font-size: smaller;
+    font-size: smaller;    
+    overflow: hidden; /* Ensures text doesn't overflow */
+
+ /* Mask for text fade out starting at 90% of the parent's width */
+ -webkit-mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
+ mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
 }
 
 .chat-tab.active {
@@ -113,13 +204,14 @@ body {
     min-width: 80vw;
     max-height: 80vh;
     height: 80vh;
-    background: #fff;
+    background: var(--chatbox-bg-color);
     border-radius: 10px;
     box-shadow: 0px 11px 35px 2px rgba(0, 0, 0, 0.14);
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-left: 10vw;
+    margin-left: 13vw;
+    transition: margin-left 0.3s;
 }
 
 .chat-tab.active {
@@ -154,9 +246,8 @@ table tr td {
 }
 
 .textarea-container {
-    position: relative;
-    flex: 1;
-    margin-right: 10px;
+    position: inherit;
+    width: 100%;
 }
 
 .icon-container-left,
@@ -167,13 +258,12 @@ table tr td {
 }
 
 .icon-container-left {
-    top: 50%;
-    left: 25px;
-    transform: translateY(-50%);
+    bottom: 4.5vh;
+    transform: translateY(50%);
 }
 
 .icon-container-right {
-    bottom: 50%;
+    bottom: 4.5vh;
     right: 25px;
     transform: translateY(50%);
 }
@@ -190,22 +280,21 @@ table tr td {
     resize: vertical;
     max-height: 60vh;
     min-height: 70px;
+    background-color: var(--chatbox-bg-color);
+    color: var(--text-color);
 }
 
 
 .input-field button {
     background: none;
     cursor: pointer;
-    padding: 10px 10px;
     border: none;
 }
 
 .input-field button:disabled {
     color: #d54747;
     border: none;
-    padding: 10px 10px;
     cursor: not-allowed !important;
-    transition: background 0.3s;
 }
 
 .input-field button:hover {
@@ -220,14 +309,12 @@ table tr td {
     color: #184386;
     border: none;
     cursor: pointer;
-    transition: background 0.3s;
 }
 
 .input-field .send-button:disabled {
     color: #d54747;
     border: none;
     cursor: not-allowed !important;
-    transition: background 0.3s;
 }
 
 .input-field .send-button:hover {
@@ -242,14 +329,12 @@ table tr td {
     color: #184386;
     border: none;
     cursor: pointer;
-    transition: background 0.3s;
 }
 
 .input-field .record-button:disabled {
     color: #d54747;
     border: none;
     cursor: not-allowed !important;
-    transition: background 0.3s;
 }
 
 .input-field .record-button:hover {
@@ -262,6 +347,11 @@ table tr td {
 
 .input-field i {
     margin-right: 10px;
+    width: 15px;
+}
+
+.deletebutton {
+    margin-right: 0px !important;
 }
 
 .input-field .cogwheel {
@@ -361,13 +451,23 @@ table tr td {
     padding-right: 5px;
 }
 
+.message .bubble {
+    display: block;
+}
+
+.message .bubble img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-bottom: 10px;
+}
 .bubble {
     display: inline;
 }
 
 .message.bot .bubble {
-    background-color: #ddd;
-    color: #333;
+    background-color: var(--bot-bubble-color);
+    color: var(--bot-bubble-text-color);
     border-radius: 6px;
     padding: 10px 15px;
     display: inline;
@@ -424,8 +524,8 @@ table tr td {
 }
 
 .message.user .bubble {
-    background-color: #5084d8;
-    color: #fff;
+    background-color: var(--user-bubble-color);
+    color: var(--user-bubble-text-color);
     border-radius: 6px;
     padding: 10px 15px;
     display: inline;
@@ -446,6 +546,17 @@ table tr td {
 
 .message.error .bubble {
     background-color: #df6969;
+    color: white;
+    border-radius: 6px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+    align-self: flex-end;
+}
+
+.message.warning .bubble {
+    background-color: #e38148;
     color: white;
     border-radius: 6px;
     padding: 10px 15px;
@@ -607,17 +718,15 @@ pre {
 
 .sidenav {
     height: 100%;
-    width: 15vw;
+    width: 18vw;
     position: fixed;
     z-index: 1;
     top: 0;
     left: 0;
-    /* background-color: #111; */
     overflow-x: hidden;
-    transition: 0.5s;
-    padding-top: 60px;
-    color: #c9c8c8;
+    transition: left 0.5s;
     padding-top: 15vh;
+    color: #c9c8c8;
 }
 
 .sidenav a {
@@ -838,7 +947,7 @@ pre {
 }
 
 .statsWindow {
-    background-color: #d1d9e3;
+    background-color: var(--debug-stats-bg-color);
     overflow-y: auto;
     max-height: 150px;
     display: flex;
@@ -848,7 +957,7 @@ pre {
 }
 
 .statsWindow p {
-    color: #333;
+    color: var(--text-color);
     margin-bottom: 0 !important;
     margin-top: 0 !important;
     padding-left: 10px;
@@ -1202,6 +1311,7 @@ body * {
     padding: 10px 15px;
     color: #111111;
     text-decoration: none;
+    font-size: smaller;
 }
 
 .nav-item a:hover {
@@ -1364,3 +1474,87 @@ body * {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+@keyframes windup-spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    50% {
+      transform: rotate(180deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .fa-spinner {
+    display: inline-block;
+    animation: windup-spin 2s infinite linear;
+  }
+
+  .play-button {
+    cursor: pointer;
+    color: #000;
+  }
+
+  
+/* Add this attribute to the element that needs a tooltip */
+[data-tooltip] {
+    position: relative;
+    z-index: 0;
+    cursor: pointer;
+  }
+  
+  /* Hide the tooltip content by default */
+  [data-tooltip]:before,
+  [data-tooltip]:after {
+    visibility: hidden;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";
+    filter: progid: DXImageTransform.Microsoft.Alpha(Opacity=0);
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  /* Position tooltip above the element */
+  [data-tooltip]:before {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    margin-bottom: 5px;
+    margin-left: -80px;
+    padding: 7px;
+    width: 160px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    background-color: #5084d8;
+    color: #fff;
+    content: attr(data-tooltip);
+    text-align: center;
+    font-size: 14px;
+    line-height: 1.2;
+    border-radius: 5px;
+  }
+  
+  /* make the tooltip look like a text bubble */
+  [data-tooltip]:after {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    margin-left: -5px;
+    width: 0;
+    border-top: 5px solid #5084d8;
+    border-right: 5px solid transparent;
+    border-left: 5px solid transparent;
+    content: " ";
+    font-size: 0;
+    line-height: 0;
+  }
+  
+  /* Show tooltip content on hover */
+  [data-tooltip]:hover:before,
+  [data-tooltip]:hover:after {
+    visibility: visible;
+    -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=100)";
+    filter: progid: DXImageTransform.Microsoft.Alpha(Opacity=100);
+    opacity: 1;
+  }

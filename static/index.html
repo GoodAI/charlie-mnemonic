@@ -100,11 +100,11 @@
 
 <body>
     <!-- Socket Info -->
-    <div id="socketStatus"
-        style="position: fixed; top: 10px; left: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); z-index: 10;">
-        <p id="username" style="margin: 0; font-weight: bold;"></p>
-        <p id="connectionStatus" style="margin: 0;"></p>
+    <div id="socketStatus" class="socket-status">
+        <p id="username"></p>
+        <p id="connectionStatus"></p>
     </div>
+    
     <!-- Big red Abort Button 
     <div id="abortButton" style="position: fixed; top: 10px; right: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
         <button id="abort" title="This will shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
@@ -226,6 +226,7 @@
                 </div>
                 <div class="modal-body">
                     <button id="logout-button">Logout</button><br>
+                    <button id="theme-toggle">Toggle Theme</button><br>
                     <div id="SidenavAddons"></div>
                 </div>
                 <div class="modal-footer">
@@ -280,7 +281,7 @@
     <table>
         <tr>
             <td>
-                <button id="toggle-chat-tabs" class="toggle-chat-tabs" onclick="closeTabs()">⯇</button>
+                <button id="toggle-chat-tabs" class="toggle-chat-tabs" onclick="closeTabs()" data-tooltip="Hide Chat Tabs"><span>⯇</span></button>
                 <div class="chat-interface">
                     <!-- Toggle Button for Side Navigation -->
                     <div id="chat-container" class="chat-container">
@@ -300,24 +301,23 @@
                             <div class="input-field">
                                 <div class="textarea-container">
                                     <div class="icon-container-left">
-                                        <i class="fa fa-cog cogwheel" onclick="openNav()"></i>
-                                        <i class="fas fa-terminal cogwheel"
-                                            onclick="event.stopPropagation(); openDebugNav()"></i>
+                                        <button id="settings" class="settings-button" data-tooltip="Settings" onclick="openNav()"><i class="fa fa-cog cogwheel"></i></button>
+                                        <button id="debug" class="debug-button" data-tooltip="Debug window" onclick="event.stopPropagation(); openDebugNav()"><i class="fas fa-terminal cogwheel"></i></button>
                                     </div>
-                                    <textarea id="message" placeholder="Type a message..." rows="1"></textarea>
+                                    <textarea id="message" placeholder="Type a message..." rows="1" autofocus="autofocus"></textarea>
                                     <div class="icon-container-right">
                                         <input type="file" id="uploadImageInput" accept="image/*" hidden>
-                                        <button id="upload-image" class="upload-button"><i
+                                        <button id="upload-image" class="upload-button" data-tooltip="Upload Image"><i
                                                 class="fa fa-paperclip cogwheel"></i></button>
-                                        <button id="record" class="record-button"><i class="fa fa-microphone"></i></button>
-                                        <button id="send" class="send-button"><i class="fa fa-paper-plane"></i></button>
+                                        <button id="record" class="record-button" data-tooltip="Start recording"><i class="fa fa-microphone"></i></button>
+                                        <button id="send" class="send-button" data-tooltip="Send"><i class="fa fa-paper-plane"></i></button>
                                     </div>
                                 </div>
                                 <div id="image-preview" style="display: none;">
                                     <div class="image-wrapper">
                                         <img id="preview-image" alt="uploaded image">
                                         <div class="hover-text">
-                                            <i class="fa fa-times-circle"></i>
+                                            <i class="fa fa-times-circle deletebutton"></i>
                                             <p>Delete</p>
                                         </div>
                                     </div>

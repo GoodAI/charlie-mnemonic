@@ -106,19 +106,25 @@ function closeNav() {
 }
 
 function openTabs() {
-    document.getElementById("toggle-chat-tabs").style.left = "15vw";
-    document.getElementById("sideNav").style.width = "15vw";
-    document.getElementById("chat-container").style.marginLeft = "10vw";
-    document.getElementById("toggle-chat-tabs").innerHTML = "⯇";
-    document.getElementById("toggle-chat-tabs").onclick = closeTabs;
+    const toggle = document.getElementById("toggle-chat-tabs");
+    toggle.style.left = "15vw";
+    toggle.classList.remove("closed");
+    toggle.classList.add("open");
+    toggle.onclick = closeTabs;
+
+    document.getElementById("sideNav").style.left = "0";
+    document.getElementById("chat-container").style.marginLeft = "13vw";
 }
 
 function closeTabs() {
-    document.getElementById("toggle-chat-tabs").style.left = "0";
-    document.getElementById("sideNav").style.width = "0";
-    document.getElementById("chat-container").style.marginLeft= "0";
-    document.getElementById("toggle-chat-tabs").innerHTML = "⯈";
-    document.getElementById("toggle-chat-tabs").onclick = openTabs;
+    const toggle = document.getElementById("toggle-chat-tabs");
+    toggle.style.left = "0";
+    toggle.classList.remove("open");
+    toggle.classList.add("closed");
+    toggle.onclick = openTabs;
+
+    document.getElementById("sideNav").style.left = "-18vw";
+    document.getElementById("chat-container").style.marginLeft = "0";
 }
 
 

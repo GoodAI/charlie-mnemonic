@@ -100,10 +100,10 @@ werkzeug==2.3.6
 python-multipart==0.0.6
 geopy==2.3.0
 pyproj==3.6.0
-rich
-termcolor
-pyfiglet
-pytest
+rich==13.7.0
+termcolor==2.4.0
+pyfiglet==1.0.2
+pytest==7.4.4
 tiktoken==0.5.1
 pydub==0.25.1
 docker==6.1.3
@@ -113,7 +113,5 @@ google-auth==2.23.2
 Authlib==1.2.1
 unidecode==1.3.7
 moviepy==1.0.3
-decorator
-replicate
-fastapi-users[sqlalchemy,oauth]
-aiosqlite
+decorator==5.1.1
+replicate==0.22.0

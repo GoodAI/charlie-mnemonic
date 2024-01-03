@@ -441,4 +441,45 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.toggle('dark-theme');
         localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark-theme' : '');
     });
+})
+
+document.addEventListener('DOMContentLoaded', function () {
+    const tooltipElements = document.querySelectorAll('[data-tooltip]');
+
+    tooltipElements.forEach(el => {
+        el.addEventListener('mouseenter', function (e) {
+            const tooltipText = this.getAttribute('data-tooltip');
+            const tooltipDiv = document.createElement('div');
+            tooltipDiv.className = 'dynamic-tooltip';
+            tooltipDiv.textContent = tooltipText;
+            document.body.appendChild(tooltipDiv);
+
+            let rect = this.getBoundingClientRect();
+            let left = rect.left + window.scrollX + (this.offsetWidth / 2) - (tooltipDiv.offsetWidth / 2);
+            let top = rect.top + window.scrollY - tooltipDiv.offsetHeight - 5; // 5px above the element
+
+            // Adjust if tooltip goes beyond the right edge of the viewport
+            const rightEdge = left + tooltipDiv.offsetWidth;
+            if (rightEdge > window.innerWidth) {
+                left -= rightEdge - window.innerWidth;
+            }
+
+            // Adjust if tooltip goes beyond the left edge of the viewport
+            if (left < 0) {
+                left = 0;
+            }
+
+            // Apply the calculated position
+            tooltipDiv.style.left = `${left}px`;
+            tooltipDiv.style.top = `${top}px`;
+            tooltipDiv.style.visibility = 'visible';
+            tooltipDiv.style.opacity = '1';
+        });
+
+        el.addEventListener('mouseleave', function () {
+            document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => {
+                tooltip.remove();
+            });
+        });
+    });
 });

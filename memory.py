@@ -149,28 +149,26 @@ class MemoryManager:
 
     async def split_text_into_chunks(self, text, max_chunk_len=200):
         """Split the text into chunks of up to `max_chunk_len`"""
-        # Tokenize the text into sentences, then count the number of tokens in each sentence and add them to a chunk until the chunk is full
-        sentences = sent_tokenize(text)
+        # Split the text into lines, then count the number of tokens in each line and add them to a chunk until the chunk is full
+        lines = text.split("\n")
 
         chunks = []
         chunk = []
         token_count = 0
 
-        for sentence in sentences:
-            current_sentence_token_count = utils.MessageParser.num_tokens_from_string(
-                sentence
-            )
-            if token_count + current_sentence_token_count > max_chunk_len:
-                chunks.append(" ".join(chunk))
-                chunk = [sentence]
-                token_count = current_sentence_token_count
+        for line in lines:
+            current_line_token_count = utils.MessageParser.num_tokens_from_string(line)
+            if token_count + current_line_token_count > max_chunk_len:
+                chunks.append("\n".join(chunk))
+                chunk = [line]
+                token_count = current_line_token_count
             else:
-                chunk.append(sentence)
-                token_count += current_sentence_token_count
+                chunk.append(line)
+                token_count += current_line_token_count
 
         # add the last chunk
         if chunk:
-            chunks.append(" ".join(chunk))
+            chunks.append("\n".join(chunk))
 
         return chunks
 

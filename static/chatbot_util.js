@@ -71,6 +71,7 @@ function setupCollapsible() {
 function openDebugNav() {
     document.getElementById("debugNav").style.width = "60%";
     document.getElementById("debugNav").style.height = "100vh";
+    document.getElementById("debugNav").style.display = "block";
     document.addEventListener('click', closeDebugNavOnClickOutside);
 }
 
@@ -78,6 +79,7 @@ function openDebugNav() {
 function closeDebugNav() {
     document.getElementById("debugNav").style.width = "0";
     document.getElementById("debugNav").style.height = "0";
+    document.getElementById("debugNav").style.display = "none";
     document.removeEventListener('click', closeDebugNavOnClickOutside);
 }
 

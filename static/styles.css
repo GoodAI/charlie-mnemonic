@@ -440,13 +440,6 @@ table tr td {
     align-items: center;
 }
 
-.message p {
-    margin-top: 0;
-    margin-bottom: 0;
-    display: inline;
-}
-
-
 .message span.timestamp {
     font-size: 0.7em;
     color: #888;
@@ -719,15 +712,13 @@ pre {
 }
 
 .sidenav {
-    height: 100%;
-    width: 18vw;
+    height: 80%;
+    width: 15vw;
     position: fixed;
-    z-index: 1;
-    top: 0;
+    top: 18vh;
     left: 0;
-    overflow-x: hidden;
+    overflow-x: auto;
     transition: left 0.5s;
-    padding-top: 15vh;
     color: #c9c8c8;
     z-index: 5;
 }
@@ -926,7 +917,7 @@ pre {
     /* initial size can be anything, but usually wise to set it to something sensible initially. */
     height: 0;
     width: 0;
-    z-index: 5;
+    z-index: 500;
     background-color: #111;
 }
 

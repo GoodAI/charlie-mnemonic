@@ -1,10 +1,7 @@
 function addUserMessage(message) {
-    var escaped_message = escapeHTML(message);
-    var messageFormatted = formatTempReceived(escaped_message);
-    var messageR = messageFormatted.replace(/\n/g, "<br>");
-    if (messageR.endsWith('<br>')) {
-        messageR = messageR.slice(0, -4);
-    }
+    console.log(message);
+    var messageR = parseAndFormatMessage(message, false, false);
+    console.log(messageR);
     var timestamp = new Date().toLocaleTimeString();
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
@@ -43,17 +40,39 @@ function addUserMessage(message) {
     canSendMessage();
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null) {
-    //var escaped_message = escapeHTML(message);
-    // replace `` ` with ``` and ` `` with ``` etc
+function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = false) {
+    // Replace multiple backticks with triple backticks
     message = message.replace(/(`\s*`\s*`)/g, '```');
-    messageFormatted = formatTempReceived(message);
-    if (replaceNewLines) {
-        var messageReplaced = messageFormatted.replace(/\n/g, "<br>");
+    
+    // Count the number of triple backticks
+    var count = (message.match(/```/g) || []).length;
+
+    // If the count is odd, add an extra set of backticks to close the last code block
+    if (count % 2 !== 0) {
+        message += '\n```';
+        console.log(message);
+        message = message.replace(/\n/g, "<br>");
+        console.log(message);
     }
-    else {
-        var messageReplaced = messageFormatted.replace(/\n/g, "");
+
+    // if outside of code block, add the typing indicator
+    if (count % 2 === 0 && addIndicator) {
+        if (!replaceNewLines) {
+            message = message.replace(/\n/g, "");
+        }
+        else {
+            message = message.replace(/\n/g, "<br>");
+        }
+        message += '<div class="typing-indicator"><div class="dot"></div></div>';
     }
+
+    // Apply Markdown formatting
+    return marked(message);
+}
+
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null) {
+    var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
+
     if (messageReplaced.endsWith('<br>')) {
         messageReplaced = messageReplaced.slice(0, -4);
     }

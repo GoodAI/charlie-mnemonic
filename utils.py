@@ -1156,7 +1156,7 @@ async def process_message(
         token_usage_active_brain,
         unique_results1,
     ) = await memory.process_active_brain(
-        f"{og_message}",
+        og_message,
         username,
         all_messages,
         tokens_active_brain,
@@ -1170,7 +1170,7 @@ async def process_message(
 
     if tokens_episodic_memory > 100:
         episodic_memory, timezone = await memory.process_episodic_memory(
-            f"{og_message}", username, all_messages, tokens_episodic_memory, verbose
+            og_message, username, all_messages, tokens_episodic_memory, verbose
         )
         if episodic_memory is None or episodic_memory == "":
             episodic_memory_string = ""
@@ -1194,7 +1194,7 @@ async def process_message(
             token_usage_relevant_memory,
             unique_results2,
         ) = await memory.process_incoming_memory(
-            None, f"{og_message}", username, tokens_cat_brain, verbose
+            None, og_message, username, tokens_cat_brain, verbose
         )
         merged_results_dict = {
             id: (document, distance, formatted_date)
@@ -1277,6 +1277,7 @@ async def process_message(
             tokens_output,
             history_messages,
         )
+    print(f"response: {response}")
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
     response = json.loads(response)

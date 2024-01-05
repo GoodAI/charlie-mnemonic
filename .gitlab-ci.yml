@@ -1,19 +1,10 @@
 image: python:3.10.12-slim
 
-before_script:
-  - apt update
-  - apt install -y python3-venv git libpq-dev build-essential
-  - python3 -m venv venv
-  - source venv/bin/activate
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
-
-
 stages:
   - Static Analysis
-  - Test
 
 black:
   stage: Static Analysis
   script:
+    - pip install black
     - black . --check

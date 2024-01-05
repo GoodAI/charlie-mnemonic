@@ -850,8 +850,8 @@ function handleChunkMessage(msg) {
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
         // Appending the new chunk to the existing content of the last message
-        var tempcontent = tempFullChunk + createTypingIndicator();
-        lastMessage.innerHTML = formatTempReceived(tempcontent);
+        var tempcontent = tempFullChunk;
+        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
 
     } else {
         // If there is no last message, create a new message element for the chunk
@@ -866,11 +866,10 @@ function handleChunkMessage(msg) {
         chatMessageElement.innerHTML = chatMessage;
         document.getElementById('messages').appendChild(chatMessageElement);
     }
+    //resetState();
     function createTypingIndicator() {
         return '<div class="typing-indicator"><div class="dot"></div></div>';
     }
-    //resetState();
-
     // Auto-scroll to the bottom of the chat
     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 }
@@ -1166,43 +1165,51 @@ async function get_recent_messages(username, chat_id) {
 
         const full_data = await handleError(response);
 
-        data = full_data.recent_messages;
-
-        // data is an array with messages from the user and the assistant
+        let data = full_data.recent_messages;
         let messages = [];
 
-        data.forEach(message => {
-            
-            var text = message.document;
-            var user = message.metadata.username;
-            var timestamp = message.metadata.updated_at;
-            
-            // if no username is set get the username from the message (trying some backwards compatibility here)
-            if (user == undefined || (user.toLowerCase() != 'user' && user.toLowerCase() != 'assistant') && text.includes(': ')) {
-                user = text.split(':')[0].trim().toLowerCase();
-                text = text.split(': ').slice(1).join(': ');
-            }
+        // Merge messages by UUID and process them
+        let currentUUID = null;
+        let currentMessage = '';
+        let currentUser = '';
+        let currentTimestamp = null;
 
-            if (user.toLowerCase() === 'assistant') {
-                messages.push({ text: text, user: 'bot', timestamp: timestamp });
-            }
-            else if (user.toLowerCase() === 'user') {
-                messages.push({ text: text, user: 'user', timestamp: timestamp });
+        data.forEach(message => {
+            const uuid = message.metadata.uid;
+            const text = message.document;
+            const user = message.metadata.username;
+            const timestamp = message.metadata.updated_at;
+
+            // Check for UUID continuity
+            if (uuid === currentUUID) {
+                currentMessage += '\n' + text;
             } else {
-                messages.push({ text: text, user: 'bot', timestamp: timestamp });
+                if (currentUUID !== null) {
+                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp });
+                }
+                currentUUID = uuid;
+                currentMessage = text;
+                currentUser = user;
+                currentTimestamp = timestamp;
             }
         });
 
-        // Process the messages in the order they were received
+        // Add the last message if it exists
+        if (currentUUID !== null) {
+            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp });
+        }
+
+        // Process and display the messages
         messages.forEach(message => {
-            addCustomMessage(message.text, message.user, false, true, message.timestamp);
+            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp);
         });
 
     } catch (error) {
-        console.error('Failed to send message: ', error);
-        showErrorMessage('Failed to send message: ' + error);
+        console.error('Failed to get messages: ', error);
+        showErrorMessage('Failed to get messages: ' + error);
     }
 }
+
 
 function get_settings(username) {
     var timestamp = new Date().toLocaleTimeString();

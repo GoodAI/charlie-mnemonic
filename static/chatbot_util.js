@@ -71,6 +71,7 @@ function setupCollapsible() {
 function openDebugNav() {
     document.getElementById("debugNav").style.width = "60%";
     document.getElementById("debugNav").style.height = "100vh";
+    document.getElementById("debugNav").style.display = "block";
     document.addEventListener('click', closeDebugNavOnClickOutside);
 }
 
@@ -78,6 +79,7 @@ function openDebugNav() {
 function closeDebugNav() {
     document.getElementById("debugNav").style.width = "0";
     document.getElementById("debugNav").style.height = "0";
+    document.getElementById("debugNav").style.display = "none";
     document.removeEventListener('click', closeDebugNavOnClickOutside);
 }
 
@@ -114,6 +116,7 @@ function openTabs() {
 
     document.getElementById("sideNav").style.left = "0";
     document.getElementById("chat-container").style.marginLeft = "13vw";
+    toggle.setAttribute("data-tooltip", "Hide Chat tabs");
 }
 
 function closeTabs() {
@@ -122,6 +125,7 @@ function closeTabs() {
     toggle.classList.remove("open");
     toggle.classList.add("closed");
     toggle.onclick = openTabs;
+    toggle.setAttribute("data-tooltip", "Show Chat tabs");
 
     document.getElementById("sideNav").style.left = "-18vw";
     document.getElementById("chat-container").style.marginLeft = "0";

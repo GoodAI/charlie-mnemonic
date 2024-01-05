@@ -50,9 +50,6 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     // If the count is odd, add an extra set of backticks to close the last code block
     if (count % 2 !== 0) {
         message += '\n```';
-        console.log(message);
-        message = message.replace(/\n/g, "<br>");
-        console.log(message);
     }
 
     // if outside of code block, add the typing indicator

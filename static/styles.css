@@ -576,7 +576,8 @@ table tr td {
 pre {
     background-color: #f5f5f5;
     /* or any color you prefer */
-    padding: 15px;
+    padding-top: 5px;
+    padding-left: 10px;
     border-radius: 5px;
     overflow: auto;
     color:#111;
@@ -590,14 +591,14 @@ pre {
 
 .copy-btn {
     float: right;
-    margin-right: 10px;
+    margin-right: 5px;
     margin-top: -20px;
     background: #c3cfe2;
     color: white;
     border: none;
-    padding: 5px 10px;
     cursor: pointer;
     transition: background 0.3s;
+    border-radius: 5px;
 }
 
 .copy-btn:hover {

@@ -8,6 +8,8 @@ var viewportHeight = window.innerHeight;
 var limit = Math.floor((viewportHeight * 0.7) / lineHeight); // max lines based on 70% of viewport height
 var min = 1; // minimum number of lines
 
+let pastedImageFile;
+
 // check for session token when page loads
 window.onload = function () {
     const overlay = document.getElementById('overlay_msg');
@@ -90,7 +92,6 @@ document.getElementById('errorModalClose').addEventListener('click', function ()
     $('#errorModal').modal('hide');
 });
 
-let pastedImageFile;
 
 document.getElementById('upload-image').addEventListener('click', function () {
 
@@ -103,9 +104,6 @@ document.getElementById('upload-image').addEventListener('click', function () {
         document.getElementById('uploadImageInput').click();
     }
 });
-
-
- // Variable to hold the pasted/dropped image file
 
 // check if the preview image was clicked, is so, remove it, show the upload-image button and clear the file input
 document.getElementById('image-preview').addEventListener('click', function () {
@@ -122,6 +120,8 @@ document.getElementById('image-preview').addEventListener('click', function () {
     // set the .icon-container-right padding to 25
     document.querySelector('.icon-container-right').style.right = '25px';
 });
+
+
 
 
 // check if an image was uploaded
@@ -151,35 +151,46 @@ function handleImageFile(imageFile) {
         showErrorMessage('Invalid file type. Please upload an image file.', true);
         return;
     }
+    
     // create a new FileReader object
     let reader = new FileReader();
 
-    // set the onload function, this will be called when the image is loaded
     reader.onload = function (event) {
-        // set the image-preview innerhtml to the uploaded image
-        document.getElementById('preview-image').src = event.target.result;
-        // show the image-preview
-        document.getElementById('image-preview').style.display = 'block';
-        // hide the upload-image button
-        document.getElementById('upload-image').style.display = 'none';
+        // create a new Image object
+        let img = new Image();
 
-        let imageWrapper = document.querySelector('.image-wrapper');
-        imageWrapper.addEventListener('mouseover', function () {
-            this.querySelector('.hover-text').style.display = 'block';
-        });
-        imageWrapper.addEventListener('mouseout', function () {
-            this.querySelector('.hover-text').style.display = 'none';
-        });
+        img.onload = function() {
+            // Apply CSS constraints to get thumbnail size
+            let thumbnailWidth = Math.min(100, img.width);
+            let thumbnailHeight = Math.min(36, img.height);
+
+            // Preserve aspect ratio
+            if (img.width > 100 || img.height > 36) {
+                let ratio = Math.min(100 / img.width, 36 / img.height);
+                thumbnailWidth = img.width * ratio;
+                thumbnailHeight = img.height * ratio;
+            }
+
+            console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
+            document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
+
+            // Set image src to the result of FileReader
+            document.getElementById('preview-image').src = event.target.result;
+            // Show the image-preview
+            document.getElementById('image-preview').style.display = 'block';
+            // Hide the upload-image button
+            document.getElementById('upload-image').style.display = 'none';
+        };
+
+        // Set image src to the result of FileReader
+        img.src = event.target.result;
     };
 
-    // read the image file as a data URL
+    // Read the image file as a data URL
     reader.readAsDataURL(imageFile);
 
     // Store the image file for later use
     pastedImageFile = imageFile;
-
-    // set the .icon-container-right padding to 60
-    document.querySelector('.icon-container-right').style.right = '60px';
 }
 
 window.addEventListener('paste', function (event) {
@@ -209,28 +220,44 @@ window.addEventListener('drop', function (event) {
 });
 
 document.getElementById('send').addEventListener('click', async function () {
-    // make sure the message is not empty
     if (document.getElementById('message').value.trim() === '') {
         return;
     }
     if (pastedImageFile) {
-        send_image(pastedImageFile);
-        // clear the file input
-        document.getElementById('uploadImageInput').value = '';
-        // clear the preview image
-        document.getElementById('preview-image').src = '';
-        // hide the preview image
-        document.getElementById('image-preview').style.display = 'none';
-        // show the upload-image button
-        document.getElementById('upload-image').style.display = 'block';
-        // clear the pastedImageFile variable
-        pastedImageFile = null;
-        document.getElementById('message').value = '';
+        let reader = new FileReader();
+        reader.onload = function (event) {
+            let img = new Image();
+            img.onload = function() {
+                // Apply CSS constraints to get thumbnail size
+                let thumbnailWidth = Math.min(100, img.width);
+                let thumbnailHeight = Math.min(36, img.height);
+
+                // Preserve aspect ratio
+                if (img.width > 100 || img.height > 36) {
+                    let ratio = Math.min(100 / img.width, 36 / img.height);
+                    thumbnailWidth = img.width * ratio;
+                    thumbnailHeight = img.height * ratio;
+                }
+
+                console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
+                document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
+
+                // Image sending operations
+                send_image(pastedImageFile);
+                document.getElementById('uploadImageInput').value = '';
+                document.getElementById('preview-image').src = '';
+                document.getElementById('image-preview').style.display = 'none';
+                document.getElementById('upload-image').style.display = 'block';
+                pastedImageFile = null;
+                document.getElementById('message').value = '';
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(pastedImageFile);
     } else {
         sendMessageToServer();
     }
 });
-
 
 document.getElementById('message').addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) {

@@ -136,3 +136,10 @@ function updateCounterDiv(message_lenght, tokens_used, max_message_tokens, cost)
     const countDiv = document.getElementById("tokenCount");
     countDiv.innerHTML = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
 }
+
+function formatTime(seconds) {
+    const pad = (num) => (num < 10 ? '0' : '') + num;
+    const minutes = Math.floor(seconds / 60);
+    seconds = seconds % 60;
+    return `${pad(minutes)}:${pad(seconds)}`;
+}

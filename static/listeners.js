@@ -136,7 +136,7 @@ document.getElementById('uploadImageInput').addEventListener('change', function 
         }
         const file = this.files[0];
         if (!file.type.startsWith('image/')) { // if the file is not an image
-            showErrorModal('Invalid file type. Please select an image file.');
+            showErrorMessage('Invalid file type. Please select an image file.', true);
             this.value = ''; // reset the input
         } else {
             handleImageFile(file);

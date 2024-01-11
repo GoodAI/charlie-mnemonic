@@ -221,12 +221,16 @@ body {
     color: white;
 }
 
-table {
-    height: 80vh;
-}
+blockquote {
+    font: 14px/22px normal helvetica, sans-serif;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-left: 50px;
+    padding-left: 15px;
+    border-left: 3px solid #ccc;
+  }
 
 table tr {
-    height: 100%;
     align-items: center;
 }
 
@@ -491,7 +495,7 @@ table tr td {
 }
 
 .message.debug .bubble {
-    color: #333;
+    color: var(--text-color);
     border-radius: 6px;
     display: inline;
     max-width: 80%;

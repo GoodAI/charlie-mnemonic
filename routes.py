@@ -1052,6 +1052,23 @@ async def handle_delete_data(request: Request, user: UserName):
     return {"message": "User data deleted successfully"}
 
 
+async def handle_delete_data_keep_settings(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    wipe_all_memories(user.username)
+    stop_database(user.username)
+    # remove all users recent messages
+    await BrainProcessor.delete_recent_messages(user.username)
+    # remove chat tabs from the database
+    with Database() as db:
+        user_id = db.get_user_id(user.username)[0]
+        db.delete_tab_data(user_id)
+    return {"message": "User data deleted successfully"}
+
+
 @router.post(
     "/upload_data/",
     tags=["Data"],

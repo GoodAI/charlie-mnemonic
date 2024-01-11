@@ -1052,7 +1052,7 @@ async def process_message(
     # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
     token_usage = 500
     # Extract individual settings with defaults if not found
-    max_token_usage = 6500
+    max_token_usage = max(memory_settings.get("max_tokens", 6500), 120000)
     tokens_active_brain = memory_settings.get("ltm1", 1000)
     tokens_cat_brain = memory_settings.get("ltm2", 700)
     tokens_episodic_memory = memory_settings.get("episodic", 650)
@@ -1277,7 +1277,6 @@ async def process_message(
             tokens_output,
             history_messages,
         )
-    print(f"response: {response}")
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
     response = json.loads(response)

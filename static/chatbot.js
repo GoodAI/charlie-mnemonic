@@ -11,14 +11,14 @@ function populateSettingsMenu(settings) {
         settingsMenu.firstChild.remove();
     }
 
-    var tabs = ['Addons', 'Data', 'General Settings', 'Recent Messages', 'User Data', 'Memory Configuration'];
+    var tabs = ['Addons', 'Data', 'General Settings', 'User Data', 'Memory Configuration'];
     var tabNav = createTabNav(tabs);
     settingsMenu.appendChild(tabNav);
 
     settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab1'));
     settingsMenu.appendChild(createDataTabContent(settings.audio, 'tab2'));
     settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab3'));
-    settingsMenu.appendChild(createRecentMessagesTabContent('tab4'));
+    //settingsMenu.appendChild(createRecentMessagesTabContent('tab4'));
     settingsMenu.appendChild(createUserDataTabContent('tab5'));
     settingsMenu.appendChild(createMemoryTabContent('tab6'));
 
@@ -135,7 +135,7 @@ function createAddonsTabContent(addons, tabId) {
     var h3 = document.createElement('h3');
     h3.textContent = 'Addons';
     tabContent.appendChild(h3);
-
+    // todo: don't hardcode the addon descriptions
     var addon_descriptions = [
         {
           name: 'get_current_weather',
@@ -520,7 +520,11 @@ function setSettings(newSettings) {
                     // Add play button to all existing chat bubbles of bot messages
                     var allMessages = document.querySelectorAll('.message.bot .bubble');
                     allMessages.forEach(function(message) {
-                        if (!message.querySelector('.play-button')) {
+                        // Check if a play button or an audio player already exists
+                        var playButtonExists = message.querySelector('.play-button');
+                        var audioPlayerExists = message.querySelector('audio');
+        
+                        if (!playButtonExists && !audioPlayerExists) {
                             message.innerHTML += playButtonCode;
                             var playButton = message.querySelector('.play-button');
                             playButton.addEventListener('click', playButtonHandler);
@@ -530,7 +534,6 @@ function setSettings(newSettings) {
                 .catch(function (err) {
                     edit_status('audio', 'voice_output', false);
                     $('#record').hide();
-                    // Error handling code...
                 });
         
         } else {
@@ -547,6 +550,7 @@ function setSettings(newSettings) {
                 audio.remove();
             });
         }
+        
 
         if (newSettings.avatar.avatar) {
             $('#d-id-content').show();
@@ -851,7 +855,7 @@ function handleChunkMessage(msg) {
     if (lastMessage) {
         // Appending the new chunk to the existing content of the last message
         var tempcontent = tempFullChunk;
-        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
+        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, false);
 
     } else {
         // If there is no last message, create a new message element for the chunk
@@ -962,8 +966,6 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
                     formattedMsgContent += `${formatContent(msg[key])}<br/>`;
                 }
             }
-            
-        console.log("Formatted content for key", key, formattedMsgContent);
         }
     }
     var expandableContent = `<div class="expandable-content" style="display: none;">${formattedMsgContent}</div>`;

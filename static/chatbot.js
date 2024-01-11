@@ -18,9 +18,8 @@ function populateSettingsMenu(settings) {
     settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab1'));
     settingsMenu.appendChild(createDataTabContent(settings.audio, 'tab2'));
     settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab3'));
-    //settingsMenu.appendChild(createRecentMessagesTabContent('tab4'));
-    settingsMenu.appendChild(createUserDataTabContent('tab5'));
-    settingsMenu.appendChild(createMemoryTabContent('tab6'));
+    settingsMenu.appendChild(createUserDataTabContent('tab4'));
+    settingsMenu.appendChild(createMemoryTabContent('tab5'));
 
     var maxRange = settings.memory.max_tokens;
     var minRange = settings.memory.min_tokens;
@@ -284,26 +283,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
         edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
     }
     tabContent.appendChild(cotItem);
-
-    return tabContent;
-}
-
-
-function createRecentMessagesTabContent(tabId) {
-    var tabContent = document.createElement('div');
-    tabContent.id = tabId;
-    tabContent.className = 'tab-content';
-
-    var h3 = document.createElement('h3');
-    h3.textContent = 'Recent Message';
-    tabContent.appendChild(h3);
-
-    var clearMsgBtn = document.createElement('button');
-    clearMsgBtn.id = 'clearMsgBtn';
-    clearMsgBtn.textContent = 'Clear recent messages';
-    tabContent.appendChild(clearMsgBtn);
-    
-    clearMsgBtn.addEventListener('click', delete_recent_messages);
 
     return tabContent;
 }

@@ -1052,6 +1052,9 @@ async def handle_delete_data(request: Request, user: UserName):
     return {"message": "User data deleted successfully"}
 
 
+@router.post(
+    "/delete_data_keep_settings/",
+)
 async def handle_delete_data_keep_settings(request: Request, user: UserName):
     session_token = request.cookies.get("session_token")
     auth = Authentication()

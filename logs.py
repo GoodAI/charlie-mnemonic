@@ -2,6 +2,8 @@ import logging
 import os
 import codecs
 
+from simple_utils import get_root
+
 
 class SafeFileHandler(logging.FileHandler):
     def _open(self):

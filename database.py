@@ -46,7 +46,9 @@ class Database:
 
     def load_migrations(self):
         migrations = []
-        filenames = sorted(os.listdir(self.migrations_dir))
+        from utils import get_root
+
+        filenames = sorted(os.listdir(get_root(self.migrations_dir)))
         for filename in filenames:
             if filename.endswith(".py") and filename != "__init__.py":
                 module = importlib.import_module(

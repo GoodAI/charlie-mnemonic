@@ -71,7 +71,7 @@ logger = logs.Log("routes", "routes.log").get_logger()
 from config import api_keys
 
 router = APIRouter()
-templates = Jinja2Templates(directory="static")
+templates = Jinja2Templates(directory=get_root("static"))
 
 connections = {}
 
@@ -81,8 +81,8 @@ ORIGINS = os.environ["ORIGINS"]
 
 users_dir = "users"
 
-router.mount("/static", StaticFiles(directory="static"), name="static")
-router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
+router.mount("/static", StaticFiles(directory=get_root("static")), name="static")
+router.mount("/d-id", StaticFiles(directory=get_root("d-id")), name="d-id")
 
 
 @router.get("/d-id/api.json")

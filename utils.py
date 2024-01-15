@@ -26,6 +26,8 @@ import logs
 import prompts
 from unidecode import unidecode
 
+from simple_utils import get_root
+
 logger = logs.Log("utils", "utils.log").get_logger()
 
 
@@ -1012,7 +1014,7 @@ class SettingsManager:
     @staticmethod
     def get_version():
         version = "0.0"
-        with open("version.txt", "r") as f:
+        with open(get_root("version.txt"), "r") as f:
             new_version = f.read().strip()
             if new_version:
                 version = new_version

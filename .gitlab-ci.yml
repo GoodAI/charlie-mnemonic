@@ -2,6 +2,7 @@ image: python:3.10.12-slim
 
 stages:
   - Static Analysis
+  - Tests
 
 black:
   stage: Static Analysis
@@ -15,3 +16,10 @@ djlint:
   script:
     - pip install djlint
     - djlint static --check
+
+
+pytest:
+  stage: Tests
+  script:
+    - pip install pytest openai python-dotenv elevenlabs
+    - pytest configuration_page/

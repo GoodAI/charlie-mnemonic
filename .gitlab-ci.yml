@@ -8,3 +8,10 @@ black:
   script:
     - pip install black
     - black . --check
+
+
+djlint:
+  stage: Static Analysis
+  script:
+    - pip install djlint
+    - djlint static --check

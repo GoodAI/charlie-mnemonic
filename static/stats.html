@@ -1,11 +1,11 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <title>Admin Panel</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
+    <head>
+        <title>Admin Panel</title>
+        <link rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
         .small-font {
             font-size: 0.5em;
         }
@@ -14,177 +14,172 @@
             width: 100%;
             height: 20vh;
         }
-    </style>
-</head>
-
-<body>
-    <div class="container mt-4">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Admin Controls</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Daily Spending Limit</th>
-                                <th>Allow Access</th>
-                                <th>Maintenance</th>
-                                <th>Server Reboot</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <form method="post" action="/admin/update_controls">
-                                <tr>
-                                    <td>
-                                        <input type="hidden" name="id" value="{{ admin_controls.id }}">
-                                        <input type="text" name="daily_spending_limit"
-                                            value="{{ admin_controls.daily_spending_limit }}">
-                                    </td>
-                                    <td>
-                                        <select name="allow_access">
-                                            <option value="yes" {% if admin_controls.allow_access==True %}selected{%
-                                                endif %}>Yes</option>
-                                            <option value="no" {% if admin_controls.allow_access==False %}selected{%
-                                                endif %}>No</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select name="maintenance">
-                                            <option value="yes" {% if admin_controls.maintenance==True %}selected{%
-                                                endif %}>Yes</option>
-                                            <option value="no" {% if admin_controls.maintenance==False %}selected{%
-                                                endif %}>No</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input type="submit" value="Reboot">
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td colspan="4">
-                                        <input type="submit" value="Update">
-                                    </td>
-                                </tr>
-                            </form>
-                        </tbody>
-                    </table>
+        </style>
+    </head>
+    <body>
+        <div class="container mt-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Admin Controls</h5>
                 </div>
-            </div>
-
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Global Statistics</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Total Messages</th>
-                                <th>Total Tokens</th>
-                                <th>Prompt tokens</th>
-                                <th>Response tokens</th>
-                                <th>Voice</th>
-                                <th>Total Cost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>{{ statistics.total_messages }}</td>
-                                <td>{{ statistics.total_tokens }}</td>
-                                <td>{{ statistics.total_prompt_tokens }}</td>
-                                <td>{{ statistics.total_completion_tokens }}</td>
-                                <td>{{ statistics.total_voice_usage }}</td>
-                                <td>{{ statistics.total_spending }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">User Statistics</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <div class="container mt-4">
-                        <canvas id="myChart" height="300px"></canvas>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Daily Spending Limit</th>
+                                    <th>Allow Access</th>
+                                    <th>Maintenance</th>
+                                    <th>Server Reboot</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <form method="post" action="/admin/update_controls">
+                                    <tr>
+                                        <td>
+                                            <input type="hidden" name="id" value="{{ admin_controls.id }}">
+                                            <input type="text"
+                                                   name="daily_spending_limit"
+                                                   value="{{ admin_controls.daily_spending_limit }}">
+                                        </td>
+                                        <td>
+                                            <select name="allow_access">
+                                                <option value="yes" {% if admin_controls.allow_access==True %}selected{%
+                                                    endif %}>Yes</option>
+                                                <option value="no" {% if admin_controls.allow_access==False %}selected{%
+                                                    endif %}>No</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select name="maintenance">
+                                                <option value="yes" {% if admin_controls.maintenance==True %}selected{%
+                                                    endif %}>Yes</option>
+                                                <option value="no" {% if admin_controls.maintenance==False %}selected{%
+                                                    endif %}>No</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="submit" value="Reboot">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="4">
+                                            <input type="submit" value="Update">
+                                        </td>
+                                    </tr>
+                                </form>
+                            </tbody>
+                        </table>
                     </div>
-                    <table class="table table-striped table-bordered">
-                        <thead>
-                            <tr>
-                                <th>User ID</th>
-                                <th>Username</th>
-                                <th id="amount_of_messages">Messages</th>
-                                <th id="total_tokens_used">Total Tokens</th>
-                                <th id="prompt_tokens">Prompt tokens</th>
-                                <th id="completion_tokens">Response tokens</th>
-                                <th id="voice_usage">Voice</th>
-                                <th id="total_spending_count">Total Cost</th>
-                                <th>Has Access - Role</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in rows %}
-                            <tr>
-                                <td>{{ row.user_id }}</td>
-                                <td><a href="/admin/statistics/user/{{ row.user_id }}">{{ row.username }}</a></td>
-                                <td>{{ row.amount_of_messages }}</td>
-                                <td>{{ row.total_tokens_used }}</td>
-                                <td>{{ row.prompt_tokens }}</td>
-                                <td>{{ row.completion_tokens }}</td>
-                                <td>{{ row.voice_usage }}</td>
-                                <td>{{ row.total_spending_count }}</td>
-                                <td>
-                                    <form method="post" action="/admin/update_user/{{ row.user_id }}">
-                                        <select name="has_access">
-                                            <option value="true" {% if row.has_access==True %}selected{% endif %}>Yes
-                                            </option>
-                                            <option value="false" {% if row.has_access==False %}selected{% endif %}>No
-                                            </option>
-                                        </select>
-                                        <select name="role">
-                                            <option value="admin" {% if row.role=='admin' %}selected{% endif %}>Admin
-                                            </option>
-                                            <option value="mod" {% if row.role=='mod' %}selected{% endif %}>Mod</option>
-                                            <option value="user" {% if row.role=='user' %}selected{% endif %}>User
-                                            </option>
-                                        </select>
-                                        <input type="submit" value="Update">
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
                 </div>
-                <br>
-                <nav>
-                    <ul class="pagination">
-                        <!-- Add buttons for previous page -->
-                        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                            <a class="page-link"
-                                href="{% if page > 1 %}{{ url_for('get_statistics', page=page-1) }}{% else %}#{% endif %}"
-                                tabindex="-1">Previous</a>
-                        </li>
-
-                        <!-- Add page numbers -->
-                        {% for i in range(1, total_pages + 1) %}
-                        <li class="page-item {% if page == i %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('get_statistics', page=i) }}">{{ i }}</a>
-                        </li>
-                        {% endfor %}
-
-                        <!-- Add buttons for next page -->
-                        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                            <a class="page-link" href="{{ url_for('get_statistics', page=page+1) }}">Next</a>
-                        </li>
-                    </ul>
-                </nav>
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Global Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Total Messages</th>
+                                    <th>Total Tokens</th>
+                                    <th>Prompt tokens</th>
+                                    <th>Response tokens</th>
+                                    <th>Voice</th>
+                                    <th>Total Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>{{ statistics.total_messages }}</td>
+                                    <td>{{ statistics.total_tokens }}</td>
+                                    <td>{{ statistics.total_prompt_tokens }}</td>
+                                    <td>{{ statistics.total_completion_tokens }}</td>
+                                    <td>{{ statistics.total_voice_usage }}</td>
+                                    <td>{{ statistics.total_spending }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">User Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <div class="container mt-4">
+                            <canvas id="myChart" height="300px"></canvas>
+                        </div>
+                        <table class="table table-striped table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>User ID</th>
+                                    <th>Username</th>
+                                    <th id="amount_of_messages">Messages</th>
+                                    <th id="total_tokens_used">Total Tokens</th>
+                                    <th id="prompt_tokens">Prompt tokens</th>
+                                    <th id="completion_tokens">Response tokens</th>
+                                    <th id="voice_usage">Voice</th>
+                                    <th id="total_spending_count">Total Cost</th>
+                                    <th>Has Access - Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in rows %}
+                                    <tr>
+                                        <td>{{ row.user_id }}</td>
+                                        <td>
+                                            <a href="/admin/statistics/user/{{ row.user_id }}">{{ row.username }}</a>
+                                        </td>
+                                        <td>{{ row.amount_of_messages }}</td>
+                                        <td>{{ row.total_tokens_used }}</td>
+                                        <td>{{ row.prompt_tokens }}</td>
+                                        <td>{{ row.completion_tokens }}</td>
+                                        <td>{{ row.voice_usage }}</td>
+                                        <td>{{ row.total_spending_count }}</td>
+                                        <td>
+                                            <form method="post" action="/admin/update_user/{{ row.user_id }}">
+                                                <select name="has_access">
+                                                    <option value="true" {% if row.has_access==True %}selected{% endif %}>Yes</option>
+                                                    <option value="false" {% if row.has_access==False %}selected{% endif %}>No</option>
+                                                </select>
+                                                <select name="role">
+                                                    <option value="admin" {% if row.role=='admin' %}selected{% endif %}>Admin</option>
+                                                    <option value="mod" {% if row.role=='mod' %}selected{% endif %}>Mod</option>
+                                                    <option value="user" {% if row.role=='user' %}selected{% endif %}>User</option>
+                                                </select>
+                                                <input type="submit" value="Update">
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <br>
+                    <nav>
+                        <ul class="pagination">
+                            <!-- Add buttons for previous page -->
+                            <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                                <a class="page-link"
+                                   href="{% if page > 1 %}{{ url_for('get_statistics', page=page-1) }}{% else %}#{% endif %}"
+                                   tabindex="-1">Previous</a>
+                            </li>
+                            <!-- Add page numbers -->
+                            {% for i in range(1, total_pages + 1) %}
+                                <li class="page-item {% if page == i %}active{% endif %}">
+                                    <a class="page-link" href="{{ url_for('get_statistics', page=i) }}">{{ i }}</a>
+                                </li>
+                            {% endfor %}
+                            <!-- Add buttons for next page -->
+                            <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="{{ url_for('get_statistics', page=page+1) }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
             </div>
         </div>
-    </div>
-    <script>
+        <script>
         var rawData = JSON.parse('{{ chart_data | safe }}'.replace(/\\"/g, '"'));
         var ctx = document.getElementById('myChart').getContext('2d');
         var chartLabels = rawData.map(function (row) { return row.username; });
@@ -237,8 +232,7 @@
             myChart.data.datasets[0].label = 'Total Spending Count';
             myChart.update();
         });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
-</body>
-
+        </script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.min.js"></script>
+    </body>
 </html>

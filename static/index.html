@@ -1,39 +1,45 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <title>GoodAI Agent {{version}}</title>
-    <link href='https://fonts.googleapis.com/css?family=Lexend' rel='stylesheet'>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
-    <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/marked/2.1.3/marked.min.js"></script>
-    <script src="https://unpkg.com/json5@2/dist/index.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"
-        integrity="sha512-3gJwYpMe3QewGELv8k/BX9vcqhryRdzRMxVfq6ngyWXwo03GFEzjsUm8Q7RZcHPHksttq7/GFoxjCVUjkjvPdw=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.js"
-        integrity="sha512-MBa5biLyZuJEdQR7TkouL0i1HAqpq8lh8suPgA//wpxGx4fU1SGz1hGSlZhYmm+b7HkoncCWpfVKN3NDcowZgQ=="
-        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css"
-        integrity="sha512-ZKX+BvQihRJPA8CROKBhDNvoc2aDMOdAlcm7TUQY+35XYtrd3yh95QOOhsPDQY9QnKE0Wqag9y38OIgEvb88cA=="
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
-        crossorigin="anonymous"></script>
-    <link href="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.js"></script>
-
-    <script type="module" src="cl100k_base.js"></script>
-    <script src="chatbot_util.js?v={{version}}"></script>
-    <link rel="stylesheet" href="styles.css?v={{version}}">
-
-    <script>
+    <head>
+        <title>GoodAI Agent {{ version }}</title>
+        <link href='https://fonts.googleapis.com/css?family=Lexend'
+              rel='stylesheet'>
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+        <link rel="stylesheet"
+              href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/default.min.css">
+        <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/highlight.min.js"></script>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/marked/2.1.3/marked.min.js"></script>
+        <script src="https://unpkg.com/json5@2/dist/index.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"
+                integrity="sha512-3gJwYpMe3QewGELv8k/BX9vcqhryRdzRMxVfq6ngyWXwo03GFEzjsUm8Q7RZcHPHksttq7/GFoxjCVUjkjvPdw=="
+                crossorigin="anonymous"
+                referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/js/lightbox.js"
+                integrity="sha512-MBa5biLyZuJEdQR7TkouL0i1HAqpq8lh8suPgA//wpxGx4fU1SGz1hGSlZhYmm+b7HkoncCWpfVKN3NDcowZgQ=="
+                crossorigin="anonymous"
+                referrerpolicy="no-referrer"></script>
+        <link rel="stylesheet"
+              href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.4/css/lightbox.min.css"
+              integrity="sha512-ZKX+BvQihRJPA8CROKBhDNvoc2aDMOdAlcm7TUQY+35XYtrd3yh95QOOhsPDQY9QnKE0Wqag9y38OIgEvb88cA=="
+              crossorigin="anonymous"
+              referrerpolicy="no-referrer" />
+        <link rel="stylesheet"
+              href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+              rel="stylesheet"
+              integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+              crossorigin="anonymous">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+                crossorigin="anonymous"></script>
+        <link href="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.css"
+              rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.js"></script>
+        <script type="module" src="cl100k_base.js"></script>
+        <script src="chatbot_util.js?v={{version}}"></script>
+        <link rel="stylesheet" href="styles.css?v={{ version }}">
+        <script>
         let production = '{{ production }}';
         production = production.trim();
         if (production == 'False' || production == 'false' || production == '0' || production == 'False\n' || production == 'false\n' || production == '0\n') {
@@ -94,272 +100,335 @@
 
 
         
-    </script>
-    <script src="chatbot.js?v={{version}}"></script>
-</head>
-
-<body>
-    <!-- Socket Info -->
-    <div id="socketStatus" class="socket-status">
-        <p id="username"></p>
-        <p id="connectionStatus"></p>
-    </div>
-    
-    <!-- Big red Abort Button 
+        </script>
+        <script src="chatbot.js?v={{version}}"></script>
+    </head>
+    <body>
+        <!-- Socket Info -->
+        <div id="socketStatus" class="socket-status">
+            <p id="username"></p>
+            <p id="connectionStatus"></p>
+        </div>
+        <!-- Big red Abort Button
     <div id="abortButton" style="position: fixed; top: 10px; right: 10px; padding: 10px; background-color: #f2f2f2; border: 1px solid #ccc; border-radius: 5px; font-family: Arial, sans-serif; width: 200px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);">
         <button id="abort" title="This will shut down the agent!" style="background-color: red; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; width: 100%;">Emergency Button</button>
     </div>
     -->
-    <!-- Toasts -->
-    <div class="toast-container position-fixed top-0 end-0 p-3">
-    </div>
-    <!-- Error Modal -->
-    <div id="errorModal" class="modal fade">
-        <div class="modal-dialog modal-confirm">
-            <div class="modal-content">
-                <div class="modal-header justify-content-center">
-                    <div class="icon-box">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="2em"
-                            viewBox="0 0 384 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. -->
-                            <style>
+        <!-- Toasts -->
+        <div class="toast-container position-fixed top-0 end-0 p-3"></div>
+        <!-- Error Modal -->
+        <div id="errorModal" class="modal fade">
+            <div class="modal-dialog modal-confirm">
+                <div class="modal-content">
+                    <div class="modal-header justify-content-center">
+                        <div class="icon-box">
+                            <svg xmlns="http://www.w3.org/2000/svg" height="2em" viewBox="0 0 384 512">
+                                <!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license (Commercial License) Copyright 2023 Fonticons, Inc. -->
+                                <style>
                                 svg {
                                     fill: #ffffff
                                 }
-                            </style>
-                            <path
-                                d="M376.6 84.5c11.3-13.6 9.5-33.8-4.1-45.1s-33.8-9.5-45.1 4.1L192 206 56.6 43.5C45.3 29.9 25.1 28.1 11.5 39.4S-3.9 70.9 7.4 84.5L150.3 256 7.4 427.5c-11.3 13.6-9.5 33.8 4.1 45.1s33.8 9.5 45.1-4.1L192 306 327.4 468.5c11.3 13.6 31.5 15.4 45.1 4.1s15.4-31.5 4.1-45.1L233.7 256 376.6 84.5z" />
-                        </svg>
+                                </style>
+                                <path d="M376.6 84.5c11.3-13.6 9.5-33.8-4.1-45.1s-33.8-9.5-45.1 4.1L192 206 56.6 43.5C45.3 29.9 25.1 28.1 11.5 39.4S-3.9 70.9 7.4 84.5L150.3 256 7.4 427.5c-11.3 13.6-9.5 33.8 4.1 45.1s33.8 9.5 45.1-4.1L192 306 327.4 468.5c11.3 13.6 31.5 15.4 45.1 4.1s15.4-31.5 4.1-45.1L233.7 256 376.6 84.5z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="errorModal-body text-center">
+                        <h4>Ooops!</h4>
+                        <p id="errorModal-body">Error.</p>
+                        <button class="btn btn-success" id="errorModalClose">Close</button>
                     </div>
                 </div>
-                <div class="errorModal-body text-center">
-                    <h4>Ooops!</h4>
-                    <p id="errorModal-body">Error.</p>
-                    <button class="btn btn-success" id="errorModalClose">Close</button>
+            </div>
+        </div>
+        <!-- Login Modal -->
+        <div class="modal" tabindex="-1" role="dialog" id="login-modal">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Login</h5>
+                    </div>
+                    <div class="modal-body">
+                        <form id="login-form">
+                            <div class="form-group">
+                                <div class="loginError"></div>
+                                <label for="username-input">Email</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="username-input"
+                                       placeholder="Enter your email"
+                                       maxlength="50"
+                                       required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password-input">Password</label>
+                                <input type="password"
+                                       class="form-control"
+                                       id="password-input"
+                                       placeholder="Enter your password"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Login</button>
+                        </form>
+                        <p class="mt-3">
+                            Don't have an account? <a href="#" id="register-link">Register</a>
+                        </p>
+                        <hr class="my-4">
+                        <h2 class="fs-5 fw-bold mb-3">Or use Google</h2>
+                        <center>
+                            <div id="g_id_onload"
+                                 data-client_id="542383045898-lt6g33jc7dcv6mqhhkujirhfopa6fobf.apps.googleusercontent.com"
+                                 data-context="signin"
+                                 data-callback="handleCredentialResponse"
+                                 data-nonce=""
+                                 data-auto_prompt="false"></div>
+                            <div class="g_id_signin"
+                                 data-type="standard"
+                                 data-shape="rectangular"
+                                 data-theme="outline"
+                                 data-text="signin_with"
+                                 data-size="large"
+                                 data-logo_alignment="left"></div>
+                        </center>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Login Modal -->
-    <div class="modal" tabindex="-1" role="dialog" id="login-modal">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Login</h5>
-                </div>
-                <div class="modal-body">
-                    <form id="login-form">
-                        <div class="form-group">
-                            <div class="loginError"></div>
-                            <label for="username-input">Email</label>
-                            <input type="text" class="form-control" id="username-input" placeholder="Enter your email"
-                                maxlength="50" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="password-input">Password</label>
-                            <input type="password" class="form-control" id="password-input"
-                                placeholder="Enter your password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Login</button>
-                    </form>
-                    <p class="mt-3">Don't have an account? <a href="#" id="register-link">Register</a></p>
-                    <hr class="my-4">
-                    <h2 class="fs-5 fw-bold mb-3">Or use Google</h2>
-                    <center>
-                        <div id="g_id_onload"
-                            data-client_id="542383045898-lt6g33jc7dcv6mqhhkujirhfopa6fobf.apps.googleusercontent.com"
-                            data-context="signin" data-callback="handleCredentialResponse" data-nonce=""
-                            data-auto_prompt="false">
-                        </div>
-
-                        <div class="g_id_signin" data-type="standard" data-shape="rectangular" data-theme="outline"
-                            data-text="signin_with" data-size="large" data-logo_alignment="left">
-                        </div>
-                    </center>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Register Modal -->
-    <div class="modal" tabindex="-1" role="dialog" id="register-modal">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Register a new account</h5>
-                </div>
-                <div class="modal-body">
-                    <form id="register-form">
-                        <div class="form-group">
-                            <div id="register-error" class="text-danger"></div>
-                            <label for="register-username-input">Email</label>
-                            <input type="text" class="form-control" id="register-username-input"
-                                placeholder="Enter your email" maxlength="50" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="register-display_name-input">Display Name</label>
-                            <input type="text" class="form-control" id="register-display_name-input"
-                                placeholder="Enter your display name" maxlength="50"
-                                pattern="^[a-zA-Z0-9_ \u00C0-\u00FF ]*$" required>
-                            <small class="form-text text-muted">Max 50 characters.</small>
-                        </div>
-                        <div class="form-group">
-                            <label for="register-password-input">Password</label>
-                            <input type="password" class="form-control" id="register-password-input"
-                                placeholder="Enter your password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Register</button>
-                    </form>
-                    <p class="mt-3">Already have an account? <a href="#" id="login-link">Login</a></p>
+        <!-- Register Modal -->
+        <div class="modal" tabindex="-1" role="dialog" id="register-modal">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Register a new account</h5>
+                    </div>
+                    <div class="modal-body">
+                        <form id="register-form">
+                            <div class="form-group">
+                                <div id="register-error" class="text-danger"></div>
+                                <label for="register-username-input">Email</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="register-username-input"
+                                       placeholder="Enter your email"
+                                       maxlength="50"
+                                       required>
+                            </div>
+                            <div class="form-group">
+                                <label for="register-display_name-input">Display Name</label>
+                                <input type="text"
+                                       class="form-control"
+                                       id="register-display_name-input"
+                                       placeholder="Enter your display name"
+                                       maxlength="50"
+                                       pattern="^[a-zA-Z0-9_ \u00C0-\u00FF ]*$"
+                                       required>
+                                <small class="form-text text-muted">Max 50 characters.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="register-password-input">Password</label>
+                                <input type="password"
+                                       class="form-control"
+                                       id="register-password-input"
+                                       placeholder="Enter your password"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Register</button>
+                        </form>
+                        <p class="mt-3">
+                            Already have an account? <a href="#" id="login-link">Login</a>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Settings Modal -->
-    <div class="modal fade" id="settingsModal" tabindex="-1" role="dialog" aria-labelledby="settingsModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog settings-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="closeNav()">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <button id="logout-button">Logout</button><br>
-                    <button id="theme-toggle">Toggle Theme</button><br>
-                    <div id="SidenavAddons"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="closeNav()">Close</button>
+        <!-- Settings Modal -->
+        <div class="modal fade"
+             id="settingsModal"
+             tabindex="-1"
+             role="dialog"
+             aria-labelledby="settingsModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog settings-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeNav()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <button id="logout-button">Logout</button>
+                        <br>
+                        <button id="theme-toggle">Toggle Theme</button>
+                        <br>
+                        <div id="SidenavAddons"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                data-dismiss="modal"
+                                onclick="closeNav()">Close</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Right side navigation -->
-    <div class="bottomright-with-nw-resize-outer bgcolorstack" id="debugNav" style="display: none;">
-        <div class="bottomright-with-nw-resize-inner">
-            <div id="resizeHandle" class="resize-handle"></div>
-            <a href="javascript:void(0)" class="dclosebtn"
-                onclick="event.stopPropagation(); closeDebugNav()">&times;</a>
-            <div id="debugWindow1" class="debugWindow">
-                <h2>LLM Debug</h2>
-                <div id="debugContent1"></div>
-            </div>
-            <div id="debugWindow2" class="debugWindow">
-                <h2>System Debug</h2>
-                <div id="debugContent2"></div>
+        <!-- Right side navigation -->
+        <div class="bottomright-with-nw-resize-outer bgcolorstack"
+             id="debugNav"
+             style="display: none">
+            <div class="bottomright-with-nw-resize-inner">
+                <div id="resizeHandle" class="resize-handle"></div>
+                <a href="javascript:void(0)"
+                   class="dclosebtn"
+                   onclick="event.stopPropagation(); closeDebugNav()">&times;</a>
+                <div id="debugWindow1" class="debugWindow">
+                    <h2>LLM Debug</h2>
+                    <div id="debugContent1"></div>
+                </div>
+                <div id="debugWindow2" class="debugWindow">
+                    <h2>System Debug</h2>
+                    <div id="debugContent2"></div>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- Side Navigation -->
-    <div id="sideNav" class="sidenav">
-        <div id="chat-buttons" class="chat-buttons">
+        <!-- Side Navigation -->
+        <div id="sideNav" class="sidenav">
             <div id="chat-buttons" class="chat-buttons">
-                    
-                <div id="control-buttons-container" class="control-buttons-container">
-                    <button id="add-tab" class="control-tab" onclick="addChatTab()">+</button>
-                    <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button>
-                </div>
-                <div id="chat-tabs-container" class="chat-tabs-container">
-                    <div class="loader"></div>
-                    <!-- <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button> -->
+                <div id="chat-buttons" class="chat-buttons">
+                    <div id="control-buttons-container" class="control-buttons-container">
+                        <button id="add-tab" class="control-tab" onclick="addChatTab()">+</button>
+                        <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button>
+                    </div>
+                    <div id="chat-tabs-container" class="chat-tabs-container">
+                        <div class="loader"></div>
+                        <!-- <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button> -->
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="main_title">GoodAI Agent {{version}}</div>
-    <div class="sub_title">Personal assistant with long-term memory</div>
-    <div id="overlay">
-        <div class="text">Code copied to clipboard</div>
-    </div>
-    <div id="overlay_msg" style="display: none;">
-        <div id="overlay-content">
-            <div id="overlay-message">Uploading...</div>
-            <div id="overlay-loader"></div>
+        <div class="main_title">GoodAI Agent {{ version }}</div>
+        <div class="sub_title">Personal assistant with long-term memory</div>
+        <div id="overlay">
+            <div class="text">Code copied to clipboard</div>
         </div>
-    </div>
-    <table>
-        <tr>
-            <td>
-                <button id="toggle-chat-tabs" class="toggle-chat-tabs" onclick="closeTabs()" data-tooltip="Hide Chat Tabs"><span>⯇</span></button>
-                <div class="chat-interface">
-                    <!-- Toggle Button for Side Navigation -->
-                    <div id="chat-container" class="chat-container">
-                        <div id="messages"></div>
-                        <div class="message-container">
-                            <!-- <div class="preset-text-container">
+        <div id="overlay_msg" style="display: none;">
+            <div id="overlay-content">
+                <div id="overlay-message">Uploading...</div>
+                <div id="overlay-loader"></div>
+            </div>
+        </div>
+        <table>
+            <tr>
+                <td>
+                    <button id="toggle-chat-tabs"
+                            class="toggle-chat-tabs"
+                            onclick="closeTabs()"
+                            data-tooltip="Hide Chat Tabs">
+                        <span>⯇</span>
+                    </button>
+                    <div class="chat-interface">
+                        <!-- Toggle Button for Side Navigation -->
+                        <div id="chat-container" class="chat-container">
+                            <div id="messages"></div>
+                            <div class="message-container">
+                                <!-- <div class="preset-text-container">
                         <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
                         <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
                         <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
                         <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
                     </div> -->
-                            <div id="statsWindow" class="statsWindow">
-                                <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
-                                <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
-                                <p id="userStats"></p>
-                            </div>
-                            <div class="input-field">
-                                <div class="textarea-container">
-                                    <div class="icon-container-left">
-                                        <button id="settings" class="settings-button" data-tooltip="Settings" onclick="openNav()"><i class="fa fa-cog cogwheel"></i></button>
-                                        <button id="debug" class="debug-button" data-tooltip="Debug window" onclick="event.stopPropagation(); openDebugNav()"><i class="fas fa-terminal cogwheel"></i></button>
-                                    </div>
-                                    <textarea id="message" placeholder="Type a message..." rows="1" autofocus="autofocus"></textarea>
-                                    <div class="icon-container-right">
-                                        <input type="file" id="uploadImageInput" accept="image/*" hidden>
-                                        <button id="upload-image" class="upload-button" data-tooltip="Upload Image"><i
-                                                class="fa fa-paperclip cogwheel"></i></button>
-                                        <button id="record" class="record-button" data-tooltip="Start recording"><i class="fa fa-microphone"></i></button>
-                                        <button id="send" class="send-button" data-tooltip="Send"><i class="fa fa-paper-plane"></i></button>
-                                    </div>
+                                <div id="statsWindow" class="statsWindow">
+                                    <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
+                                    <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
+                                    <p id="userStats"></p>
                                 </div>
-                                <div id="image-preview" style="display: none;">
-                                    <div class="image-wrapper">
-                                        <img id="preview-image" alt="uploaded image">
-                                        <div class="hover-text">
-                                            <i class="fa fa-times-circle deletebutton"></i>
-                                            <p>Delete</p>
+                                <div class="input-field">
+                                    <div class="textarea-container">
+                                        <div class="icon-container-left">
+                                            <button id="settings"
+                                                    class="settings-button"
+                                                    data-tooltip="Settings"
+                                                    onclick="openNav()">
+                                                <i class="fa fa-cog cogwheel"></i>
+                                            </button>
+                                            <button id="debug"
+                                                    class="debug-button"
+                                                    data-tooltip="Debug window"
+                                                    onclick="event.stopPropagation(); openDebugNav()">
+                                                <i class="fas fa-terminal cogwheel"></i>
+                                            </button>
+                                        </div>
+                                        <textarea id="message"
+                                                  placeholder="Type a message..."
+                                                  rows="1"
+                                                  autofocus="autofocus"></textarea>
+                                        <div class="icon-container-right">
+                                            <input type="file" id="uploadImageInput" accept="image/*" hidden>
+                                            <button id="upload-image" class="upload-button" data-tooltip="Upload Image">
+                                                <i class="fa fa-paperclip cogwheel"></i>
+                                            </button>
+                                            <button id="record" class="record-button" data-tooltip="Start recording">
+                                                <i class="fa fa-microphone"></i>
+                                            </button>
+                                            <button id="send" class="send-button" data-tooltip="Send">
+                                                <i class="fa fa-paper-plane"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="image-preview" style="display: none;">
+                                        <div class="image-wrapper">
+                                            <img id="preview-image" alt="uploaded image">
+                                            <div class="hover-text">
+                                                <i class="fa fa-times-circle deletebutton"></i>
+                                                <p>Delete</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </td>
-            <td>
-
-                <!-- D-ID -->
-                <div id="d-id-content" min-width="400" min-height="400"
-                    style="flex: 10%; margin-left: 40px; display: none;">
-                    <div id="video-wrapper">
-                        <div>
-                            <video id="talk-video" width="400" height="400" autoplay></video>
+                </td>
+                <td>
+                    <!-- D-ID -->
+                    <div id="d-id-content"
+                         min-width="400"
+                         min-height="400"
+                         style="flex: 10%;
+                                margin-left: 40px;
+                                display: none">
+                        <div id="video-wrapper">
+                            <div>
+                                <video id="talk-video" width="400" height="400" autoplay>
+                                </video>
+                            </div>
                         </div>
-                    </div>
-                    <br />
-
-                    <div id="buttons">
-                        <button id="connect-button" type="button"><span id="avatar-button-text">Show the
-                                avatar</span><span id="loading-icon" style="display: none;">
-                                <div class="spinner"></div>
-                            </span></button>
-                        <!-- We don't need the destroy button, since session will close automatically after 5 mins of inactivity
+                        <br />
+                        <div id="buttons">
+                            <button id="connect-button" type="button">
+                                <span id="avatar-button-text">Show the
+                                    avatar</span><span id="loading-icon" style="display: none;">
+                                    <div class="spinner"></div>
+                                </span>
+                            </button>
+                            <!-- We don't need the destroy button, since session will close automatically after 5 mins of inactivity
                 <button id="destroy-button" type="button">Destroy</button> 
             !-->
-                    </div>
-
-                    <!-- d-id connection status:
+                        </div>
+                        <!-- d-id connection status:
             <div id="status">
-            ICE gathering status: <label id="ice-gathering-status-label"></label
-            >
+            ICE gathering status: <label id="ice-gathering-status-label"></label>
             ICE status: <label id="ice-status-label"></label>
             Peer connection status: <label id="peer-status-label"></label>
             Signaling status: <label id="signaling-status-label"></label>
             Streaming status: <label id="streaming-status-label"></label>
             </div>
             !-->
-                </div>
+                    </div>
                 </div>
                 <script type="module" src="./d-id/index.js"></script>
             </td>
@@ -369,5 +438,4 @@
 <script src="chatbot_core.js?v={{version}}"></script>
 <script src="listeners.js?v={{version}}"></script>
 </body>
-
 </html>

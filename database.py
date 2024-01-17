@@ -1,5 +1,7 @@
 import datetime
 import json
+import sys
+
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
@@ -18,6 +20,9 @@ class Database:
         self.conn = None
         self.cursor = None
         self.migrations_dir = "migrations"
+        if getattr(sys, "frozen", False):
+            # If the application is frozen (bundled)
+            sys.path.append(os.path.join(sys._MEIPASS, "migrations"))
 
     def open(self):
         if self.PRODUCTION == "false":
@@ -43,7 +48,7 @@ class Database:
         migrations = []
         filenames = sorted(os.listdir(self.migrations_dir))
         for filename in filenames:
-            if filename.endswith(".py"):
+            if filename.endswith(".py") and filename != "__init__.py":
                 module = importlib.import_module(
                     f"{self.migrations_dir}.{filename[:-3]}"
                 )

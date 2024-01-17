@@ -1,13 +1,10 @@
 version: '3'
 services:
   charlie-mnemonic:
+    image: charlie-mnemonic:v1
     container_name: charlie-mnemonic
     hostname: charlie-mnemonic
     entrypoint: ["python", "launcher.py"]
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: charlie-mnemonic:v1
     environment:
       - DEPLOY_ENV=local
       - HOST=0.0.0.0
@@ -15,9 +12,10 @@ services:
     ports:
       - 8002:8002
     volumes:
-      - ./data/user:/app/users
-    env_file:
-      - .env
+      - ${HOME}/AppData/Roaming/charlie-mnemonic/users:/app/users
+    restart: unless-stopped
+#    env_file:
+#      - .env
 
   psdb:
     image: postgres:14
@@ -26,13 +24,10 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
-    ports:
-      - 5432:5432
     environment:
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_HOSTNAME=psdb
 
 volumes:
   postgres-data:

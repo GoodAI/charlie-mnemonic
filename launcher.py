@@ -2,7 +2,7 @@ import os
 
 import uvicorn
 
-from configuration_page import RedirectToConfigurationMiddleware
+from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
 
 
 def create_app():

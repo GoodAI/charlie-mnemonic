@@ -8,7 +8,6 @@ from elevenlabs import set_api_key as set_elevenlabs_api_key
 
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
 from simple_utils import get_root
-from .redirect_middleware import RedirectToConfigurationMiddleware
 
 
 def update_openai_api_key(value: str):

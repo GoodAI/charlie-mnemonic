@@ -74,10 +74,10 @@ from google.auth.transport import requests
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys
+from config import api_keys, STATIC, CONFIGURATION_URL
 
 router = APIRouter()
-templates = Jinja2Templates(directory=get_root("static"))
+templates = Jinja2Templates(directory=get_root(STATIC))
 
 connections = {}
 
@@ -87,7 +87,7 @@ ORIGINS = os.environ["ORIGINS"]
 
 users_dir = "users"
 
-router.mount("/static", StaticFiles(directory=get_root("static")), name="static")
+router.mount(f"/{STATIC}", StaticFiles(directory=get_root(STATIC)), name="static")
 router.mount("/d-id", StaticFiles(directory=get_root("d-id")), name="d-id")
 
 
@@ -1393,7 +1393,7 @@ async def get_user_profile(
         )
 
 
-@router.get("/configuration/", response_class=HTMLResponse)
+@router.get(CONFIGURATION_URL, response_class=HTMLResponse)
 async def configuration(request: Request):
     version = SettingsManager.get_version()
     with Database() as db:
@@ -1408,18 +1408,13 @@ async def configuration(request: Request):
     )
 
 
-@router.post("/configuration/", response_class=JSONResponse)
+@router.post(CONFIGURATION_URL, response_class=JSONResponse)
 async def update_configuration(config_data: ConfigurationData):
     # TODO: security check for login
     try:
         filtered = {k: v for k, v in config_data.dict().items() if v is not None}
         modify_settings(filtered)
         return {"message": "Configuration updated successfully"}
-    except JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid JSON, expecting new configuration in request body as JSON.",
-        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -19,3 +19,6 @@ api_keys = {
     "elevenlabs": os.getenv("ELEVENLABS_API_KEY"),
     "d-id": os.getenv("D_ID_API_KEY"),
 }
+
+STATIC = "static"
+CONFIGURATION_URL = "/configuration/"

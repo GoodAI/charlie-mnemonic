@@ -2,6 +2,8 @@ import os
 
 import uvicorn
 
+from configuration_page import RedirectToConfigurationMiddleware
+
 
 def create_app():
     from fastapi import FastAPI
@@ -50,6 +52,7 @@ def create_app():
         logs.Log("main", "main.log").get_logger().debug("Shutting down server")
 
     app.include_router(router)
+    app.add_middleware(RedirectToConfigurationMiddleware)
     return app
 
 

@@ -6,6 +6,7 @@ import openai
 import pytest
 from fastapi.testclient import TestClient
 
+from config import CONFIGURATION_URL
 from main import app
 
 client = TestClient(app)
@@ -18,13 +19,34 @@ def config_file_path():
     return tmp.name
 
 
-def test_configuration_page_working():
-    response = client.get("/configuration/")
+@pytest.fixture(autouse=False)
+def fake_openai_key():
+    openai.api_key = "accepted-fake-key"
+    os.environ["OPENAI_API_KEY"] = "accepted-fake-key"
+    yield
+
+
+@pytest.fixture(autouse=False)
+def no_openai_key():
+    openai.api_key = ""
+    os.environ["OPENAI_API_KEY"] = ""
+    yield
+
+
+@pytest.fixture(autouse=False)
+def none_openai_key():
+    openai.api_key = None
+    del os.environ["OPENAI_API_KEY"]
+    yield
+
+
+def test_configuration_page_working(fake_openai_key):
+    response = client.get(CONFIGURATION_URL)
     assert response.status_code == 200
 
 
-def test_updating_invalid_key():
-    response = client.post("/configuration/", json={"testkey": "value"})
+def test_updating_invalid_key(fake_openai_key):
+    response = client.post(CONFIGURATION_URL, json={"testkey": "value"})
     content = response.json()
     assert (
         response.status_code == 422
@@ -43,8 +65,8 @@ def test_updating_invalid_key():
     ]
 
 
-def test_updating_set_openai_key(config_file_path):
-    response = client.post("/configuration/", json={"OPENAI_API_KEY": "value"})
+def test_updating_set_openai_key(config_file_path, fake_openai_key):
+    response = client.post(CONFIGURATION_URL, json={"OPENAI_API_KEY": "value"})
     content = response.json()
     assert response.status_code == 200
     assert "message" in content
@@ -59,9 +81,9 @@ OPENAI_API_KEY=value
     assert openai.api_key == "value"
 
 
-def test_blank_elevenlabs_resets(config_file_path):
+def test_blank_elevenlabs_resets(config_file_path, fake_openai_key):
     response = client.post(
-        "/configuration/", json={"OPENAI_API_KEY": "value", "ELEVENLABS_API_KEY": ""}
+        CONFIGURATION_URL, json={"OPENAI_API_KEY": "value", "ELEVENLABS_API_KEY": ""}
     )
     content = response.json()
     assert (
@@ -78,8 +100,8 @@ Content:
     assert loaded_values["ELEVENLABS_API_KEY"] == ""
 
 
-def test_missing_json_body():
-    response = client.post("/configuration/")
+def test_missing_json_body(fake_openai_key):
+    response = client.post(CONFIGURATION_URL)
     content = response.json()
     assert (
         response.status_code == 422
@@ -92,3 +114,18 @@ Content:
     assert content["detail"] == [
         {"loc": ["body"], "msg": "field required", "type": "value_error.missing"}
     ]
+
+
+def test_redirect_on_missing_openai_key(no_openai_key):
+    response = client.get("/")
+    assert response.url.path == CONFIGURATION_URL
+
+
+def test_redirect_on_missing_openai_key_none(none_openai_key):
+    response = client.get("/")
+    assert response.url.path == CONFIGURATION_URL
+
+
+def test_no_redirect_openai_key(fake_openai_key):
+    response = client.get("/")
+    assert response.url.path == "/"

@@ -8,6 +8,7 @@ from elevenlabs import set_api_key as set_elevenlabs_api_key
 
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
 from simple_utils import get_root
+from .redirect_middleware import RedirectToConfigurationMiddleware
 
 
 def update_openai_api_key(value: str):
@@ -19,6 +20,7 @@ class ConfigurationMeta:
     key: str
     validate_callback: Optional[Callable[[str], None]] = None
     update_callback: Optional[Callable[[str], None]] = None
+    is_valid: Optional[Callable[[], bool]] = None
     input_type: str = "password"
 
     @property
@@ -30,6 +32,7 @@ configuration_meta_list = [
     ConfigurationMeta(
         key="OPENAI_API_KEY",
         update_callback=update_openai_api_key,
+        is_valid=lambda: openai.api_key and os.environ.get("OPENAI_API_KEY", None),
     ),
     ConfigurationMeta(
         key="ELEVENLABS_API_KEY",

@@ -100,7 +100,7 @@
         });
 
 
-        
+
         </script>
         <script src="chatbot.js?v={{version}}"></script>
     </head>
@@ -301,8 +301,8 @@
             <div id="chat-buttons" class="chat-buttons">
                 <div id="chat-buttons" class="chat-buttons">
                     <div id="control-buttons-container" class="control-buttons-container">
-                        <button id="add-tab" class="control-tab" onclick="addChatTab()">+</button>
-                        <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button>
+                        <button id="add-tab" class="control-tab" onclick="addChatTab()">Create new chat tab</button>
+                        <!-- <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button> -->
                     </div>
                     <div id="chat-tabs-container" class="chat-tabs-container">
                         <div class="loader"></div>
@@ -394,49 +394,10 @@
                         </div>
                     </div>
                 </td>
-                <td>
-                    <!-- D-ID -->
-                    <div id="d-id-content"
-                         min-width="400"
-                         min-height="400"
-                         style="flex: 10%;
-                                margin-left: 40px;
-                                display: none">
-                        <div id="video-wrapper">
-                            <div>
-                                <video id="talk-video" width="400" height="400" autoplay>
-                                </video>
-                            </div>
-                        </div>
-                        <br />
-                        <div id="buttons">
-                            <button id="connect-button" type="button">
-                                <span id="avatar-button-text">Show the
-                                    avatar</span><span id="loading-icon" style="display: none;">
-                                    <div class="spinner"></div>
-                                </span>
-                            </button>
-                            <!-- We don't need the destroy button, since session will close automatically after 5 mins of inactivity
-                <button id="destroy-button" type="button">Destroy</button> 
-            !-->
-                        </div>
-                        <!-- d-id connection status:
-            <div id="status">
-            ICE gathering status: <label id="ice-gathering-status-label"></label>
-            ICE status: <label id="ice-status-label"></label>
-            Peer connection status: <label id="peer-status-label"></label>
-            Signaling status: <label id="signaling-status-label"></label>
-            Streaming status: <label id="streaming-status-label"></label>
-            </div>
-            !-->
-                    </div>
-                </div>
-                <script type="module" src="./d-id/index.js"></script>
-            </td>
-        </tr>
-    </table>
-</body>
-<script src="chatbot_core.js?v={{version}}"></script>
-<script src="listeners.js?v={{version}}"></script>
+            </tr>
+        </table>
+    </body>
+    <script src="chatbot_core.js?v={{version}}"></script>
+    <script src="listeners.js?v={{version}}"></script>
 </body>
 </html>

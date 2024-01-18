@@ -16,12 +16,15 @@
     --nav-text-color: #c9c8c8;
     --chat-tab-active-bg: #a6c1ee;
     --chat-tab-bg: #c3cfe200;
+    --control-tab-bg: #5084d8;
     --sidenav-bg-color: #111;
     --debug-window-bg-color: #4b4b4b;
     --socket-status-bg-color: #f2f2f2;
     --socket-status-border-color: #ccc;
     --socket-status-shadow-color: rgba(0,0,0,0.1);
     --debug-stats-bg-color: #f2f2f2;
+    --table-header-text-color: #ddd;
+    --link-color: #5084d8;
 }
 
 /* Dark Theme Variables */
@@ -39,15 +42,18 @@
     --button-hover-bg-color: #444;
     --tooltip-bg-color: #333;
     --nav-bg-color: #222;
-    --nav-text-color: #f1f1f1;
+    --nav-text-color: #696969;
     --chat-tab-active-bg: #333;
     --chat-tab-bg: #22222200;
+    --control-tab-bg: #184386;
     --sidenav-bg-color: #222;
     --debug-window-bg-color: #333;
     --socket-status-bg-color: #333;
     --socket-status-border-color: #444;
     --socket-status-shadow-color: rgba(0,0,0,0.3);
     --debug-stats-bg-color: #595656;
+    --table-header-text-color: #ddd;
+    --link-color: #5b9eff;
 }
 
 
@@ -63,6 +69,10 @@ body {
     overflow: hidden;
     flex-direction: column;
     margin-left: 0;
+}
+
+a {
+    color: var(--link-color);
 }
 
 .socket-status {
@@ -159,7 +169,7 @@ body {
 
 .control-tab {
     display: block;
-    background-color: var(--chat-tab-bg);
+    background-color: var(--control-tab-bg);
     color: white;
     border: none;
     padding: 10px;
@@ -168,6 +178,9 @@ body {
     margin-bottom: 5px;
     text-align: center;
     align-items: flex-start;
+    width: 100%;
+    overflow: hidden;
+    font-size: small;
 }
 
 .chat-tabs-container {
@@ -175,7 +188,7 @@ body {
 }
 
 
-.chat-tab, .control-tab {
+.chat-tab {
     display: block;
     margin-bottom: 5px;
     background-color: var(--chat-tab-bg);
@@ -186,16 +199,21 @@ body {
     cursor: pointer;
     text-align: left;
     font-size: smaller;    
-    overflow: hidden; /* Ensures text doesn't overflow */
+    overflow: hidden;
+    /* Mask for text fade out starting at 90% of the parent's width */
+    -webkit-mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
+    mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
+    width: 100%;
+}
 
- /* Mask for text fade out starting at 90% of the parent's width */
- -webkit-mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
- mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
+.chat-tab:hover {
+    background-color: #5084d841;
 }
 
 .chat-tab.active {
     background-color: #a6c1ee;
     font-size: smaller;
+    width: 100%;
 }
 
 .chat-container {
@@ -237,6 +255,36 @@ table tr {
 table tr td {
     vertical-align: top;
 }
+
+.markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+}
+
+.markdown th, 
+.markdown td {
+    border: 1px solid var(--bot-bubble-text-color);
+    padding: 8px;
+}
+
+.markdown th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    text-align: left;
+    background-color: var(--tooltip-bg-color);
+    color: var(--table-header-text-color);
+}
+
+.markdown tr {
+    border: 1px solid var(--bot-bubble-text-color);
+}
+
+.markdown tr:nth-child(even) {
+    background-color: var(--nav-text-color);
+}
+
 
 #messages {
     flex: 1;
@@ -1519,4 +1567,46 @@ body * {
 [data-tooltip] {
     position: relative;
     cursor: pointer;
+}
+
+.chat-tab-dots {
+    position: absolute;
+    right: 10px;
+    transform: translateY(-80%);
+    cursor: pointer;
+    display: none;
+    font-size: x-large;
+}
+
+.chat-tab:hover .chat-tab-dots {
+    display: block;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: #f9f9f9;
+    min-width: 100px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 999999;
+    width: 150px;
+}
+
+.dropdown-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.dropdown-menu ul li {
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    color: black;
+    font-size: medium;
+}
+
+.dropdown-menu ul li:hover {
+    background-color: #f1f1f1;
 }

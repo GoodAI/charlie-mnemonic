@@ -22,7 +22,9 @@ function addUserMessage(message) {
     botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
     document.getElementById('messages').appendChild(botMessage.firstChild);
 
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    var messagesContainer = document.getElementById('messages');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
     // remove input text
     document.getElementById('message').value = '';
     var textarea = document.getElementById('message');
@@ -64,7 +66,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     }
 
     // Apply Markdown formatting
-    return marked(message);
+    return `<div class="markdown">${marked(message)}</div>`;
 }
 
 function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null) {
@@ -75,11 +77,11 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
     }
     if (timestamp == null) {
         timestamp = new Date().toLocaleTimeString();
-    }
-    else {
+    } else {
         var date = new Date(timestamp * 1000);
         timestamp = date.toLocaleTimeString();
     }
+
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
         lastMessage.classList.remove('last-message');
@@ -87,22 +89,47 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
 
     var chatMessage = document.createElement('div');
     chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageReplaced + '</div></div>';
-    document.getElementById('messages').appendChild(chatMessage);
-
-    var lastMessage2 = document.querySelector('.last-message');
-    if (lastMessage2) {
-        lastMessage2.classList.remove('last-message');
-    }
+    var messagesContainer = document.getElementById('messages');
+    messagesContainer.appendChild(chatMessage);
 
     if (showLoading) {
-        // create a bot message div with a loading spinner
         var botMessage = document.createElement('div');
         botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
-        document.getElementById('messages').appendChild(botMessage);
+        messagesContainer.appendChild(botMessage);
     }
-    // scroll to the bottom of the chat
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+
+    scrollToBottom();
 }
+
+function isUserAtBottom(container) {
+    const threshold = 50; // Pixels from the bottom
+    return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+}
+
+function showNewMessageIndicator() {
+    var indicator = document.getElementById('new-message-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'new-message-indicator';
+        indicator.innerHTML = '<button onclick="scrollToBottom()">New Messages ↓</button>';
+        document.body.appendChild(indicator);
+    }
+    indicator.style.display = 'block';
+}
+
+function hideNewMessageIndicator() {
+    var indicator = document.getElementById('new-message-indicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+function scrollToBottom() {
+    var messagesContainer = document.getElementById('messages');
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    hideNewMessageIndicator();
+}
+
 
 function addExternalMessage(message) {
     var escaped_message = escapeHTML(message);
@@ -124,7 +151,13 @@ function addExternalMessage(message) {
     var element = document.createElement('div');
     element.innerHTML = botMessage;
     document.getElementById('messages').innerHTML += botMessage;
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    var messagesContainer = document.getElementById('messages');
+    if (isUserAtBottom(messagesContainer)) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
     // remove input text
     document.getElementById('message').value = '';
     document.getElementById('message').placeholder = 'Please wait for the response...';
@@ -380,7 +413,13 @@ async function send_image(image_file, prompt) {
             addCustomMessage(fullmessage, 'user', true);
         }
 
-        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        var messagesContainer = document.getElementById('messages');
+        if (isUserAtBottom(messagesContainer)) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            hideNewMessageIndicator();
+        } else {
+            showNewMessageIndicator();
+        }
 
         canRecord = false;
         canSend = false;
@@ -684,6 +723,8 @@ function canSendMessage() {
 canSendMessage();
 
 function populateChatTabs(tabs_data) {
+    // sort the tabs by created_at row, most recent first
+    tabs_data.sort((a, b) => (a.created_at < b.created_at) ? 1 : -1);
     // Get the chat tabs container
     var chatTabs = document.getElementById('chat-tabs-container');
     // Remove the loader
@@ -717,8 +758,60 @@ function populateChatTabs(tabs_data) {
         if (tabs_data[i].is_active) {
             newTab.classList.add('active');
         }
+        var dots = document.createElement('div');
+        dots.className = 'chat-tab-dots';
+        dots.innerHTML = '&#x22EE;';
+        dots.onclick = function(event) {
+            event.stopPropagation();
+            showDropdown(this, tabs_data[i].chat_id);
+        };
+
+        newTab.appendChild(dots);
 
         // Append the new tab to the chat tabs container
         chatTabs.appendChild(newTab);
+        
     }
+    
+    setupDropdownMenus();
+}
+
+function showDropdown(dotElement, chatId) {
+    // Close any already open dropdowns
+    closeAllDropdowns();
+
+    var dropdownMenu = document.createElement('div');
+    dropdownMenu.className = 'dropdown-menu';
+    dropdownMenu.innerHTML = `<ul>
+        <li onclick="deleteChatTab('${chatId}')">Delete</li>
+        <li onclick="shareChat('${chatId}')">Share</li>
+    </ul>`;
+
+    document.body.appendChild(dropdownMenu);
+
+    // Position the dropdown menu
+    var rect = dotElement.getBoundingClientRect();
+    dropdownMenu.style.position = 'absolute';
+    dropdownMenu.style.left = `${rect.left}px`;
+    dropdownMenu.style.top = `${rect.bottom}px`;
+    dropdownMenu.style.display = 'block';
+}
+
+function closeAllDropdowns() {
+    var dropdowns = document.querySelectorAll('.dropdown-menu');
+    dropdowns.forEach(function(dropdown) {
+        dropdown.remove();
+    });
+}
+
+// Ensure that clicking anywhere on the window closes the dropdown
+window.onclick = closeAllDropdowns;
+
+function setupDropdownMenus() {
+    window.addEventListener('click', function() {
+        var dropdowns = document.querySelectorAll('.dropdown-menu');
+        dropdowns.forEach(function(dropdown) {
+            dropdown.style.display = 'none';
+        });
+    });
 }

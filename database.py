@@ -160,6 +160,18 @@ class Database:
         row = dict_cursor.fetchone()
         return row
 
+    def update_created_at(self, user_id, chat_id):
+        now = datetime.datetime.now()
+        self.cursor.execute(
+            """
+            UPDATE chat_tabs
+            SET created_at = %s
+            WHERE user_id = %s AND chat_id = %s
+        """,
+            (now, user_id, chat_id),
+        )
+        self.conn.commit()
+
     def insert_tab_data(self, user_id, chat_id, chat_name, tab_id, is_active):
         self.cursor.execute(
             """

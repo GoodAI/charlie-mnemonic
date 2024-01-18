@@ -419,6 +419,7 @@ class OpenAIResponser:
         stream=False,
         function_metadata=None,
         function_call="auto",
+        chat_id=None,
     ):
         if function_metadata is None:
             function_metadata = [
@@ -494,11 +495,13 @@ class OpenAIResponser:
                     chunk_message = chunk["choices"][0]["delta"]["content"]
                     collected_messages.append(chunk_message)
                     await MessageSender.send_message(
-                        {"chunk_message": chunk_message}, "blue", username
+                        {"chunk_message": chunk_message, "chat_id": chat_id},
+                        "blue",
+                        username,
                     )
                 if chunk["choices"][0]["finish_reason"] == "stop":
                     await MessageSender.send_message(
-                        {"stop_message": True}, "blue", username
+                        {"stop_message": True, "chat_id": chat_id}, "blue", username
                     )
                     await session.close()
                     break
@@ -1279,6 +1282,7 @@ async def process_message(
             users_dir,
             tokens_output,
             history_messages,
+            chat_id=chat_id,
         )
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
@@ -1370,6 +1374,7 @@ async def generate_response(
     users_dir,
     max_allowed_tokens,
     history_messages,
+    chat_id=None,
 ):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
@@ -1402,7 +1407,11 @@ async def generate_response(
         openai_model, temperature, max_allowed_tokens, max_responses, username
     )
     response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata, stream=True
+        username,
+        messages,
+        function_metadata=function_metadata,
+        stream=True,
+        chat_id=chat_id,
     )
     # check if the response is a stream or not
     if (

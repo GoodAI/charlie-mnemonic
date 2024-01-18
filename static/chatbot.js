@@ -273,16 +273,16 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
-    // Populate chain of thought settings
-    var cotItem = document.createElement('a');
-    cotItem.href = "#";
-    var status = settings.cot_enabled.cot_enabled ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-    cotItem.innerHTML = 'Chain of thought (experimental): ' + status;
-    cotItem.onclick = function (e) {
-        e.preventDefault();
-        edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
-    }
-    tabContent.appendChild(cotItem);
+    // Populate chain of thought settings (disabled for now)
+    // var cotItem = document.createElement('a');
+    // cotItem.href = "#";
+    // var status = settings.cot_enabled.cot_enabled ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+    // cotItem.innerHTML = 'Chain of thought (experimental): ' + status;
+    // cotItem.onclick = function (e) {
+    //     e.preventDefault();
+    //     edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
+    // }
+    // tabContent.appendChild(cotItem);
 
     return tabContent;
 }
@@ -686,7 +686,13 @@ function handlePlanMessage(msg) {
     botMessageElement.innerHTML = botMessage;
     document.getElementById('messages').appendChild(botMessageElement);
 
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    var messagesContainer = document.getElementById('messages');
+    if (isUserAtBottom(messagesContainer)) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
     content = '';
     tempReceived = '';
     tempFormatted = '';
@@ -768,6 +774,18 @@ function handleTabDescription(msg) {
 }
 
 async function handleStopMessage(msg) {
+    var target_chat_id = msg.chat_id;
+    // check if the current active tab is the same as the target chat id
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var activeTab = chatTabs.querySelector('.active');
+    var current_chat_id = activeTab.id.replace('chat-tab-', '');
+    console.log('current chat id: ' + current_chat_id);
+    console.log('target chat id: ' + target_chat_id);
+    if (current_chat_id != target_chat_id) {
+        // if not, do nothing
+        resetState();
+        return;
+    }
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
         // Remove the typing indicator
@@ -815,6 +833,17 @@ async function handleStopMessage(msg) {
 
 function handleChunkMessage(msg) {
     // check if the last message is a chunk message or a debug message
+    var target_chat_id = msg.chat_id;
+    // check if the current active tab is the same as the target chat id
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var activeTab = chatTabs.querySelector('.active');
+    var current_chat_id = activeTab.id.replace('chat-tab-', '');
+    console.log('current chat id: ' + current_chat_id);
+    console.log('target chat id: ' + target_chat_id);
+    if (current_chat_id != target_chat_id) {
+        // if not, do nothing
+        return;
+    }
 
     var timestamp = new Date().toLocaleTimeString();
     var chunkContent = msg.chunk_message;
@@ -854,7 +883,13 @@ function handleChunkMessage(msg) {
         return '<div class="typing-indicator"><div class="dot"></div></div>';
     }
     // Auto-scroll to the bottom of the chat
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    var messagesContainer = document.getElementById('messages');
+    if (isUserAtBottom(messagesContainer)) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
 }
 
 
@@ -1082,7 +1117,7 @@ const uuid = () => {
 };
 
 function addChatTab(id) {
-    if (id == undefined) {
+    if (id === undefined) {
         id = uuid();
     }
     chat_id = id;
@@ -1091,14 +1126,33 @@ function addChatTab(id) {
     newTab.className = 'chat-tab';
     newTab.innerText = 'New Chat';
     newTab.id = 'chat-tab-' + id;
+
+    // Create the three-dot icon
+    var dots = document.createElement('div');
+    dots.className = 'chat-tab-dots';
+    dots.innerHTML = '&#x22EE;';
+    dots.onclick = function(event) {
+        event.stopPropagation();
+        showDropdown(this, id);
+    };
+
+    // Append the dots to the new tab
+    newTab.appendChild(dots);
+
+    // Set the onclick function for the new tab
     newTab.onclick = function() {
         setChat(id);
     };
-    chatTabs.appendChild(newTab);
+
+    // Prepend the new tab to ensure it's added at the beginning
+    chatTabs.prepend(newTab);
+
+    // Set the newly added chat as the active chat
     setChat(id);
 }
 
-function deleteChatTab() {
+
+function deleteChatTab(chat_id) {
     var chatTabs = document.getElementById('chat-tabs-container');
     var targetTab = document.getElementById('chat-tab-' + chat_id);
     if (!targetTab) {
@@ -1456,7 +1510,13 @@ function resetState() {
     tempFormatted = '';
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
-        document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        var messagesContainer = document.getElementById('messages');
+        if (isUserAtBottom(messagesContainer)) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            hideNewMessageIndicator();
+        } else {
+            showNewMessageIndicator();
+        }
     }
     content = '';
     canSend = true;

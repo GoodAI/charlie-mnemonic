@@ -633,6 +633,7 @@ async def handle_message(request: Request, message: userMessage):
             )
         # if there is an active tab, set chat_id to the active tab's chat_id
         else:
+            db.update_created_at(user_id, message.chat_id)
             message.chat_id = active_tab_data["chat_id"]
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {message.username} does not have access")

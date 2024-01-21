@@ -31,9 +31,6 @@ from simple_utils import get_root
 logger = logs.Log("utils", "utils.log").get_logger()
 
 
-# Set ElevenLabs API key
-set_api_key(api_keys["elevenlabs"])
-
 # Parameters for OpenAI
 openai_model = api_keys["chatgpt_model"]
 max_responses = 1
@@ -1807,10 +1804,3 @@ async def process_final_message(
         #     return response
         # else:
         return response
-
-
-def check_api_keys():
-    OPENAI_API_KEY = api_keys["openai"]
-    if not len(OPENAI_API_KEY):
-        logger.critical("Please set OPENAI_API_KEY environment variable. Exiting.")
-        sys.exit(1)

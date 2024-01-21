@@ -4,14 +4,26 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Callable
 
 import openai
+from dotenv import load_dotenv
 from elevenlabs import set_api_key as set_elevenlabs_api_key
 
+from config import update_api_keys, api_keys
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
 from simple_utils import get_root
 
 
 def update_openai_api_key(value: str):
     openai.api_key = value
+
+
+def reload_configuration():
+    load_dotenv()
+    load_dotenv(dotenv_path=CONFIGURATION_FILE, override=True)
+    update_api_keys()
+    for config_meta_item in configuration_meta_list:
+        value = os.environ.get(config_meta_item.key, None)
+        if value:
+            config_meta_item.update_callback(value)
 
 
 @dataclass
@@ -41,8 +53,7 @@ configuration_meta_list = [
 
 configuration_meta = OrderedDict([(meta.key, meta) for meta in configuration_meta_list])
 
-# TODO: make this configurable
-CONFIGURATION_FILE = get_root("user.env")
+CONFIGURATION_FILE = get_root("users/user.env")
 
 
 def modify_settings(settings: Dict[str, str], path: Optional[str] = None):

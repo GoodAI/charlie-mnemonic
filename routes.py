@@ -662,6 +662,17 @@ async def handle_message(request: Request, message: userMessage):
     )
 
 
+@router.post("/stop_streaming/")
+async def stop_streaming(request: Request, user: UserName):
+    session_token = request.cookies.get("session_token")
+    auth = Authentication()
+    success = auth.check_token(user.username, session_token)
+    if not success:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    OpenAIResponser.user_pressed_stop(user.username)
+    return {"message": "Streaming stopped successfully"}
+
+
 @router.post("/message_with_image/", tags=["Messaging"])
 async def handle_message_image(
     request: Request,

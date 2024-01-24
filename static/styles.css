@@ -25,6 +25,8 @@
     --debug-stats-bg-color: #f2f2f2;
     --table-header-text-color: #ddd;
     --link-color: #5084d8;
+    --chat-tab-dots-color: #111;
+    --icon-color: #184386;
 }
 
 /* Dark Theme Variables */
@@ -54,6 +56,8 @@
     --debug-stats-bg-color: #595656;
     --table-header-text-color: #ddd;
     --link-color: #5b9eff;
+    --chat-tab-dots-color: #ddd;
+    --icon-color: #4a91ff;
 }
 
 
@@ -155,16 +159,18 @@ a {
     cursor: pointer;
     font-size: 18px;
     z-index: 6;
-    transition: left 0.5s, transform 0.5s;
+    color: var(--icon-color);
 }
 
 #toggle-chat-tabs.open span {
     display: inline-block;
     transform: rotate(0deg);
+    transition: left 0.5s, transform 0.5s;
 }
 #toggle-chat-tabs.closed span {
     display: inline-block;
     transform: rotate(60deg);
+    transition: left 0.5s, transform 0.5s;
 }
 
 .control-tab {
@@ -195,6 +201,7 @@ a {
     color: var(--text-color);
     border: none;
     padding: 10px;
+    padding-right: 20px;
     border-radius: 5px;
     cursor: pointer;
     text-align: left;
@@ -214,6 +221,7 @@ a {
     background-color: #a6c1ee;
     font-size: smaller;
     width: 100%;
+    padding-right: 20px;
 }
 
 .chat-container {
@@ -238,15 +246,6 @@ a {
     background-color: #5084d8;
     color: white;
 }
-
-blockquote {
-    font: 14px/22px normal helvetica, sans-serif;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    margin-left: 50px;
-    padding-left: 15px;
-    border-left: 3px solid #ccc;
-  }
 
 table tr {
     align-items: center;
@@ -352,7 +351,7 @@ table tr td {
 }
 
 .input-field button:hover {
-    color: #184386;
+    color: var(--icon-color);
 }
 
 .input-field button[disabled]:hover {
@@ -360,7 +359,7 @@ table tr td {
 }
 
 .input-field .send-button {
-    color: #184386;
+    color: var(--icon-color);
     border: none;
     cursor: pointer;
 }
@@ -380,7 +379,12 @@ table tr td {
 }
 
 .input-field .record-button {
-    color: #184386;
+    color: var(--icon-color);
+    border: none;
+    cursor: pointer;
+}
+.input-field .stop-button {
+    color: var(--icon-color);
     border: none;
     cursor: pointer;
 }
@@ -409,13 +413,13 @@ table tr td {
 }
 
 .input-field .cogwheel {
-    color: #184386;
+    color: var(--icon-color);
     font-size: 20px;
     cursor: pointer;
 }
 
 .input-field .upload-icon {
-    color: #184386;
+    color: var(--icon-color);
     font-size: 20px;
     cursor: pointer;
 }
@@ -427,7 +431,7 @@ table tr td {
 }
 
 .input-field .upload-button i {
-    color: #184386;
+    color: var(--icon-color);
     transition: color 0.3s;
 }
 
@@ -508,8 +512,26 @@ table tr td {
     height: auto;
     margin-bottom: 10px;
 }
+
 .bubble {
-    display: inline;
+    word-wrap: break-word;
+    white-space: normal;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.bubble table {
+    display: block;
+    width: auto;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.bubble blockquote {
+    font: 14px/22px normal helvetica, sans-serif;
+    padding-left: 15px;
+    border-left: 3px solid #ccc;
+    text-wrap: nowrap;
 }
 
 .message.bot .bubble {
@@ -1542,7 +1564,7 @@ body * {
 
   .play-button {
     cursor: pointer;
-    color: #000;
+    color: var(--icon-color);
   }
 
   
@@ -1570,12 +1592,14 @@ body * {
 }
 
 .chat-tab-dots {
+    color: var(--chat-tab-dots-color);
     position: absolute;
     right: 10px;
     transform: translateY(-80%);
     cursor: pointer;
     display: none;
     font-size: x-large;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .chat-tab:hover .chat-tab-dots {

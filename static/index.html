@@ -96,11 +96,7 @@
                     '<pre><code>' + hljs.highlightAuto(code, [lang]).value + '</code></pre>';
             },
             renderer: renderer,
-            breaks: true,
         });
-
-
-
         </script>
         <script src="chatbot.js?v={{version}}"></script>
     </head>
@@ -377,6 +373,13 @@
                                             </button>
                                             <button id="send" class="send-button" data-tooltip="Send">
                                                 <i class="fa fa-paper-plane"></i>
+                                            </button>
+                                            <button id="stop"
+                                                    class="stop-button"
+                                                    data-tooltip="Stop"
+                                                    style="display: none"
+                                                    onclick="stopStream()">
+                                                <i class="fa fa-stop"></i>
                                             </button>
                                         </div>
                                     </div>

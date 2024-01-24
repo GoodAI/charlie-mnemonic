@@ -1,7 +1,7 @@
 version: '3'
 services:
   charlie-mnemonic:
-    image: charlie-mnemonic:v1
+    image: goodaidev/charlie-mnemonic:latest
     container_name: charlie-mnemonic
     hostname: charlie-mnemonic
     entrypoint: ["python", "launcher.py"]

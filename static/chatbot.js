@@ -437,21 +437,22 @@ function edit_status(category, setting, value) {
         .catch(console.error);
 };
 
-function playButtonHandler() {
-    var playIcon = this.querySelector('.play-button');
-    playIcon.classList.remove('fa-play');
-    playIcon.classList.add('fa-spinner');
-    var messageBubble = this.parentElement.querySelector('p');
-    var clonedButton = playIcon.cloneNode(true);
-    messageBubble.appendChild(clonedButton);
-    request_audio(clonedButton).then(audioSrc => {
-        var audioElement = document.createElement('audio');
-        audioElement.controls = true;
-        audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-        this.closest('.bubble').appendChild(audioElement);
-        this.remove();
-    });
-}
+// duplicate function
+// function playButtonHandler() {
+//     var playIcon = this.querySelector('.play-button');
+//     playIcon.classList.remove('fa-play');
+//     playIcon.classList.add('fa-spinner');
+//     var messageBubble = this.parentElement.querySelector('p');
+//     var clonedButton = playIcon.cloneNode(true);
+//     messageBubble.appendChild(clonedButton);
+//     request_audio(clonedButton).then(audioSrc => {
+//         var audioElement = document.createElement('audio');
+//         audioElement.controls = true;
+//         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+//         this.closest('.bubble').appendChild(audioElement);
+//         this.remove();
+//     });
+// }
 
 function setSettings(newSettings) {
     // import the settings and populate the settings menu
@@ -502,13 +503,23 @@ function setSettings(newSettings) {
                         // Check if a play button or an audio player already exists
                         var playButtonExists = message.querySelector('.play-button');
                         var audioPlayerExists = message.querySelector('audio');
+                        // check if the message is still loading
+                        var spinner = message.querySelector('.spinner');
         
-                        if (!playButtonExists && !audioPlayerExists) {
+                        if (!playButtonExists && !audioPlayerExists && !spinner) {
                             message.innerHTML += playButtonCode;
                             var playButton = message.querySelector('.play-button');
                             playButton.addEventListener('click', playButtonHandler);
                         }
                     });
+                    // check if we need to scroll to the bottom of the chat
+                    var messagesContainer = document.getElementById('messages');
+                    if (isUserAtBottom(messagesContainer)) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        hideNewMessageIndicator();
+                    } else {
+                        showNewMessageIndicator();
+                    }
                 })
                 .catch(function (err) {
                     edit_status('audio', 'voice_output', false);
@@ -529,7 +540,6 @@ function setSettings(newSettings) {
                 audio.remove();
             });
         }
-        
 
         if (newSettings.avatar.avatar) {
             $('#d-id-content').show();
@@ -771,16 +781,25 @@ function handleTabDescription(msg) {
     tabButton.classList.add('typewriter-text');
     // force the browser to reflow the element
     tabButton.offsetWidth;
+    // add the chat-tab-dots class to the tab button
+    var dots = document.createElement('div');
+    dots.className = 'chat-tab-dots';
+    dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
+    dots.onclick = function(event) {
+        event.stopPropagation();
+        showDropdown(this, tabId);
+    };
+
+    // Append the dots to the new tab
+    tabButton.appendChild(dots);
 }
 
-async function handleStopMessage(msg) {
+async function handleCancelMessage(msg) {
     var target_chat_id = msg.chat_id;
     // check if the current active tab is the same as the target chat id
     var chatTabs = document.getElementById('chat-tabs-container');
     var activeTab = chatTabs.querySelector('.active');
     var current_chat_id = activeTab.id.replace('chat-tab-', '');
-    console.log('current chat id: ' + current_chat_id);
-    console.log('target chat id: ' + target_chat_id);
     if (current_chat_id != target_chat_id) {
         // if not, do nothing
         resetState();
@@ -792,7 +811,38 @@ async function handleStopMessage(msg) {
         removeTypingIndicator();
 
         // Appending the new chunk to the existing content of the last message
-        lastMessage.innerHTML = formatTempReceived(tempFullChunk);
+        lastMessage.innerHTML = parseAndFormatMessage(tempFullChunk);
+    }
+
+    // Function to remove the typing indicator
+    function removeTypingIndicator() {
+        var typingIndicator = document.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+    tempFullChunk = '';
+    resetState();
+}
+
+async function handleStopMessage(msg) {
+    var target_chat_id = msg.chat_id;
+    // check if the current active tab is the same as the target chat id
+    var chatTabs = document.getElementById('chat-tabs-container');
+    var activeTab = chatTabs.querySelector('.active');
+    var current_chat_id = activeTab.id.replace('chat-tab-', '');
+    if (current_chat_id != target_chat_id) {
+        // if not, do nothing
+        resetState();
+        return;
+    }
+    var lastMessage = document.querySelector('.last-message .bubble');
+    if (lastMessage) {
+        // Remove the typing indicator
+        removeTypingIndicator();
+
+        // Appending the new chunk to the existing content of the last message
+        lastMessage.innerHTML = parseAndFormatMessage(tempFullChunk);
     }
 
     // Function to remove the typing indicator
@@ -838,8 +888,6 @@ function handleChunkMessage(msg) {
     var chatTabs = document.getElementById('chat-tabs-container');
     var activeTab = chatTabs.querySelector('.active');
     var current_chat_id = activeTab.id.replace('chat-tab-', '');
-    console.log('current chat id: ' + current_chat_id);
-    console.log('target chat id: ' + target_chat_id);
     if (current_chat_id != target_chat_id) {
         // if not, do nothing
         return;
@@ -962,8 +1010,6 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
     var lastMessageWrapper = messagesContainer.lastElementChild;
     var lastMessage = lastMessageWrapper ? lastMessageWrapper.firstElementChild : null;
     var isLastDebug = lastMessage && lastMessage.classList.contains('debug');
-
-    console.log(msg);
 
     var formattedMsgContent = '';
     for (var key in msg) {
@@ -1130,7 +1176,7 @@ function addChatTab(id) {
     // Create the three-dot icon
     var dots = document.createElement('div');
     dots.className = 'chat-tab-dots';
-    dots.innerHTML = '&#x22EE;';
+    dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
     dots.onclick = function(event) {
         event.stopPropagation();
         showDropdown(this, id);
@@ -1236,7 +1282,7 @@ async function get_recent_messages(username, chat_id) {
 
         // Process and display the messages
         messages.forEach(message => {
-            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp);
+            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true);
         });
 
     } catch (error) {
@@ -1320,6 +1366,10 @@ function get_settings(username) {
         }
         else if (msg.stop_message) {
             handleStopMessage(msg);
+        }
+        else if (msg.cancel_message) {
+            console.log('cancel message received');
+            handleCancelMessage(msg);
         }
         else if (msg.tab_description) {
             handleTabDescription(msg);

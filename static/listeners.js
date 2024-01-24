@@ -456,6 +456,13 @@ document.getElementById('messages').addEventListener('click', function(e) {
     }
 });
 
+document.getElementById('messages').addEventListener('scroll', function() {
+    var messagesContainer = this;
+    if (isUserAtBottom(messagesContainer)) {
+        hideNewMessageIndicator();
+    }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';

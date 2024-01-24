@@ -1,7 +1,5 @@
 function addUserMessage(message) {
-    console.log(message);
     var messageR = parseAndFormatMessage(message, false, false);
-    console.log(messageR);
     var timestamp = new Date().toLocaleTimeString();
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
@@ -53,7 +51,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     if (count % 2 !== 0) {
         message += '\n```';
     }
-
+    
     // if outside of code block, add the typing indicator
     if (count % 2 === 0 && addIndicator) {
         if (!replaceNewLines) {
@@ -69,7 +67,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     return `<div class="markdown">${marked(message)}</div>`;
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false) {
     var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
 
     if (messageReplaced.endsWith('<br>')) {
@@ -98,11 +96,16 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
         messagesContainer.appendChild(botMessage);
     }
 
-    scrollToBottom();
+    if (isUserAtBottom(messagesContainer) || scroll) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
 }
 
 function isUserAtBottom(container) {
-    const threshold = 50; // Pixels from the bottom
+    const threshold = 50;
     return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
 }
 
@@ -197,9 +200,16 @@ async function sendMessageToServer(message) {
 }
 
 async function request_audio(button) {
-    // get the text from the p tag sibling of the button's grandparent
-    var messageContainer = button.closest('.play-button-wrapper').previousElementSibling;
-    var message = messageContainer.innerText;
+    var bubbleContainer = button.closest('.bubble');
+
+    var clonedBubbleContainer = bubbleContainer.cloneNode(true);
+
+    var codeBlocks = clonedBubbleContainer.querySelectorAll('code[class^="language-"]');
+    codeBlocks.forEach(function(block) {
+        block.parentNode.removeChild(block);
+    });
+
+    var message = clonedBubbleContainer.innerText;
 
     try {
         const response = await fetch(API_URL + '/generate_audio/', {
@@ -393,6 +403,23 @@ async function swap_tab() {
         // Hide the overlay in case of error
         overlay.style.display = 'none';
     }
+}
+
+function stopStream() {
+    // send a message to the server to stop the stream to /stop_streaming/
+    fetch(API_URL + '/stop_streaming/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 'username': user_name }),
+        credentials: 'include'
+    })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+        })
+        .catch(console.error);
 }
 
 async function send_image(image_file, prompt) {
@@ -692,10 +719,30 @@ async function big_red_abort_button() {
 //     }
 // });
 
+function toggleStopButton(showStop) {
+    const stopButton = document.getElementById('stop');
+    const sendButton = document.getElementById('send');
+    const recordButton = document.getElementById('record');
+    const uploadButton = document.getElementById('upload-image');
+
+    if (showStop) {
+
+        stopButton.style.display = 'block';
+        sendButton.style.display = 'none';
+        recordButton.style.display = 'none';
+        uploadButton.style.display = 'none';
+    } else {
+        stopButton.style.display = 'none';
+        sendButton.style.display = 'block';
+        recordButton.style.display = 'block';
+        uploadButton.style.display = 'block';
+    }
+}
 
 function canSendMessage() {
     record_button = document.getElementById('record');
     const message = document.getElementById("message");
+
     if (message.value.trim() == '') {
         document.getElementById('send').disabled = true;
         canSend = false;
@@ -718,6 +765,7 @@ function canSendMessage() {
             record_button.disabled = true;
         }
     }
+    toggleStopButton(isWaiting);
 }
 
 canSendMessage();
@@ -760,7 +808,7 @@ function populateChatTabs(tabs_data) {
         }
         var dots = document.createElement('div');
         dots.className = 'chat-tab-dots';
-        dots.innerHTML = '&#x22EE;';
+        dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
         dots.onclick = function(event) {
             event.stopPropagation();
             showDropdown(this, tabs_data[i].chat_id);

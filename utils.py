@@ -37,6 +37,7 @@ max_responses = 1
 temperature = 0.2
 max_tokens = 1000
 COT_RETRIES = {}
+stopPressed = {}
 
 
 class MessageSender:
@@ -410,6 +411,16 @@ class OpenAIResponser:
         self.trace_config = aiohttp.TraceConfig()
         self.trace_config.on_request_end.append(log_response_headers)
 
+    @staticmethod
+    def user_pressed_stop(username):
+        global stopPressed
+        stopPressed[username] = True
+
+    @staticmethod
+    def reset_stop_stream(username):
+        global stopPressed
+        stopPressed[username] = False
+
     @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
     async def get_response(
         self,
@@ -488,7 +499,22 @@ class OpenAIResponser:
                 "arguments": "",
             }
             collected_messages = []
+            # check if the user pressed stop to stop the stream
             async for chunk in response:
+                # check if the user pressed stop to stop the stream
+                global stopPressed
+                stopStream = False
+                if username in stopPressed:
+                    stopStream = stopPressed[username]
+                if stopStream:
+                    await session.close()
+                    stopStream = False
+                    stopPressed[username] = False
+                    await MessageSender.send_message(
+                        {"cancel_message": True, "chat_id": chat_id}, "blue", username
+                    )
+                    await session.close()
+                    break
                 delta = chunk["choices"][0]["delta"]
                 if "content" in chunk["choices"][0]["delta"]:
                     chunk_message = chunk["choices"][0]["delta"]["content"]
@@ -534,14 +560,6 @@ class OpenAIResponser:
             )
         await session.close()
         return response
-
-    # Todo: add a setting to enable/disable this feature and add the necessary code
-    async def get_response_stream(self, messages):
-        response = await self.get_response(messages, stream=True)
-        logger.info("Streaming response")
-        for chunk in response:
-            current_content = chunk["choices"][0]["delta"].get("content", "")
-            yield current_content
 
 
 class AudioProcessor:
@@ -1045,6 +1063,8 @@ async def process_message(
     chat_id=None,
 ):
     """Process the message and generate a response"""
+    # reset the stopPressed variable
+    OpenAIResponser.reset_stop_stream(username)
     if display_name is None:
         display_name = username
 

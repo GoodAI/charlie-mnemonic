@@ -150,7 +150,11 @@ class MemoryManager:
     async def split_text_into_chunks(self, text, max_chunk_len=200):
         """Split the text into chunks of up to `max_chunk_len`"""
         # Split the text into lines, then count the number of tokens in each line and add them to a chunk until the chunk is full
-        lines = text.split("\n")
+        # convert text to string if it's not already
+        if isinstance(text, str):
+            lines = text.split("\n")
+        else:
+            lines = text
 
         chunks = []
         chunk = []

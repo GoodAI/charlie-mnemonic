@@ -10,6 +10,8 @@ import importlib
 import logs
 import math
 
+from configuration_page.settings_util import is_single_user
+
 logger = logs.Log("database", "database.log").get_logger()
 
 
@@ -17,6 +19,7 @@ class Database:
     def __init__(self):
         self.DATABASE_URL = os.environ["DATABASE_URL"]
         self.PRODUCTION = os.environ["PRODUCTION"]
+        self.single_user = is_single_user()
         self.conn = None
         self.cursor = None
         self.migrations_dir = "migrations"
@@ -117,7 +120,29 @@ class Database:
         self.create_table()
         self.create_migrations_table()
         self.migrate_table()
+        if self.single_user:
+            self.create_default_user()
         self.close()
+
+    def get_user_count(self):
+        self.cursor.execute("SELECT COUNT(*) FROM users")
+        return self.cursor.fetchone()[0]
+
+    def create_default_user(self):
+        user_count = self.get_user_count()
+        if user_count > 0:
+            return
+        from authentication import Authentication
+
+        Authentication().register(
+            username="admin", password="admin", display_name="admin"
+        )
+        user_id = self.get_user_id("admin")
+        self.update_user(
+            user_id=user_id,
+            access="true",
+            role="admin",
+        )
 
     def get_user(self, username):
         self.cursor.execute("SELECT * FROM users WHERE username = %s", (username,))

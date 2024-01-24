@@ -1,8 +1,7 @@
 import os
 
+import openai
 import uvicorn
-
-from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
 
 
 def create_app():
@@ -50,7 +49,16 @@ def create_app():
         logs.Log("main", "main.log").get_logger().debug("Shutting down server")
 
     app.include_router(router)
+    from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
+
     app.add_middleware(RedirectToConfigurationMiddleware)
+
+    from configuration_page.settings_util import is_single_user
+
+    if is_single_user():
+        from configuration_page.user_hack_middleware import LoginAdminMiddleware
+
+        app.add_middleware(LoginAdminMiddleware)
     return app
 
 

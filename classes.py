@@ -1,5 +1,7 @@
-from typing import Union, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Union, Dict, Any, OrderedDict
+from pydantic import BaseModel, Field, validator
+
+from configuration_page import configuration_meta
 
 
 class User(BaseModel):
@@ -84,3 +86,44 @@ class AsciiColors:
     WARNING = "\033[93m"
     UNDERLINE = "\033[4m"
     END = "\033[0m"
+
+
+class ConfigurationData(BaseModel):
+    OPENAI_API_KEY: str = Field(
+        ...,
+        title="OpenAI API key",
+        description="This key is used for general OpenAI API calls and is required for the agent to work.",
+    )
+    ELEVENLABS_API_KEY: str = Field(
+        None,
+        title="Elevenlabs API key",
+        description="This is used for text to speech. Use it if you want agent to speak.",
+        required=False,
+    )
+
+    @staticmethod
+    def for_frontend():
+        schema = ConfigurationData.schema()
+        result = []
+        for key, single_property in schema["properties"].items():
+            meta = configuration_meta[key]
+            result.append(
+                (
+                    key,
+                    {
+                        "key": key,
+                        "title": single_property["title"],
+                        "help_text": single_property["description"],
+                        "input_type": meta.input_type,
+                        "required": key in schema["required"],
+                        "value": meta.value,
+                    },
+                )
+            )
+        return OrderedDict(result)
+
+    @validator("OPENAI_API_KEY", "ELEVENLABS_API_KEY", pre=True, always=True)
+    def check_not_empty(cls, v, field):
+        if field.required and (v is None or v == ""):
+            raise ValueError(f"{field.name} is required and cannot be empty")
+        return v

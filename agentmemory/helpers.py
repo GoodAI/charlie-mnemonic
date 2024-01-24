@@ -1,9 +1,7 @@
 import json
 import os
-from dotenv import load_dotenv
-from agentlogger import log
 
-load_dotenv()
+from agentlogger import log
 
 DEBUG = os.getenv("DEBUG", "false") == "true" or os.getenv("DEBUG", "false") == "True"
 

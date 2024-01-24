@@ -2,14 +2,17 @@ import os
 
 import uvicorn
 
+from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
+
 
 def create_app():
+    from configuration_page import reload_configuration
+
+    reload_configuration()
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     import os
     from routes import router
-    from config import api_keys
-    import openai
     import nltk
     import logs
     import utils
@@ -18,9 +21,6 @@ def create_app():
     nltk.download("punkt")
 
     version = utils.SettingsManager.get_version()
-
-    # Load environment variables
-    openai.api_key = api_keys["openai"]
 
     db = Database()
     db.setup_database()
@@ -50,6 +50,7 @@ def create_app():
         logs.Log("main", "main.log").get_logger().debug("Shutting down server")
 
     app.include_router(router)
+    app.add_middleware(RedirectToConfigurationMiddleware)
     return app
 
 

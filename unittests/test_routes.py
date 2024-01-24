@@ -136,25 +136,27 @@ def test_handle_message_with_image():
 
     # create a real image file
     img = Image.new("RGB", (100, 100), color="red")
-    img.save("test_image.jpg")
-    # create a test message
-    message = userMessage(
-        username="testuser", prompt="Hello, AI!", display_name="Test User"
-    )
-    # send the message with the test image
-    client.cookies.update(
-        {"session_token": test_session_token, "username": message.username}
-    )
-    response = client.post(
-        "/message_with_image/",
-        data={"prompt": message.prompt},
-        files={"image_file": ("test_image.jpg", open("test_image.jpg", "rb"))},
-    )
-    # check the response
-    assert response.status_code == 200
-    assert "content" in response.json()
-    # delete the test image file
-    os.remove("test_image.jpg")
+    try:
+        img.save("test_image.jpg")
+        # create a test message
+        message = userMessage(
+            username="testuser", prompt="Hello, AI!", display_name="Test User"
+        )
+        # send the message with the test image
+        client.cookies.update(
+            {"session_token": test_session_token, "username": message.username}
+        )
+        response = client.post(
+            "/message_with_image/",
+            data={"prompt": message.prompt},
+            files={"image_file": ("test_image.jpg", open("test_image.jpg", "rb"))},
+        )
+        # check the response
+        assert response.status_code == 200
+        assert "content" in response.json()
+        # delete the test image file
+    finally:
+        os.remove("test_image.jpg")
 
 
 def test_get_recent_messages_valid_token():

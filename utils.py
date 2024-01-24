@@ -26,11 +26,10 @@ import logs
 import prompts
 from unidecode import unidecode
 
+from simple_utils import get_root
+
 logger = logs.Log("utils", "utils.log").get_logger()
 
-
-# Set ElevenLabs API key
-set_api_key(api_keys["elevenlabs"])
 
 # Parameters for OpenAI
 openai_model = api_keys["chatgpt_model"]
@@ -1012,7 +1011,7 @@ class SettingsManager:
     @staticmethod
     def get_version():
         version = "0.0"
-        with open("version.txt", "r") as f:
+        with open(get_root("version.txt"), "r") as f:
             new_version = f.read().strip()
             if new_version:
                 version = new_version
@@ -1805,10 +1804,3 @@ async def process_final_message(
         #     return response
         # else:
         return response
-
-
-def check_api_keys():
-    OPENAI_API_KEY = api_keys["openai"]
-    if not len(OPENAI_API_KEY):
-        logger.critical("Please set OPENAI_API_KEY environment variable. Exiting.")
-        sys.exit(1)

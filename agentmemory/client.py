@@ -1,12 +1,9 @@
 import os
+
 import chromadb
-from dotenv import load_dotenv
-
 from chromadb.config import Settings
+
 from agentmemory.postgres import PostgresClient
-
-load_dotenv()
-
 
 DEFAULT_CLIENT_TYPE = "CHROMA"
 CLIENT_TYPE = os.environ.get("CLIENT_TYPE", DEFAULT_CLIENT_TYPE)

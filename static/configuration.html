@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>GoodAI Agent {{ version }}</title>
+        <link href='https://fonts.googleapis.com/css?family=Lexend'
+              rel='stylesheet'>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"
+                integrity="sha512-3gJwYpMe3QewGELv8k/BX9vcqhryRdzRMxVfq6ngyWXwo03GFEzjsUm8Q7RZcHPHksttq7/GFoxjCVUjkjvPdw=="
+                crossorigin="anonymous"
+                referrerpolicy="no-referrer"></script>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css"
+              rel="stylesheet"
+              integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC"
+              crossorigin="anonymous">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM"
+                crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="/styles.css?v={{ version }}">
+    </head>
+    <body>
+        <div class="container">
+            <h1>System configuration</h1>
+            <p></p>
+            <div id="alert-wrap"></div>
+            <form id="configuration-form" method="post" action="/configuration/">
+                {% for key, value in config.items() %}
+                    <div class="mb-3">
+                        <label for="field-{{ key }}" class="form-label">
+                            {{ value.title }}
+                            {% if value.required %}
+                                (required)
+                            {% endif
+                            %}
+                        </label>
+                        <input id="field-{{ key }}"
+                               name="{{ key }}"
+                               value="{{ value.value }}"
+                               type="{{ value.input_type }}"
+                               autocomplete="off"
+                               class="form-control"
+                               {% if value.required %}required="required"{% endif %}
+                               aria-describedby="help-{{ key }}" />
+                        <div id="help-{{ key }}" class="form-text">{{ value.help_text }}</div>
+                    </div>
+                {% endfor %}
+                <a class="btn btn-secondary" href="/">Back to the agent</a>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+        <script>
+    function success(message) {
+        document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span class="alert-message">${message}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>`
+    }
+
+    function error(message) {
+        document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <span class="alert-message">${message}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>`
+    }
+
+    async function updateConfiguration(event) {
+        event.preventDefault();
+        let formData = new FormData(this)
+        let formObject = {};
+        formData.forEach((value, key) => {
+            formObject[key] = value;
+        });
+        fetch(this.action, {
+            method: 'POST', // or 'PUT'
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(formObject),
+        }).then(response => response.json())
+            .then(data => {
+                success(data["message"]);
+            })
+            .catch((err) => {
+                error(err);
+            });
+
+        return false;
+    }
+
+    document.getElementById("configuration-form").addEventListener("submit", updateConfiguration);
+        </script>
+    </body>
+</html>

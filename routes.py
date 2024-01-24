@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 import signal
+from json import JSONDecodeError
+
 from fastapi import (
     APIRouter,
     HTTPException,
@@ -27,6 +29,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.security.api_key import APIKeyCookie
 import urllib.parse
 from unidecode import unidecode
+
+from configuration_page import modify_settings
+from simple_utils import get_root
 from utils import (
     process_message,
     OpenAIResponser,
@@ -48,6 +53,7 @@ from classes import (
     noTokenMessage,
     UserGoogle,
     generateAudioMessage,
+    ConfigurationData,
 )
 import shutil
 from database import Database
@@ -68,10 +74,10 @@ from google.auth.transport import requests
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys
+from config import api_keys, STATIC, CONFIGURATION_URL
 
 router = APIRouter()
-templates = Jinja2Templates(directory="static")
+templates = Jinja2Templates(directory=get_root(STATIC))
 
 connections = {}
 
@@ -81,8 +87,8 @@ ORIGINS = os.environ["ORIGINS"]
 
 users_dir = "users"
 
-router.mount("/static", StaticFiles(directory="static"), name="static")
-router.mount("/d-id", StaticFiles(directory="d-id"), name="d-id")
+router.mount(f"/{STATIC}", StaticFiles(directory=get_root(STATIC)), name="static")
+router.mount("/d-id", StaticFiles(directory=get_root("d-id")), name="d-id")
 
 
 @router.get("/d-id/api.json")
@@ -1385,6 +1391,32 @@ async def get_user_profile(
             "user_profile.html",
             {"request": request, "profile": user_profile, "daily_stats": daily_stats},
         )
+
+
+@router.get(CONFIGURATION_URL, response_class=HTMLResponse)
+async def configuration(request: Request):
+    version = SettingsManager.get_version()
+    with Database() as db:
+        daily_limit = db.get_daily_limit()
+        maintenance_mode = db.get_maintenance_mode()
+
+    config = ConfigurationData.for_frontend()
+
+    return templates.TemplateResponse(
+        "configuration.html",
+        context=locals(),
+    )
+
+
+@router.post(CONFIGURATION_URL, response_class=JSONResponse)
+async def update_configuration(config_data: ConfigurationData):
+    # TODO: security check for login
+    try:
+        filtered = {k: v for k, v in config_data.dict().items() if v is not None}
+        modify_settings(filtered)
+        return {"message": "Configuration updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/data/{file_path:path}")

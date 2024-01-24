@@ -2,6 +2,8 @@ import logging
 import os
 import codecs
 
+from simple_utils import get_root
+
 
 class SafeFileHandler(logging.FileHandler):
     def _open(self):
@@ -24,7 +26,7 @@ class Log:
         self.logger.setLevel(logging.DEBUG)
 
         # Specify the directory where the log files will be saved
-        log_dir = "logs"
+        log_dir = get_root("logs")
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)
 

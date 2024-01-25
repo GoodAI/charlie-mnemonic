@@ -326,46 +326,28 @@ async def login(user: LoginUser, response: Response):
     auth = Authentication()
     session_token = auth.login(user.username, user.password)
     if session_token:
-        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION == "true":
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-            response.set_cookie(
-                key="username",
-                value=user.username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-        else:
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
-            response.set_cookie(
-                key="username",
-                value=user.username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
+        set_login_cookies(session_token, user.username, response)
         return {"message": "User logged in successfully"}
     else:
         raise HTTPException(status_code=401, detail="User login failed")
+
+
+def set_login_cookies(
+    session_token: str, username: str, response: Response, duration_days: int = 90
+) -> None:
+    expiracy_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
+    cookie_params = {
+        "secure": True,
+        "httponly": False,
+        "samesite": "None",
+        "expires": expiracy_date,
+    }
+
+    if PRODUCTION == "true":
+        cookie_params["domain"] = ORIGINS
+
+    response.set_cookie(key="session_token", value=session_token, **cookie_params)
+    response.set_cookie(key="username", value=username, **cookie_params)
 
 
 # logout route

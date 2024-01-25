@@ -21,7 +21,7 @@
     <body>
         <div class="container">
             <h1>System configuration</h1>
-            <p></p>
+            <p>Welcome to Charlie Mnemonic! Please enter the following information to start using it.</p>
             <div id="alert-wrap"></div>
             <form id="configuration-form" method="post" action="/configuration/">
                 {% for key, value in config.items() %}
@@ -44,7 +44,7 @@
                         <div id="help-{{ key }}" class="form-text">{{ value.help_text }}</div>
                     </div>
                 {% endfor %}
-                <a class="btn btn-secondary" href="/">Back to the agent</a>
+                <a class="btn btn-secondary" href="/">To the agent</a>
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
         </div>
@@ -71,7 +71,7 @@
             formObject[key] = value;
         });
         fetch(this.action, {
-            method: 'POST', // or 'PUT'
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
@@ -79,6 +79,9 @@
         }).then(response => response.json())
             .then(data => {
                 success(data["message"]);
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 1000);
             })
             .catch((err) => {
                 error(err);

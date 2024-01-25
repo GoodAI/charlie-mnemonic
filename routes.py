@@ -1406,6 +1406,7 @@ async def get_user_profile(
 
 @router.get(CONFIGURATION_URL, response_class=HTMLResponse)
 async def configuration(request: Request):
+    # TODO: security check for login
     version = SettingsManager.get_version()
     with Database() as db:
         daily_limit = db.get_daily_limit()

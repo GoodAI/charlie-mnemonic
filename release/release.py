@@ -19,7 +19,7 @@ def semver_type(version: str) -> str:
 def run_command(
     command: str,
     error_message: str = "Command '{command}' exited with code: {return_code}",
-) -> None:
+) -> str:
     """Run a shell command and stream its output to stdout, including errors."""
     with subprocess.Popen(
         command,
@@ -29,13 +29,16 @@ def run_command(
         text=True,
         bufsize=1,
     ) as proc:
+        result = ""
         for line in proc.stdout:
             print(line, end="")
+            result += line
 
     if proc.returncode != 0:
         raise ValueError(
             error_message.format(command=command, return_code=proc.returncode)
         )
+    return result
 
 
 def zip_directory(path: str, zip_name: str) -> str:
@@ -50,7 +53,13 @@ def zip_directory(path: str, zip_name: str) -> str:
 
 
 def release(
-    version: str, docker_repo: str, github_repo: str, origin_name: str, release_dir: str
+    version: str,
+    docker_repo: str,
+    github_repo: str,
+    origin_name: str,
+    release_dir: str,
+    release_notes: str,
+    release_branch: str,
 ) -> None:
     """Perform the build, push, tagging, and release process."""
     zip_file = f"charlie-mnemonic-{version}.zip"
@@ -74,16 +83,20 @@ def release(
 
     print("Creating GitHub release")
     run_command(
-        f'gh release create {version} {zip_path} --repo {github_repo} --title "Release {version}" --notes "Release notes here"'
+        f'gh release create {version} {zip_path} --repo {github_repo} --title "Release {version}" --notes "{release_notes}"'
     )
 
     with open("version.txt", "w") as f:
         f.write(version)
 
+    run_command(f"git add version.txt")
+    run_command(f"git commit -m 'Release {version}'")
+    run_command(f"git push {origin_name} {release_branch}")
+
     print(f"Successfully created and released version {version}")
 
 
-def release_checks(new_version: str, current_version: str) -> None:
+def check_version_is_newer(new_version: str, current_version: str) -> None:
     from packaging import version
 
     if version.parse(current_version) >= version.parse(new_version):
@@ -91,6 +104,21 @@ def release_checks(new_version: str, current_version: str) -> None:
             f"Error: Provided version {new_version} must be higher than the current version {current_version}."
         )
         sys.exit(1)
+
+
+def check_on_branch(branch_name: str) -> None:
+    current_branch = run_command("git rev-parse --abbrev-ref HEAD").strip()
+    if current_branch != branch_name:
+        raise ValueError(
+            f"Error: You must be on the '{branch_name}' branch to perform a release. Currently on '{current_branch}'."
+        )
+
+
+def check_clean_repo() -> None:
+    run_command(
+        "git diff --exit-code",
+        error_message="Git repository is not clean, please commit or stash all changes before releasing.",
+    )
 
 
 def main() -> None:
@@ -118,6 +146,18 @@ def main() -> None:
         help="GitHub repository URL (default: github.com/goodai/charlie-mnemonic)",
     )
 
+    parser.add_argument(
+        "--release-notes",
+        default="Release notes here",
+        help="Release notes for the GitHub release (default: 'Release notes here')",
+    )
+
+    parser.add_argument(
+        "--release-branch",
+        default="dev",
+        help="Git branch to release from (default: 'dev')",
+    )
+
     args = parser.parse_args()
 
     docker_repo = args.docker_repo
@@ -127,14 +167,19 @@ def main() -> None:
     with open("version.txt", "r") as f:
         current_version = f.read()
 
-    release_checks(args.version, current_version=current_version)
+    check_on_branch(args.release_branch)
+    check_clean_repo()
+    check_version_is_newer(args.version, current_version=current_version)
     release(
         args.version,
         docker_repo,
         github_repo=github_repo,
         release_dir=release_dir,
         origin_name=origin_name,
+        release_notes=args.release_notes,
+        release_branch=args.release_branch,
     )
+    print("Done, wohoo!")
 
 
 if __name__ == "__main__":

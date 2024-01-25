@@ -5,6 +5,8 @@ import subprocess
 import sys
 import zipfile
 
+import pytest
+
 
 def semver_type(version: str) -> str:
     """Custom argparse type for validating Semantic Versioning."""
@@ -121,6 +123,10 @@ def check_clean_repo() -> None:
     )
 
 
+def check_tests() -> None:
+    pytest.main(["configuration_page", "-v"])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Manage Docker and Git releases.")
 
@@ -167,6 +173,7 @@ def main() -> None:
     with open("version.txt", "r") as f:
         current_version = f.read()
 
+    check_tests()
     check_on_branch(args.release_branch)
     check_clean_repo()
     check_version_is_newer(args.version, current_version=current_version)

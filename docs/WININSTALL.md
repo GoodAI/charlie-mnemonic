@@ -40,7 +40,11 @@ You can now use Charlie Mnemonic. If you run into any issues, please see section
 By default, once the agent is downloaded, it doesn't explicitly update. To update the agent to the latest version,
 run `update.bat` from the extracted folder.
 
-## Purging All the Data
+## Uninstalling the Agent
+
+To uninstall the agent, run `uninstall.bat` from the extracted folder. User data will be preserved.
+
+## Purging All the user Data
 
 To purge all the data, run `purge.bat` from the extracted folder.
 

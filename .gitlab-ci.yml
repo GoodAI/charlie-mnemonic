@@ -7,7 +7,7 @@ stages:
 black:
   stage: Static Analysis
   script:
-    - pip install black
+    - pip install black==23.10.1
     - black . --check
 
 

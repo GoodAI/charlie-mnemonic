@@ -62,7 +62,9 @@ def release(
     release_dir: str,
     release_notes: str,
     release_branch: str,
+    force_push: bool = False,
 ) -> None:
+    force_str = " --force" if force_push else ""
     """Perform the build, push, tagging, and release process."""
     zip_file = f"charlie-mnemonic-{version}.zip"
     print(f"Creating zip file {zip_file}")
@@ -93,7 +95,7 @@ def release(
 
     run_command(f"git add version.txt")
     run_command(f"git commit -m 'Release {version}'")
-    run_command(f"git push {origin_name} {release_branch}")
+    run_command(f"git push {force_str} {origin_name} {release_branch}")
 
     print(f"Successfully created and released version {version}")
 
@@ -164,6 +166,12 @@ def main() -> None:
         help="Git branch to release from (default: 'dev')",
     )
 
+    parser.add_argument(
+        "--force-push",
+        action="store_true",
+        help="Enable force push to the repository. Use with caution!",
+    )
+
     args = parser.parse_args()
 
     docker_repo = args.docker_repo
@@ -185,6 +193,7 @@ def main() -> None:
         origin_name=origin_name,
         release_notes=args.release_notes,
         release_branch=args.release_branch,
+        force_push=args.force_push,
     )
     print("Done, wohoo!")
 

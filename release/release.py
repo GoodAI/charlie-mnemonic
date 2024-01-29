@@ -19,17 +19,17 @@ def semver_type(version: str) -> str:
 
 
 def run_command(
-    command: str,
-    error_message: str = "Command '{command}' exited with code: {return_code}",
+        command: str,
+        error_message: str = "Command '{command}' exited with code: {return_code}",
 ) -> str:
     """Run a shell command and stream its output to stdout, including errors."""
     with subprocess.Popen(
-        command,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
     ) as proc:
         result = ""
         for line in proc.stdout:
@@ -55,14 +55,16 @@ def zip_directory(path: str, zip_name: str) -> str:
 
 
 def release(
-    version: str,
-    docker_repo: str,
-    github_repo: str,
-    origin_name: str,
-    release_dir: str,
-    release_notes: str,
-    release_branch: str,
+        version: str,
+        docker_repo: str,
+        github_repo: str,
+        origin_name: str,
+        release_dir: str,
+        release_notes: str,
+        release_branch: str,
+        force_push: bool = False,
 ) -> None:
+    force_str = " --force" if force_push else ""
     """Perform the build, push, tagging, and release process."""
     zip_file = f"charlie-mnemonic-{version}.zip"
     print(f"Creating zip file {zip_file}")
@@ -93,7 +95,7 @@ def release(
 
     run_command(f"git add version.txt")
     run_command(f"git commit -m 'Release {version}'")
-    run_command(f"git push {origin_name} {release_branch}")
+    run_command(f"git push {force_str} {origin_name} {release_branch}")
 
     print(f"Successfully created and released version {version}")
 
@@ -164,6 +166,12 @@ def main() -> None:
         help="Git branch to release from (default: 'dev')",
     )
 
+    parser.add_argument(
+        "--force-push",
+        action='store_true',
+        help="Enable force push to the repository. Use with caution!",
+    )
+
     args = parser.parse_args()
 
     docker_repo = args.docker_repo
@@ -185,6 +193,7 @@ def main() -> None:
         origin_name=origin_name,
         release_notes=args.release_notes,
         release_branch=args.release_branch,
+        force_push=args.force_push,
     )
     print("Done, wohoo!")
 

@@ -39,6 +39,8 @@ You can now use Charlie Mnemonic. If you run into any issues, please see section
 
 By default, once the agent is downloaded, it doesn't explicitly update. To update the agent to the latest version,
 run `update.bat` from the extracted folder.
+This updates only the agent, but not all the update scripts. Once in a while it's good to head over
+to [GitHub releases page](https://github.com/GoodAI/charlie-mnemonic/releases) and download the latest version.
 
 ## Uninstalling the Agent
 
@@ -52,6 +54,7 @@ User data are in:
 
 - User home directory in AppData\Roaming\charlie-mnemonic
 - Database are saved in Docker volume named `postgres-data`
+- More information about persistence can be found in [Persistence](PERSISTENCE.md) document.
 
 ## Troubleshooting
 

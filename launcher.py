@@ -1,8 +1,9 @@
 import argparse
 import os
 
-import openai
 import uvicorn
+
+from configuration_page.middleware import LoginRequiredCheckMiddleware
 
 
 def create_app():
@@ -53,11 +54,12 @@ def create_app():
     from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
 
     app.add_middleware(RedirectToConfigurationMiddleware)
+    app.add_middleware(LoginRequiredCheckMiddleware)
 
     from configuration_page.settings_util import is_single_user
 
     if is_single_user():
-        from configuration_page.user_hack_middleware import LoginAdminMiddleware
+        from configuration_page.middleware import LoginAdminMiddleware
 
         app.add_middleware(LoginAdminMiddleware)
     return app

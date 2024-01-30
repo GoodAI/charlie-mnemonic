@@ -31,6 +31,7 @@ import urllib.parse
 from unidecode import unidecode
 
 from configuration_page import modify_settings
+from configuration_page.middleware import login_user_request
 from simple_utils import get_root
 from utils import (
     process_message,
@@ -74,7 +75,7 @@ from google.auth.transport import requests
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, CONFIGURATION_URL
+from config import api_keys, STATIC, CONFIGURATION_URL, LOGIN_REQUIRED
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
@@ -179,10 +180,6 @@ async def read_root():
         return FileResponse("static/styles.css")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
-
-
-def get_token(request: Request):
-    return request.cookies.get("session_token")
 
 
 async def send_debug_message(username: str, message: str):
@@ -322,11 +319,12 @@ async def register(user: User, response: Response):
         },
     },
 )
-async def login(user: LoginUser, response: Response):
+async def login(request: Request, user: LoginUser, response: Response):
     auth = Authentication()
     session_token = auth.login(user.username, user.password)
     if session_token:
         set_login_cookies(session_token, user.username, response)
+        login_user_request(session_token, user.username, request)
         return {"message": "User logged in successfully"}
     else:
         raise HTTPException(status_code=401, detail="User login failed")
@@ -415,7 +413,7 @@ async def check_token(user: UserCheckToken):
 # load settings route
 @router.post(
     "/load_settings/",
-    tags=["Settings"],
+    tags=["Settings", LOGIN_REQUIRED],
     summary="Load settings",
     description="This endpoint allows you to load the user's settings by providing a username and session token. If the token is valid, the settings will be returned. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the user's settings if the token is valid, else returns an HTTPException with status code 401.",
@@ -440,11 +438,6 @@ async def check_token(user: UserCheckToken):
     },
 )
 async def handle_get_settings(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     await AddonManager.load_addons(user.username, users_dir)
     with open(os.path.join(users_dir, user.username, "settings.json"), "r") as f:
         settings = json.load(f)
@@ -470,7 +463,7 @@ def count_tokens(message):
 # update settings route
 @router.post(
     "/update_settings/",
-    tags=["Settings"],
+    tags=["Settings", LOGIN_REQUIRED],
     summary="Update settings",
     description="This endpoint allows you to update the user's settings by providing a username, session token, category, setting, and value. If the token is valid, the settings will be updated. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the user's updated settings if the token is valid, else returns an HTTPException with status code 401.",
@@ -503,11 +496,6 @@ def count_tokens(message):
     },
 )
 async def handle_update_settings(request: Request, user: editSettings):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     # create the directory if it doesn't exist
     user_dir = os.path.join(users_dir, user.username)
     if not os.path.exists(user_dir):
@@ -562,7 +550,7 @@ async def handle_update_settings(request: Request, user: editSettings):
 # openAI response route
 @router.post(
     "/message/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send a message to the AI",
     description="This endpoint allows you to send a message to the AI by providing a username, session token, and prompt. If the token is valid, the AI will respond to the prompt. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the AI's response if the token is valid, else returns an HTTPException with status code 401.",
@@ -584,11 +572,6 @@ async def handle_update_settings(request: Request, user: editSettings):
     },
 )
 async def handle_message(request: Request, message: userMessage):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     with open(os.path.join(users_dir, message.username, "settings.json"), "r") as f:
         settings = json.load(f)
     if count_tokens(message.prompt) > settings["memory"]["output"]:
@@ -644,18 +627,13 @@ async def handle_message(request: Request, message: userMessage):
     )
 
 
-@router.post("/stop_streaming/")
+@router.post("/stop_streaming/", tags=[LOGIN_REQUIRED])
 async def stop_streaming(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     OpenAIResponser.user_pressed_stop(user.username)
     return {"message": "Streaming stopped successfully"}
 
 
-@router.post("/message_with_image/", tags=["Messaging"])
+@router.post("/message_with_image/", tags=["Messaging", LOGIN_REQUIRED])
 async def handle_message_image(
     request: Request,
     image_file: UploadFile,
@@ -663,12 +641,7 @@ async def handle_message_image(
     username: str = Form(...),
     chat_id: str = Form(...),
 ):
-    session_token = request.cookies.get("session_token")
     username = request.cookies.get("username")
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     if count_tokens(prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     with Database() as db:
@@ -726,13 +699,8 @@ async def handle_message_image(
     )
 
 
-@router.post("/get_chat_tabs/")
+@router.post("/get_chat_tabs/", tags=[LOGIN_REQUIRED])
 async def get_chat_tabs(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     with Database() as db:
         user_id = db.get_user_id(user.username)[0]
         tab_data = db.get_tab_data(user_id) or []
@@ -746,26 +714,16 @@ async def get_chat_tabs(request: Request, user: UserName):
         }
 
 
-@router.post("/delete_chat_tab/")
+@router.post("/delete_chat_tab/", tags=[LOGIN_REQUIRED])
 async def delete_chat_tab(request: Request, user: RecentMessages):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     with Database() as db:
         user_id = db.get_user_id(user.username)[0]
         db.disable_tab(user_id, user.chat_id)
         return {"message": "Tab deleted successfully"}
 
 
-@router.post("/get_recent_messages/")
+@router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
 async def get_recent_messages(request: Request, message: RecentMessages):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     with Database() as db:
         has_access = db.get_user_access(message.username)
         user_id = db.get_user_id(message.username)[0]
@@ -924,7 +882,7 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
 
 @router.post(
     "/save_data/",
-    tags=["Data"],
+    tags=["Data", LOGIN_REQUIRED],
     summary="Save data to a JSON file",
     description="This endpoint allows you to save the user's data to a JSON file by providing a username and session token. If the token is valid, the data will be saved to a JSON file. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the JSON file if the token is valid, else returns an HTTPException with status code 401.",
@@ -944,12 +902,6 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
     },
 )
 async def handle_save_data(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-
     # Paths for memory file and settings file
     json_file_path = os.path.join(users_dir, user.username, "memory.json")
     settings_file = os.path.join(users_dir, user.username, "settings.json")
@@ -1012,7 +964,7 @@ async def handle_save_data(request: Request, user: UserName):
 
 @router.post(
     "/delete_data/",
-    tags=["Data"],
+    tags=["Data", LOGIN_REQUIRED],
     summary="Delete user data",
     description="This endpoint allows you to delete the user's data by providing a username and session token. If the token is valid, the user's data will be deleted. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
@@ -1034,11 +986,6 @@ async def handle_save_data(request: Request, user: UserName):
     },
 )
 async def handle_delete_data(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     wipe_all_memories(user.username)
     stop_database(user.username)
     # remove all users recent messages
@@ -1052,15 +999,8 @@ async def handle_delete_data(request: Request, user: UserName):
     return {"message": "User data deleted successfully"}
 
 
-@router.post(
-    "/delete_data_keep_settings/",
-)
+@router.post("/delete_data_keep_settings/", tags=[LOGIN_REQUIRED])
 async def handle_delete_data_keep_settings(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     wipe_all_memories(user.username)
     stop_database(user.username)
     # remove all users recent messages
@@ -1158,7 +1098,7 @@ async def handle_upload_data(
 
 @router.post(
     "/abort_button/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Abort the AI",
     description="This endpoint allows you to abort the AI by providing a username and session token. If the token is valid, the AI will be aborted. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
@@ -1178,11 +1118,6 @@ async def handle_upload_data(
     },
 )
 async def handle_abort_button(request: Request, user: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(user.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     # kill the process, this will need a manual restart or a cron job/supervisor/...
     os.kill(os.getpid(), signal.SIGINT)
 
@@ -1526,13 +1461,8 @@ async def google_login(request: UserGoogle, response: Response):
         raise HTTPException(status_code=401, detail="User login failed")
 
 
-@router.post("/delete_recent_messages/")
+@router.post("/delete_recent_messages/", tags=[LOGIN_REQUIRED])
 async def delete_recent_messages(request: Request, message: UserName):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(message.username)
     return {"message": "Recent messages deleted successfully"}

@@ -1,12 +1,14 @@
-import datetime
-import psycopg2
-import bcrypt
 import binascii
 import os
-from fastapi import HTTPException
-from database import Database
+from typing import Optional
+
+import bcrypt
 import logs
+import psycopg2
+from fastapi import HTTPException
 from unidecode import unidecode
+
+from database import Database
 
 logger = logs.Log("authentication", "authentication.log").get_logger()
 
@@ -50,26 +52,10 @@ class Authentication:
         self.db.conn.commit()
         self.db.close()
 
-    def login(self, username, password):
+    def force_login(self, username: str) -> str:
         self.db.open()
-        self.db.cursor.execute(
-            "SELECT password FROM users WHERE username = %s", (username,)
-        )
-        result = self.db.cursor.fetchone()
-
-        if result is None:
-            return False
-
-        stored_password = result[0]
-        # Make sure stored_password is a string before encoding it to bytes
-        if isinstance(stored_password, bytes):
-            stored_password = stored_password.decode("utf-8")
-        stored_password_bytes = stored_password.encode("utf-8")
-        if not bcrypt.checkpw(password.encode("utf-8"), stored_password_bytes):
-            return False
-
-        # If password is correct, generate a session token
         session_token = binascii.hexlify(os.urandom(24)).decode()
+
         # Store the session token in the database
         self.db.cursor.execute(
             "UPDATE users SET session_token = %s WHERE username = %s",
@@ -80,6 +66,27 @@ class Authentication:
         logger.debug(f"User: {username} - Session token: {session_token}")
         # Return the session token
         return session_token
+
+    def login(self, username: str, password: str) -> Optional[str]:
+        self.db.open()
+        self.db.cursor.execute(
+            "SELECT password FROM users WHERE username = %s", (username,)
+        )
+        result = self.db.cursor.fetchone()
+        self.db.conn.commit()
+        self.db.close()
+
+        if result is None:
+            return None
+
+        stored_password = result[0]
+        if isinstance(stored_password, bytes):
+            stored_password = stored_password.decode("utf-8")
+
+        if bcrypt.checkpw(password.encode("utf-8"), stored_password.encode("utf-8")):
+            return self.force_login(username)
+        else:
+            return None
 
     def convert_name(self, name):
         # Convert non-ASCII characters to ASCII

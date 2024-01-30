@@ -10,6 +10,7 @@ import importlib
 import logs
 import math
 
+from config import SINGLE_USER_USERNAME, SINGLE_USER_DISPLAY_NAME, SINGLE_USER_PASSWORD
 from configuration_page.settings_util import is_single_user
 
 logger = logs.Log("database", "database.log").get_logger()
@@ -135,9 +136,11 @@ class Database:
         from authentication import Authentication
 
         Authentication().register(
-            username="admin", password="admin", display_name="admin"
+            username=SINGLE_USER_USERNAME,
+            password=SINGLE_USER_PASSWORD,
+            display_name=SINGLE_USER_DISPLAY_NAME,
         )
-        user_id = self.get_user_id("admin")
+        user_id = self.get_user_id(SINGLE_USER_USERNAME)
         self.update_user(
             user_id=user_id,
             access="true",

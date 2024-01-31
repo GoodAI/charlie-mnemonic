@@ -128,3 +128,4 @@ static/data/
 
 # Pycharm
 .idea/
+release/*.zip

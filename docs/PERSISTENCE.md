@@ -2,14 +2,14 @@
 
 This document describes how to persist data in Charlie Mnemonic when using docker.
 For more information about docker, see [docker documentation](https://docs.docker.com/).
-For more information about docker in Charlie Mnemonic, see our [docker documentation](DOCKER.md).
+For more information on how to run Charlie Mnemonic using docker, see [docker setup](DEV-DOCKER.md).
 
 ## User data
 
-All persistent data are in "/app/users" directory. If the directory is mounted to the docker container, the data is
-persistent.
+All persistent data are in `/app/users` directory within the running container.
+If the directory is mounted to the docker container, the data is persistent.
 Otherwise, the data are lost when the container is stopped.
-This is automatically taken care of by the docker-compose.yml file.
+This is automatically taken care of by the `docker-compose.yaml` file.
 
 The volume is mounted from `${HOME}/AppData/Roaming/charlie-mnemonic/users` in Windows, otherwise it depends on specific
 docker-compose.yml.
@@ -26,8 +26,6 @@ the following command:
 ```bash
 docker volume rm postgres-data
 ```
-
-If sqlite is used, the data are stored in the user data above.
 
 ## Links
 

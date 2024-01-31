@@ -35,11 +35,11 @@ def create_licenses_txt_2(packages: List[Dict], output_file: str):
 
 if __name__ == "__main__":
     try:
-        with open("licenses.json", "r") as file:
+        with open("release/licenses.json", "r") as file:
             data = json.load(file)
     except FileNotFoundError as e:
         print(
-            "Please run `pip-licenses --with-license-file --format=json > licenses.json` first (install pip-licenses if needed)."
+            "Please run `pip-licenses --with-license-file --format=json > release/licenses.json` first (install pip-licenses if needed)."
         )
         exit(1)
-    create_licenses_txt_2(data, "LICENSES.txt")
+    create_licenses_txt_2(data, "docs/LICENSES.txt")

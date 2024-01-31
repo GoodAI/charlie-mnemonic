@@ -5,10 +5,10 @@ ENV PYTHONIOENCODING=utf-8
 ENV HOST=0.0.0.0
 ENV PORT=8002
 
-RUN apt-get update && apt-get install -y ffmpeg
-
 WORKDIR /app
-COPY . /app
+COPY ./requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+COPY .env_docker /app/.env
+COPY . /app
 EXPOSE 8002
 ENTRYPOINT ["python", "launcher.py"]

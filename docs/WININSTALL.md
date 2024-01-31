@@ -1,44 +1,63 @@
 # How to run Charlie Mnemonic on Windows
 
+## Install Docker
 
-
-## Install docker
-
-Install docker as per instructions from [docker.com](https://docs.docker.com/desktop/install/windows-install/).
-
-TODO: what about docker GPU support on windows? Does it require GPU or is it really just optional? Is docker gpu support automatic or needs additional setup?
+Install Docker as per instructions from [docker.com](https://docs.docker.com/desktop/install/windows-install/).
 
 ## Download Charlie Mnemonic
 
-Download our latest release for windows from [github releases](TODO) and extract it to a folder.
+- Download the latest release, `charlie-mnemonic-x.y.z.zip`, from
+  our [GitHub releases page](https://github.com/GoodAI/charlie-mnemonic/releases).
+- Extract the contents of the zip file to a preferred folder.
 
-## Start the agent
+## Starting the Agent
 
-Run `start.bat` from the extracted folder.
-This opens black terminal screen, that starts Charlie Mnemonic.
-After Charlie Mnemonic starts, it will open a browser window with the initial page.
-First run is slow as it downloads everything, so please be patient.
+- Run `start.bat` from the extracted folder. This opens a black terminal screen, which starts Charlie Mnemonic.
+- After Charlie Mnemonic starts, it will open a browser window with the initial page.
+- The first run might be slow as it downloads necessary components, so please be patient.
 
+### Handling Windows Security Alerts
 
-# Troubleshooting
+- When running `start.bat`, you might encounter the "Windows protected your PC" alert from Microsoft Defender
+  SmartScreen.
+- To proceed, click on "More info", and then select "Run anyway".
+- This alert occurs as Windows tries to protect your PC from unrecognized applications.
 
-If something goes wrong, please check copy text from the terminal or take a screenshot and send it to us.
-You can either create issues on [github](https://github.com/GoodAI/charlie-mnemonic/issues) or send us an email to [charlie-mnemonic@goodai.com](mailto:charlie-mnemonic@goodai.com)
+## Done!
 
+You can now use Charlie Mnemonic. If you run into any issues, please see sections below.
 
-Typical output is as follows:
+# Other maintenance
 
-```
-Starting Charlie Mnemonic using Docker Compose...
-First run takes a while
-[+] Running 2/2
- ✔ Container psdb              Running                                                                             0.0s
- ✔ Container charlie-mnemonic  Started                                                                             0.3s
-Checking if the Charlie Mnemonic started
-Not available yet. Retrying in 5 seconds...
-Checking if the Charlie Mnemonic started
-Charlie Mnemonic is up! Opening http://localhost:8002 in the default browser!
-[nltk_data] Downloading package punkt to /root/nltk_data...
-[nltk_data]   Unzipping tokenizers/punkt.zip.
-INFO:     Started server process [1]
-```
+## Stopping the Agent
+
+- If you close the terminal window, the agent will not stop. First, you need to stop the agent by pressing `Ctrl+C` in
+  the terminal window.
+- You can always stop the agent even if you closed the terminal window by running `stop.bat` from the extracted folder.
+
+## Updating the Agent
+
+By default, once the agent is downloaded, it doesn't explicitly update. To update the agent to the latest version,
+run `update.bat` from the extracted folder.
+This updates only the agent, but not all the update scripts. Once in a while it's good to head over
+to [GitHub releases page](https://github.com/GoodAI/charlie-mnemonic/releases) and download the latest version.
+
+## Uninstalling the Agent
+
+To uninstall the agent, run `uninstall.bat` from the extracted folder. User data will be preserved.
+
+## Purging All the user Data
+
+To purge all the data, run `purge.bat` from the extracted folder.
+
+User data are in:
+
+- User home directory in AppData\Roaming\charlie-mnemonic
+- Database are saved in Docker volume named `postgres-data`
+- More information about persistence can be found in [Persistence](PERSISTENCE.md) document.
+
+## Troubleshooting
+
+If something goes wrong, please copy the text from the terminal or take a screenshot and send it to us. You can either
+create issues on [GitHub](https://github.com/GoodAI/charlie-mnemonic/issues) or email us
+at [charlie-mnemonic@goodai.com](mailto:charlie-mnemonic@goodai.com).

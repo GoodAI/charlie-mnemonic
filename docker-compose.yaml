@@ -1,19 +1,20 @@
 version: '3'
 services:
   charlie-mnemonic:
+    image: goodaidev/charlie-mnemonic:latest
     container_name: charlie-mnemonic
     hostname: charlie-mnemonic
     entrypoint: ["python", "launcher.py"]
     build:
       context: .
       dockerfile: Dockerfile
-    image: charlie-mnemonic:v1
     environment:
       - DEPLOY_ENV=local
       - HOST=0.0.0.0
       - PORT=8002
     ports:
       - 8002:8002
+    restart: unless-stopped
     volumes:
       - ./data/user:/app/users
     env_file:

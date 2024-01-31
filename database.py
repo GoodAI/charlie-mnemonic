@@ -284,16 +284,6 @@ class Database:
         self.cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
         return self.cursor.fetchone()
 
-    def add_user(self, username, password, session_token, role="user"):
-        self.cursor.execute(
-            """
-        INSERT INTO users (username, password, session_token, role) 
-        VALUES (%s, %s, %s, %s)
-        """,
-            (username, password, session_token, role),
-        )
-        self.conn.commit()
-
     def update_user(self, user_id, access, role):
         if access == "true":
             access = True
@@ -307,10 +297,6 @@ class Database:
         """,
             (access, role, user_id),
         )
-        self.conn.commit()
-
-    def delete_user(self, username):
-        self.cursor.execute("DELETE FROM users WHERE username = %s", (username,))
         self.conn.commit()
 
     def get_admin_controls(self):

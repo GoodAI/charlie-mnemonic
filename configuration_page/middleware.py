@@ -1,5 +1,3 @@
-import os
-
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Match
@@ -80,7 +78,7 @@ class LoginAdminMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         if new_session_token:
-            from routes import set_login_cookies
+            from user_management.routes import set_login_cookies
 
             set_login_cookies(new_session_token, username, response)
 

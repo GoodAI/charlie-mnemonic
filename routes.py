@@ -1,13 +1,17 @@
-from datetime import datetime, timedelta, timezone
 import json
 import os
+import shutil
 import signal
-from json import JSONDecodeError
+import tempfile
+import urllib.parse
+import zipfile
+from datetime import datetime, timedelta, timezone
+from typing import Optional
 
+import logs
 from fastapi import (
     APIRouter,
     HTTPException,
-    BackgroundTasks,
     File,
     Request,
     UploadFile,
@@ -23,15 +27,33 @@ from fastapi.responses import (
     Response,
     JSONResponse,
 )
+from fastapi.security import HTTPBearer
+from fastapi.security.api_key import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.security.api_key import APIKeyCookie
-import urllib.parse
+from google.auth.transport import requests
+from google.oauth2 import id_token
 from unidecode import unidecode
 
-from configuration_page import modify_settings
-from configuration_page.middleware import login_user_request
+from authentication import Authentication
+from classes import (
+    RecentMessages,
+    User,
+    UserCheckToken,
+    UserName,
+    editSettings,
+    userMessage,
+    noTokenMessage,
+    UserGoogle,
+    generateAudioMessage,
+)
+from database import Database
+from memory import (
+    export_memory_to_file,
+    import_file_to_memory,
+    wipe_all_memories,
+    stop_database,
+)
 from simple_utils import get_root
 from utils import (
     process_message,
@@ -42,49 +64,15 @@ from utils import (
     BrainProcessor,
     MessageParser,
 )
-from authentication import Authentication
-from classes import (
-    LoginUser,
-    RecentMessages,
-    User,
-    UserCheckToken,
-    UserName,
-    editSettings,
-    userMessage,
-    noTokenMessage,
-    UserGoogle,
-    generateAudioMessage,
-    ConfigurationData,
-)
-import shutil
-from database import Database
-from memory import (
-    export_memory_to_file,
-    import_file_to_memory,
-    wipe_all_memories,
-    stop_database,
-)
-import tempfile
-import zipfile
-import logs
-from typing import Optional
-from jose import jwt
-from jose.exceptions import JWTError
-from google.oauth2 import id_token
-from google.auth.transport import requests
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, CONFIGURATION_URL, LOGIN_REQUIRED
+from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION, origins
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
 
 connections = {}
-
-PRODUCTION = os.environ["PRODUCTION"]
-
-ORIGINS = os.environ["ORIGINS"]
 
 users_dir = "users"
 
@@ -251,7 +239,7 @@ async def register(user: User, response: Response):
     session_token = auth.register(user.username, user.password, user.display_name)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION == "true":
+        if PRODUCTION:
             response.set_cookie(
                 key="session_token",
                 value=session_token,
@@ -259,7 +247,7 @@ async def register(user: User, response: Response):
                 httponly=False,
                 samesite="None",
                 expires=expiracy_date,
-                domain=ORIGINS,
+                domain=origins(),
             )
             response.set_cookie(
                 key="username",
@@ -268,7 +256,7 @@ async def register(user: User, response: Response):
                 httponly=False,
                 samesite="None",
                 expires=expiracy_date,
-                domain=ORIGINS,
+                domain=origins(),
             )
         else:
             response.set_cookie(
@@ -293,92 +281,6 @@ async def register(user: User, response: Response):
         }
     else:
         raise HTTPException(status_code=400, detail="User registration failed")
-
-
-# login route
-@router.post(
-    "/login/",
-    tags=["Authentication"],
-    summary="Login a user",
-    description="This endpoint allows you to login a user by providing a username and password. If the login is successful, a session token and username will be set in cookies which expire after 90 days. The cookies' secure attribute is set to True, httponly is set to False, and samesite is set to 'None'. If the login fails, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the user is logged in successfully, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User logged in successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User logged in successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "User login failed",
-            "content": {
-                "application/json": {"example": {"detail": "User login failed"}}
-            },
-        },
-    },
-)
-async def login(request: Request, user: LoginUser, response: Response):
-    auth = Authentication()
-    session_token = auth.login(user.username, user.password)
-    if session_token:
-        set_login_cookies(session_token, user.username, response)
-        login_user_request(session_token, user.username, request)
-        return {"message": "User logged in successfully"}
-    else:
-        raise HTTPException(status_code=401, detail="User login failed")
-
-
-def set_login_cookies(
-    session_token: str, username: str, response: Response, duration_days: int = 90
-) -> None:
-    expiracy_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
-    cookie_params = {
-        "secure": True,
-        "httponly": False,
-        "samesite": "None",
-        "expires": expiracy_date,
-    }
-
-    if PRODUCTION == "true":
-        cookie_params["domain"] = ORIGINS
-
-    response.set_cookie(key="session_token", value=session_token, **cookie_params)
-    response.set_cookie(key="username", value=username, **cookie_params)
-
-
-# logout route
-@router.post(
-    "/logout/",
-    tags=["Authentication"],
-    summary="Logout a user",
-    description="This endpoint allows you to logout a user by providing a username and session token. If the logout is successful, the session token and username cookies will be deleted. If the logout fails, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the user is logged out successfully, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User logged out successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User logged out successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "User logout failed",
-            "content": {
-                "application/json": {"example": {"detail": "User logout failed"}}
-            },
-        },
-    },
-)
-async def logout(user: UserCheckToken):
-    auth = Authentication()
-    success = auth.logout(user.username, user.session_token)
-    if success:
-        return {"message": "User logged out successfully"}
-    else:
-        raise HTTPException(status_code=401, detail="User logout failed")
 
 
 # check token route
@@ -1321,33 +1223,6 @@ async def get_user_profile(
         )
 
 
-@router.get(CONFIGURATION_URL, response_class=HTMLResponse)
-async def configuration(request: Request):
-    # TODO: security check for login
-    version = SettingsManager.get_version()
-    with Database() as db:
-        daily_limit = db.get_daily_limit()
-        maintenance_mode = db.get_maintenance_mode()
-
-    config = ConfigurationData.for_frontend()
-
-    return templates.TemplateResponse(
-        "configuration.html",
-        context=locals(),
-    )
-
-
-@router.post(CONFIGURATION_URL, response_class=JSONResponse)
-async def update_configuration(config_data: ConfigurationData):
-    # TODO: security check for login
-    try:
-        filtered = {k: v for k, v in config_data.dict().items() if v is not None}
-        modify_settings(filtered)
-        return {"message": "Configuration updated successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
 @router.get("/data/{file_path:path}")
 async def read_file(file_path: str, username: str = Depends(get_current_username)):
     converted_name = convert_name(username)
@@ -1420,7 +1295,7 @@ async def google_login(request: UserGoogle, response: Response):
     session_token = auth.google_login(id_info)
     if session_token:
         expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION == "true":
+        if PRODUCTION:
             response.set_cookie(
                 key="session_token",
                 value=session_token,
@@ -1428,7 +1303,7 @@ async def google_login(request: UserGoogle, response: Response):
                 httponly=False,
                 samesite="None",
                 expires=expiracy_date,
-                domain=ORIGINS,
+                domain=origins(),
             )
             response.set_cookie(
                 key="username",
@@ -1437,7 +1312,7 @@ async def google_login(request: UserGoogle, response: Response):
                 httponly=False,
                 samesite="None",
                 expires=expiracy_date,
-                domain=ORIGINS,
+                domain=origins(),
             )
         else:
             response.set_cookie(

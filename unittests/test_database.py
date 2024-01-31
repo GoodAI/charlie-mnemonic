@@ -127,15 +127,6 @@ class TestDatabase(unittest.TestCase):
         self.assertIsNotNone(row)
         self.assertEqual(row[4], "admin")
 
-    def test_delete_user(self):
-        self.db.open()
-        self.truncate_tables()
-        self.db.add_user("test_user", "test_password", "test_session_token")
-        self.db.delete_user("test_user")
-        self.db.cursor.execute("SELECT * FROM users WHERE username = 'test_user'")
-        row = self.db.cursor.fetchone()
-        self.assertIsNone(row)
-
     def test_get_admin_controls(self):
         self.db.open()
         self.db.cursor.execute("DELETE FROM admin_controls")

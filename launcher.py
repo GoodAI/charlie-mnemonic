@@ -1,19 +1,42 @@
-import argparse
 import os
+from typing import List, Type
 
-import uvicorn
+from fastapi import FastAPI, APIRouter
+from starlette.middleware.base import BaseHTTPMiddleware
 
-from configuration_page.middleware import LoginRequiredCheckMiddleware
+from config import origins
 
 
-def create_app():
+def default_middleware() -> List[Type[BaseHTTPMiddleware]]:
+    from configuration_page.middleware import LoginAdminMiddleware
+    from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
+    from configuration_page.middleware import LoginRequiredCheckMiddleware
+
+    result = [RedirectToConfigurationMiddleware, LoginRequiredCheckMiddleware]
+
+    from configuration_page.settings_util import is_single_user
+
+    if is_single_user():
+        result.append(LoginAdminMiddleware)
+    return result
+
+
+def default_routers() -> List[APIRouter]:
+    from configuration_page.routes import router as configuration_router
+    from routes import router
+    from user_management.routes import router as user_management_router
+
+    return [user_management_router, configuration_router, router]
+
+
+def create_app(
+    middlewares: List[BaseHTTPMiddleware] = None, routers: List[APIRouter] = None
+) -> FastAPI:
     from configuration_page import reload_configuration
 
     reload_configuration()
-    from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     import os
-    from routes import router
     import nltk
     import logs
     import utils
@@ -36,11 +59,9 @@ def create_app():
         version=version,
     )
 
-    origins = os.environ["ORIGINS"]
-
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=origins,
+        allow_origins=origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -50,22 +71,18 @@ def create_app():
     def shutdown_event():
         logs.Log("main", "main.log").get_logger().debug("Shutting down server")
 
-    app.include_router(router)
-    from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
+    for router in routers or default_routers():
+        app.include_router(router)
 
-    app.add_middleware(RedirectToConfigurationMiddleware)
-    app.add_middleware(LoginRequiredCheckMiddleware)
+    for middleware_class in middlewares or default_middleware():
+        app.add_middleware(middleware_class)
 
-    from configuration_page.settings_util import is_single_user
-
-    if is_single_user():
-        from configuration_page.middleware import LoginAdminMiddleware
-
-        app.add_middleware(LoginAdminMiddleware)
     return app
 
 
-def create_parser() -> argparse.ArgumentParser:
+def create_parser():
+    import argparse
+
     arg_parser = argparse.ArgumentParser(description="Run web server")
     arg_parser.add_argument(
         "--host",
@@ -83,6 +100,8 @@ def create_parser() -> argparse.ArgumentParser:
 
 
 if __name__ == "__main__":
+    import uvicorn
+
     parser = create_parser()
     args = parser.parse_args()
     app = create_app()

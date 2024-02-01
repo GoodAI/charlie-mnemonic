@@ -92,24 +92,10 @@ def test_load_settings():
     assert response.json() is not None
 
 
-def test_allow_user_access():
-    with Database() as db:
-        user_id = db.get_user_id("testuser")
-        db.update_user(user_id, "true", "admin")
-        role = db.get_user_role("testuser")
-        has_access = db.get_user_access("testuser")
-    assert role[0] == "admin"
-    assert has_access == True
-
-
-def test_edit_settings():
-    assert True == True
-
-
 def test_send_message_valid_token():
     global test_session_token
     message = userMessage(
-        username="testuser", prompt="Hello, AI!", display_name="Test User"
+        username="testuser", prompt="Hello, AI!", display_name="Test User", chat_id="1"
     )
     client.cookies.update({"session_token": test_session_token})
     response = client.post("/message/", json=message.dict())
@@ -175,7 +161,12 @@ def test_get_recent_messages_invalid_token():
     client.cookies.update({"session_token": "invalid_token"})
     response = client.post("/get_recent_messages/", json=message.dict())
     # check the response
-    assert response.status_code == 401
+    assert (
+        response.status_code == 401
+    ), f"""
+Expected status code to be 401, but got {response.status_code}
+Json: {response.json()}
+"""
     assert "detail" in response.json()
     assert response.json()["detail"] == "Token is invalid"
 
@@ -196,8 +187,7 @@ def test_delete_user():
     auth = Authentication()
     auth.delete_user("testuser")
     # check that user doesn't exist
-    with Database() as db:
-        user_id = db.get_user_id("testuser")
+    user_id = auth.dao.get_user_id("testuser")
     assert user_id is None
 
 

@@ -8,9 +8,7 @@ from launcher import create_app
 
 @pytest.fixture
 def client():
-    os.environ[
-        "DATABASE_URL"
-    ] = "postgres://postgres:postgres@localhost:5432/postgres"
+    os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
     if os.path.exists("test.db"):
         os.remove("test.db")
     os.environ["NEW_DATABASE_URL"] = "sqlite:///test.db?cache=shared"

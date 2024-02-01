@@ -103,6 +103,8 @@ def set_login_cookies(
 async def logout(request: Request):
     auth = Authentication()
     success = auth.logout(request.state.user.username)
+    request.cookies["session_token"] = ""
+    request.cookies["username"] = ""
     if success:
         return {"message": "User logged out successfully"}
     else:

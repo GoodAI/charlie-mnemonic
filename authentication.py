@@ -13,10 +13,9 @@ from user_management.dao import UsersDAO
 logger = logs.Log("authentication", "authentication.log").get_logger()
 
 
-
 class Authentication:
     def __init__(self):
-        self.dao = UsersDAO(database_url=new_database_url())
+        self.dao = UsersDAO()
 
     def register(self, username: str, password: str, display_name: str) -> str:
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())

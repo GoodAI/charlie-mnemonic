@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -11,9 +12,9 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def dao_session():
-    db_url = "sqlite:///:memory:?mode=memory&cache=shared"
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///:memory:?mode=memory&cache=shared"
 
-    dao = UsersDAO(db_url)
+    dao = UsersDAO()
     dao.create_tables()
 
     yield dao
@@ -163,14 +164,11 @@ def test_get_user_profile(dao_session):
 
 
 def test_allow_user_access(dao_session):
-    # Assuming there is already a user with username 'testuser' in the database
-    # If not, create one here
     test_username = "testuser"
-    test_password = "testpassword"  # Make sure to hash the password if your DAO expects it
+    test_password = "testpassword"
     test_display_name = "Test User"
     dao_session.add_user(test_username, test_password, "token", test_display_name)
 
-    # Fetch the user_id for 'testuser'
     user_id = dao_session.get_user_id(test_username)
     assert user_id is not None, "Test user should exist"
 
@@ -195,11 +193,11 @@ def test_update_display_name(dao_session):
     success = dao_session.update_display_name(test_username, new_display_name)
     assert success, "Update should be successful"
 
-    # Verify the update
     updated_user = dao_session.get_user(test_username)
-    assert updated_user.display_name == new_display_name, "Display name should be updated"
+    assert (
+        updated_user.display_name == new_display_name
+    ), "Display name should be updated"
 
-    # Test updating a non-existent user
     non_existent_update = dao_session.update_display_name("nonexistentuser", "Name")
     assert not non_existent_update, "Update should fail for non-existent user"
 
@@ -234,10 +232,8 @@ def test_get_user_profile(dao_session):
     profile = json.loads(profile_json)
 
     # Assertions to ensure the profile contains expected data
-    assert profile['username'] == test_username
-    assert profile['display_name'] == test_display_name
-    # Add more assertions as needed for other fields
+    assert profile["username"] == test_username
+    assert profile["display_name"] == test_display_name
 
-    # Test for a non-existent user
     non_existent_profile = dao_session.get_user_profile("nonexistentuser")
     assert non_existent_profile == json.dumps({})

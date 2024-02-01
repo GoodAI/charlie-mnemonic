@@ -36,6 +36,7 @@ from google.oauth2 import id_token
 from unidecode import unidecode
 
 from authentication import Authentication
+from chat_tabs.dao import ChatTabsDAO
 from classes import (
     RecentMessages,
     User,
@@ -347,12 +348,12 @@ async def handle_get_settings(request: Request, user: UserName):
     logger.debug(f"Loaded settings for user {user.username}")
     logger.debug(settings)
     total_tokens_used, total_cost = 0, 0
-    with Database() as db:
+    with Database() as db, UsersDAO() as dao:
         total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             user.username, True
         )
-        display_name = db.get_display_name(user.username)
+        display_name = dao.get_display_name(user.username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -487,28 +488,28 @@ async def handle_message(request: Request, message: userMessage):
         total_daily_cost,
         display_name,
     ) = (0, 0, 0, 0, 0, "")
-    with Database() as db, UsersDAO() as dao:
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
         total_tokens_used, total_cost = db.get_token_usage(message.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             message.username, True
         )
         display_name = dao.get_display_name(message.username)
         daily_limit = db.get_daily_limit()
-        has_access = db.get_user_access(message.username)
-        user_id = dao.get_user_id(message.username)[0]
-        tab_data = db.get_tab_data(user_id)
-        active_tab_data = db.get_active_tab_data(user_id)
+        has_access = dao.get_user_access(message.username)
+        user_id = dao.get_user_id(message.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
             message.chat_id = "0"
             # put the data in the database
-            db.insert_tab_data(
+            chat_tabs_dao.insert_tab_data(
                 user_id, message.chat_id, "new chat", message.chat_id, True
             )
         # if there is an active tab, set chat_id to the active tab's chat_id
         else:
-            db.update_created_at(user_id, message.chat_id)
-            message.chat_id = active_tab_data["chat_id"]
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+            message.chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {message.username} does not have access")
         raise HTTPException(
@@ -602,55 +603,40 @@ async def handle_message_image(
     )
 
 
-@router.post("/get_chat_tabs/", tags=[LOGIN_REQUIRED])
-async def get_chat_tabs(request: Request, user: UserName):
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        tab_data = db.get_tab_data(user_id) or []
-        active_tab_data = db.get_active_tab_data(user_id) or {}
-        processed_tab_data = [tab for tab in tab_data if tab["is_enabled"]]
-        if active_tab_data is None:
-            active_tab_data = {}
-        return {
-            "tab_data": processed_tab_data,
-            "active_tab_data": active_tab_data,
-        }
-
-
 @router.post("/delete_chat_tab/", tags=[LOGIN_REQUIRED])
 async def delete_chat_tab(request: Request, user: RecentMessages):
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.disable_tab(user_id, user.chat_id)
+    with UsersDAO() as user_dao, ChatTabsDAO() as chat_tabs_dao:
+        user_id = user_dao.get_user_id(user.username)
+        chat_tabs_dao.disable_tab(user_id, user.chat_id)
         return {"message": "Tab deleted successfully"}
 
 
 @router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
 async def get_recent_messages(request: Request, message: RecentMessages):
-    with Database() as db, UsersDAO() as dao:
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
         has_access = dao.get_user_access(message.username)
         user_id = dao.get_user_id(message.username)
-        tab_data = db.get_tab_data(user_id)
-        active_tab_data = db.get_active_tab_data(user_id) or {}
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id) or {}
 
         # check if the db has a row with message.chat_id
         tab_exists = False
         for tab in tab_data:
-            if tab["chat_id"] == message.chat_id:
+            if tab.chat_id == message.chat_id:
                 tab_exists = True
                 break
         if not tab_exists:
             # if not, insert a new row
-            db.insert_tab_data(
+            chat_tabs_dao.insert_tab_data(
                 user_id,
                 message.chat_id,
                 f"New Chat",
                 message.chat_id,
                 False,
             )
-        if message.chat_id != active_tab_data.get("chat_id"):
-            db.set_active_tab(user_id, message.chat_id)
-        active_tab_data = db.get_active_tab_data(user_id)
+        if message.chat_id != active_tab_data.chat_id:
+            chat_tabs_dao.set_active_tab(user_id, message.chat_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
 
         recent_messages = await MessageParser.get_recent_messages(
             message.username, message.chat_id

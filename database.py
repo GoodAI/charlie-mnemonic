@@ -9,6 +9,7 @@ import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 
+from chat_tabs.dao import ChatTabsDAO
 from configuration_page.settings_util import is_single_user
 
 logger = logs.Log("database", "database.log").get_logger()
@@ -25,6 +26,10 @@ class Database:
         if getattr(sys, "frozen", False):
             # If the application is frozen (bundled)
             sys.path.append(os.path.join(sys._MEIPASS, "migrations"))
+        from user_management.dao import UsersDAO
+
+        self.users_dao = UsersDAO()
+        self.chat_tabs_dao = ChatTabsDAO()
 
     def open(self):
         if self.PRODUCTION == "false":
@@ -119,126 +124,10 @@ class Database:
         self.create_table()
         self.create_migrations_table()
         self.migrate_table()
-        from user_management.dao import UsersDAO
-        with UsersDAO() as dao:
-            dao.create_tables()
-            dao.create_default_user()
+        self.users_dao.create_tables()
+        self.chat_tabs_dao.create_tables()
+        self.users_dao.create_default_user()
         self.close()
-
-    def get_tab_data(self, user_id):
-        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute(
-            "SELECT * FROM chat_tabs WHERE user_id = %s ORDER BY id", (user_id,)
-        )
-        rows = dict_cursor.fetchall()
-        return rows
-
-    def get_tab_count(self, user_id):
-        self.cursor.execute(
-            "SELECT COUNT(*) FROM chat_tabs WHERE user_id = %s", (user_id,)
-        )
-        return self.cursor.fetchone()[0]
-
-    def get_tab_description(self, tab_id):
-        self.cursor.execute(
-            "SELECT chat_name FROM chat_tabs WHERE tab_id = %s", (tab_id,)
-        )
-        return self.cursor.fetchone()[0]
-
-    def get_active_tab_data(self, user_id):
-        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute(
-            "SELECT * FROM chat_tabs WHERE user_id = %s AND is_active = true LIMIT 1",
-            (user_id,),
-        )
-        row = dict_cursor.fetchone()
-        return row
-
-    def update_created_at(self, user_id, chat_id):
-        now = datetime.datetime.now()
-        self.cursor.execute(
-            """
-            UPDATE chat_tabs
-            SET created_at = %s
-            WHERE user_id = %s AND chat_id = %s
-        """,
-            (now, user_id, chat_id),
-        )
-        self.conn.commit()
-
-    def insert_tab_data(self, user_id, chat_id, chat_name, tab_id, is_active):
-        self.cursor.execute(
-            """
-        INSERT INTO chat_tabs (user_id, chat_id, chat_name, tab_id, is_active) 
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-            (user_id, chat_id, chat_name, tab_id, is_active),
-        )
-        self.conn.commit()
-
-    def update_tab_data(self, user_id, chat_name, tab_id, is_active):
-        self.cursor.execute(
-            """
-            UPDATE chat_tabs
-            SET chat_name = %s, tab_id = %s, is_active = %s
-            WHERE user_id = %s
-        """,
-            (chat_name, tab_id, is_active, user_id),
-        )
-        self.conn.commit()
-
-    def update_tab_description(self, tab_id, chat_name):
-        self.cursor.execute(
-            """
-            UPDATE chat_tabs
-            SET chat_name = %s
-            WHERE tab_id = %s
-        """,
-            (chat_name, tab_id),
-        )
-        self.conn.commit()
-
-    def set_active_tab(self, user_id, tab_id):
-        # Convert user_id and tab_id to integers if they are not already
-        try:
-            # set the active tab to false for all other tabs except
-            self.cursor.execute(
-                """
-                UPDATE chat_tabs
-                SET is_active = false
-                WHERE user_id = %s AND chat_id != %s
-                """,
-                (user_id, tab_id),
-            )
-            self.conn.commit()
-
-            # set the active tab to true for the given tab_id
-            self.cursor.execute(
-                """
-                UPDATE chat_tabs
-                SET is_active = true, is_enabled = true
-                WHERE user_id = %s AND chat_id = %s
-                """,
-                (user_id, tab_id),
-            )
-            self.conn.commit()
-        except Exception as e:
-            logger.error(e)
-
-    def delete_tab_data(self, user_id):
-        self.cursor.execute("DELETE FROM chat_tabs WHERE user_id = %s", (user_id,))
-        self.conn.commit()
-
-    def disable_tab(self, user_id, tab_id):
-        self.cursor.execute(
-            """
-            UPDATE chat_tabs
-            SET is_enabled = false
-            WHERE user_id = %s AND chat_id = %s
-        """,
-            (user_id, tab_id),
-        )
-        self.conn.commit()
 
     def get_admin_controls(self):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
@@ -332,7 +221,7 @@ class Database:
 
         returns: a dictionary containing the statistic
         """
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
         dict_cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         dict_cursor.execute("SELECT * FROM statistics WHERE user_id = %s", (user_id,))
         return dict_cursor.fetchone()
@@ -351,7 +240,7 @@ class Database:
         Example usage:\n
         db.update_statistic(user_id, amount_of_messages=10, total_tokens_used=200)
         """
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
         set_clause = ", ".join([f"{k} = %s" for k in kwargs.keys()])
         query = f"UPDATE statistics SET {set_clause} WHERE user_id = %s"
         params = (*kwargs.values(), user_id)
@@ -387,7 +276,7 @@ class Database:
         db.get_daily_stats(username)['average_response_time']
         """
 
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
         dict_cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         # get the current date
         current_date = datetime.datetime.now().date()
@@ -434,7 +323,7 @@ class Database:
         "addons_used"
         """
         # get the user_id for the given username
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # get the current timestamp
         current_timestamp = datetime.datetime.now()
@@ -496,7 +385,7 @@ class Database:
         "addons_used"
         """
         # get the user_id for the given username
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # get the current timestamp
         current_timestamp = datetime.datetime.now()
@@ -583,7 +472,7 @@ class Database:
         Returns: total_tokens_used, prompt_tokens, completion_tokens
         """
         # get the user_id for the given username=
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # update or insert the token usage in the statistics table
         set_clause = ", ".join([f"{k} = statistics.{k} + %s" for k in kwargs.keys()])
@@ -612,7 +501,7 @@ class Database:
         returns: a dictionary containing the token usage
         """
         # get the user_id for the given username
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # get the token usage
         if daily:
@@ -659,7 +548,7 @@ class Database:
     def update_message_count(self, username):
         """Update the message count for the given username."""
         # get the user_id for the given username
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # get the current timestamp
         current_timestamp = datetime.datetime.now()
@@ -715,7 +604,7 @@ class Database:
     def add_voice_usage(self, username, text_lenght):
         """Add the voice usage for the given username to the statistics table."""
         # get the user_id for the given username
-        user_id = self.get_user(username)[0]
+        user_id = self.users_dao.get_user_id(username)
 
         # 0.30$ per 1000 characters
         voice_usage = round(text_lenght * 0.30 / 1000, 5)

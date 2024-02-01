@@ -25,8 +25,9 @@ def default_routers() -> List[APIRouter]:
     from configuration_page.routes import router as configuration_router
     from routes import router
     from user_management.routes import router as user_management_router
+    from chat_tabs.routes import router as chat_tabs_router
 
-    return [user_management_router, configuration_router, router]
+    return [user_management_router, chat_tabs_router, configuration_router, router]
 
 
 def create_app(
@@ -71,10 +72,13 @@ def create_app(
     def shutdown_event():
         logs.Log("main", "main.log").get_logger().debug("Shutting down server")
 
+    if middlewares is None:
+        middlewares = default_middleware()
+
     for router in routers or default_routers():
         app.include_router(router)
 
-    for middleware_class in middlewares or default_middleware():
+    for middleware_class in middlewares:
         app.add_middleware(middleware_class)
 
     return app

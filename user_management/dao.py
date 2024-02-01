@@ -2,21 +2,19 @@ import json
 import math
 from typing import Optional
 
-from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session
 
-from config import new_database_url
-from simple_utils import SingletonMeta
 from user_management.models import Users
 
 
-class UsersDAO(metaclass=SingletonMeta):
-    def __init__(self, database_url: str = None):
+class UsersDAO:
+    def __init__(self):
+        from user_management.session import engine
 
-        engine = create_engine(database_url or new_database_url())
         self.engine = engine
-        SessionLocal = sessionmaker(bind=engine)
+        from user_management.session import SessionLocal
+
         self.session: Session = SessionLocal()
 
     def __enter__(self):
@@ -38,7 +36,11 @@ class UsersDAO(metaclass=SingletonMeta):
         user_count = self.get_user_count()
         if user_count > 0:
             return
-        from config import SINGLE_USER_USERNAME, SINGLE_USER_DISPLAY_NAME, SINGLE_USER_PASSWORD
+        from config import (
+            SINGLE_USER_USERNAME,
+            SINGLE_USER_DISPLAY_NAME,
+            SINGLE_USER_PASSWORD,
+        )
         from authentication import Authentication
 
         Authentication().register(
@@ -54,17 +56,16 @@ class UsersDAO(metaclass=SingletonMeta):
         )
 
     def update_user(self, user_id: int, access: bool, role: str) -> None:
-        self.session.query(Users).filter(Users.id == user_id).update({
-            Users.has_access: access,
-            Users.role: role
-        })
+        self.session.query(Users).filter(Users.id == user_id).update(
+            {Users.has_access: access, Users.role: role}
+        )
 
     def get_password_by_username(self, username: str) -> str:
         user = self.session.query(Users).filter_by(username=username).first()
         return user.password if user else None
 
     def add_user(
-            self, username: str, password: str, session_token: str, display_name: str
+        self, username: str, password: str, session_token: str, display_name: str
     ) -> None:
         new_user = Users(
             username=username,
@@ -94,12 +95,12 @@ class UsersDAO(metaclass=SingletonMeta):
         self.session.commit()
 
     def add_or_update_google_user(
-            self,
-            google_id: str,
-            username: str,
-            hashed_password: str,
-            session_token: str,
-            display_name: str,
+        self,
+        google_id: str,
+        username: str,
+        hashed_password: str,
+        session_token: str,
+        display_name: str,
     ) -> None:
         user = (
             self.session.query(Users)

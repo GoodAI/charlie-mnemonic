@@ -4,17 +4,26 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 from sqlalchemy.orm import sessionmaker, Session
 
-from user_management.models import Users, Base
+from simple_utils import SingletonMeta
+from user_management.models import Users
 
 
-class UsersDAO:
-    def __init__(self, database_url: str, create_all: bool = False):
+class UsersDAO(metaclass=SingletonMeta):
+    def __init__(self, database_url: str):
         engine = create_engine(database_url)
-        if create_all:
-            Base.metadata.create_all(engine)
+        self.engine = engine
         SessionLocal = sessionmaker(bind=engine)
         self.session: Session = SessionLocal()
-        self.engine = engine
+
+
+    def create_tables(self):
+        Users.metadata.create_all(self.engine)
+
+    def drop_tables(self):
+        Users.metadata.drop_all(self.engine)
+
+    def get_user_count(self) -> int:
+        return self.session.query(Users).count()
 
     def get_password_by_username(self, username: str) -> str:
         user = self.session.query(Users).filter_by(username=username).first()

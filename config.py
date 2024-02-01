@@ -41,3 +41,9 @@ PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
 
 def origins():
     return os.environ["ORIGINS"]
+
+def database_url():
+    return os.environ["DATABASE_URL"]
+
+def new_database_url():
+    return os.environ["NEW_DATABASE_URL"]

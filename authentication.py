@@ -7,16 +7,16 @@ import logs
 from fastapi import HTTPException
 from unidecode import unidecode
 
+from config import new_database_url
 from user_management.dao import UsersDAO
 
 logger = logs.Log("authentication", "authentication.log").get_logger()
 
-DATABASE_URL = os.environ["DATABASE_URL"]
 
 
 class Authentication:
     def __init__(self):
-        self.dao = UsersDAO(DATABASE_URL)
+        self.dao = UsersDAO(database_url=new_database_url())
 
     def register(self, username: str, password: str, display_name: str) -> str:
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
@@ -31,7 +31,7 @@ class Authentication:
         except Exception as e:
             raise HTTPException(
                 status_code=400, detail="Email already exists or other database error."
-            )
+            ) from e
 
     def delete_user(self, username: str) -> None:
         self.dao.delete_user_by_username(username)

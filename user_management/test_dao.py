@@ -11,14 +11,14 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def dao_session():
-    db_url = "sqlite:///:memory:"
+    db_url = "sqlite:///:memory:?mode=memory&cache=shared"
 
-    dao = UsersDAO(db_url, True)
+    dao = UsersDAO(db_url)
+    dao.create_tables()
 
     yield dao
 
-    dao.close_session()
-    Base.metadata.drop_all(dao.engine)
+    dao.drop_tables()
 
 
 def test_add_user(dao_session):

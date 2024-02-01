@@ -1,6 +1,7 @@
 import os
-from fastapi.testclient import TestClient
+
 import pytest
+from fastapi.testclient import TestClient
 
 from launcher import create_app
 
@@ -9,7 +10,10 @@ from launcher import create_app
 def client():
     os.environ[
         "DATABASE_URL"
-    ] = "postgresql://postgres:postgres@localhost:5432/postgres"
+    ] = "postgres://postgres:postgres@localhost:5432/postgres"
+    if os.path.exists("test.db"):
+        os.remove("test.db")
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///test.db?cache=shared"
     from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
     from configuration_page.middleware import LoginRequiredCheckMiddleware
     from user_management.routes import router as user_management_router
@@ -29,8 +33,9 @@ def authentication(client):
     return Authentication()
 
 
-def test_logout(client, authentication):
-    # authentication.register("testuser", "testpassword", "Test User")
+def test_logout(client: TestClient, authentication):
+    authentication.dao.create_tables()
+    authentication.register("testuser", "testpassword", "Test User")
 
     login_response = client.post(
         "/login/", json={"username": "testuser", "password": "testpassword"}

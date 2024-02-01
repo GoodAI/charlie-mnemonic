@@ -116,17 +116,6 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(row[3], "test_session_token")
         self.assertEqual(row[4], "user")
 
-    def test_update_user(self):
-        self.db.open()
-        self.truncate_tables()
-        self.db.add_user("test_user", "test_password", "test_session_token")
-        user_id = self.db.get_user_id("test_user")[0]
-        self.db.update_user(user_id, "true", "admin")
-        self.db.cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
-        row = self.db.cursor.fetchone()
-        self.assertIsNotNone(row)
-        self.assertEqual(row[4], "admin")
-
     def test_get_admin_controls(self):
         self.db.open()
         self.db.cursor.execute("DELETE FROM admin_controls")

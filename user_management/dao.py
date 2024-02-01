@@ -1,20 +1,29 @@
 import json
+import math
+from typing import Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 from sqlalchemy.orm import sessionmaker, Session
 
+from config import new_database_url
 from simple_utils import SingletonMeta
 from user_management.models import Users
 
 
 class UsersDAO(metaclass=SingletonMeta):
-    def __init__(self, database_url: str):
-        engine = create_engine(database_url)
+    def __init__(self, database_url: str = None):
+
+        engine = create_engine(database_url or new_database_url())
         self.engine = engine
         SessionLocal = sessionmaker(bind=engine)
         self.session: Session = SessionLocal()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close_session()
 
     def create_tables(self):
         Users.metadata.create_all(self.engine)
@@ -25,12 +34,37 @@ class UsersDAO(metaclass=SingletonMeta):
     def get_user_count(self) -> int:
         return self.session.query(Users).count()
 
+    def create_default_user(self):
+        user_count = self.get_user_count()
+        if user_count > 0:
+            return
+        from config import SINGLE_USER_USERNAME, SINGLE_USER_DISPLAY_NAME, SINGLE_USER_PASSWORD
+        from authentication import Authentication
+
+        Authentication().register(
+            username=SINGLE_USER_USERNAME,
+            password=SINGLE_USER_PASSWORD,
+            display_name=SINGLE_USER_DISPLAY_NAME,
+        )
+        user_id = self.get_user_id(SINGLE_USER_USERNAME)
+        self.update_user(
+            user_id=user_id,
+            access=True,
+            role="admin",
+        )
+
+    def update_user(self, user_id: int, access: bool, role: str) -> None:
+        self.session.query(Users).filter(Users.id == user_id).update({
+            Users.has_access: access,
+            Users.role: role
+        })
+
     def get_password_by_username(self, username: str) -> str:
         user = self.session.query(Users).filter_by(username=username).first()
         return user.password if user else None
 
     def add_user(
-        self, username: str, password: str, session_token: str, display_name: str
+            self, username: str, password: str, session_token: str, display_name: str
     ) -> None:
         new_user = Users(
             username=username,
@@ -60,12 +94,12 @@ class UsersDAO(metaclass=SingletonMeta):
         self.session.commit()
 
     def add_or_update_google_user(
-        self,
-        google_id: str,
-        username: str,
-        hashed_password: str,
-        session_token: str,
-        display_name: str,
+            self,
+            google_id: str,
+            username: str,
+            hashed_password: str,
+            session_token: str,
+            display_name: str,
     ) -> None:
         user = (
             self.session.query(Users)
@@ -130,3 +164,36 @@ class UsersDAO(metaclass=SingletonMeta):
             return json.dumps(user_dict, default=str)
         except NoResultFound:
             return json.dumps({})
+
+    def get_user(self, username: str):
+        return self.session.query(Users).filter(Users.username == username).first()
+
+    def update_display_name(self, username: str, display_name: str) -> bool:
+        user = self.session.query(Users).filter(Users.username == username).first()
+        if user:
+            user.display_name = display_name
+            self.session.commit()
+            return True
+        return False
+
+    def get_total_statistics_pages(self, items_per_page: int) -> int:
+        total_items = self.get_user_count()
+        return math.ceil(total_items / float(items_per_page))
+
+    def get_display_name(self, username: str) -> Optional[str]:
+        user = self.get_user(username)
+        if user:
+            return user.display_name
+        return None
+
+    def get_user_access(self, username):
+        user = self.get_user(username)
+        if user:
+            return user.has_access
+        return None
+
+    def get_user_role(self, username):
+        user = self.get_user(username)
+        if user:
+            return user.role
+        return None

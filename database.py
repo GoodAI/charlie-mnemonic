@@ -1,16 +1,14 @@
 import datetime
+import importlib
 import json
+import os
 import sys
 
+import logs
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
-import os
-import importlib
-import logs
-import math
 
-from config import SINGLE_USER_USERNAME, SINGLE_USER_DISPLAY_NAME, SINGLE_USER_PASSWORD
 from configuration_page.settings_util import is_single_user
 
 logger = logs.Log("database", "database.log").get_logger()
@@ -121,45 +119,11 @@ class Database:
         self.create_table()
         self.create_migrations_table()
         self.migrate_table()
-        if self.single_user:
-            self.create_default_user()
+        from user_management.dao import UsersDAO
+        with UsersDAO() as dao:
+            dao.create_tables()
+            dao.create_default_user()
         self.close()
-
-    def get_user_count(self):
-        self.cursor.execute("SELECT COUNT(*) FROM users")
-        return self.cursor.fetchone()[0]
-
-    def create_default_user(self):
-        user_count = self.get_user_count()
-        if user_count > 0:
-            return
-        from authentication import Authentication
-
-        Authentication().register(
-            username=SINGLE_USER_USERNAME,
-            password=SINGLE_USER_PASSWORD,
-            display_name=SINGLE_USER_DISPLAY_NAME,
-        )
-        user_id = self.get_user_id(SINGLE_USER_USERNAME)
-        self.update_user(
-            user_id=user_id,
-            access="true",
-            role="admin",
-        )
-
-    def get_user(self, username):
-        self.cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-        return self.cursor.fetchone()
-
-    def get_user_role(self, username):
-        self.cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
-        return self.cursor.fetchone()
-
-    def get_user_access(self, username):
-        self.cursor.execute(
-            "SELECT has_access FROM users WHERE username = %s", (username,)
-        )
-        return self.cursor.fetchone()[0]
 
     def get_tab_data(self, user_id):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
@@ -276,29 +240,6 @@ class Database:
         )
         self.conn.commit()
 
-    def get_username(self, user_id):
-        self.cursor.execute("SELECT username FROM users WHERE id = %s", (user_id,))
-        return self.cursor.fetchone()
-
-    def get_user_id(self, username):
-        self.cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
-        return self.cursor.fetchone()
-
-    def update_user(self, user_id, access, role):
-        if access == "true":
-            access = True
-        else:
-            access = False
-        self.cursor.execute(
-            """
-            UPDATE users
-            SET has_access = %s, role = %s
-            WHERE id = %s
-        """,
-            (access, role, user_id),
-        )
-        self.conn.commit()
-
     def get_admin_controls(self):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         dict_cursor.execute("SELECT * FROM admin_controls")
@@ -369,12 +310,6 @@ class Database:
         rows = dict_cursor.fetchall()
         return json.dumps(rows, default=str)
 
-    def get_user_profile(self, username):
-        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
-        row = dict_cursor.fetchone()
-        return json.dumps(row, default=str)
-
     def get_statistics(self, page, items_per_page):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
         offset = (page - 1) * items_per_page
@@ -390,11 +325,6 @@ class Database:
         )
         rows = dict_cursor.fetchall()
         return json.dumps(rows, default=str)
-
-    def get_total_statistics_pages(self, items_per_page):
-        self.cursor.execute("SELECT COUNT(*) FROM users")
-        total_items = self.cursor.fetchone()[0]
-        return math.ceil(total_items / float(items_per_page))
 
     def get_statistic(self, username):
         """Get the statistic for the given username.
@@ -672,34 +602,6 @@ class Database:
             (user_id,),
         )
         return self.cursor.fetchone()
-
-    def get_display_name(self, username):
-        """Get the display name for the given username.
-        username: the username of the user
-
-        returns: a dictionary containing the display name
-        """
-        # get the user_id for the given username
-        user_id = self.get_user(username)[0]
-
-        # get the display name
-        self.cursor.execute("SELECT display_name FROM users WHERE id = %s", (user_id,))
-        return self.cursor.fetchone()
-
-    def update_display_name(self, username, display_name):
-        """Update the display name for the given username.
-        username: the username of the user
-
-        returns: a dictionary containing the display name
-        """
-        # get the user_id for the given username
-        user_id = self.get_user(username)[0]
-
-        # update the display name
-        self.cursor.execute(
-            "UPDATE users SET display_name = %s WHERE id = %s", (display_name, user_id)
-        )
-        self.conn.commit()
 
     def get_token_usage(self, username, daily=False):
         """Get the token usage for the given username.

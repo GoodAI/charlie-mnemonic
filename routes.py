@@ -55,6 +55,7 @@ from memory import (
     stop_database,
 )
 from simple_utils import get_root
+from user_management.dao import UsersDAO
 from utils import (
     process_message,
     OpenAIResponser,
@@ -428,7 +429,7 @@ async def handle_update_settings(request: Request, user: editSettings):
         else:
             raise HTTPException(status_code=400, detail="Setting not found")
     elif user.category == "db":
-        with Database() as db:
+        with UsersDAO() as db:
             if user.setting == "display_name":
                 db.update_display_name(user.username, user.value)
             else:
@@ -486,15 +487,15 @@ async def handle_message(request: Request, message: userMessage):
         total_daily_cost,
         display_name,
     ) = (0, 0, 0, 0, 0, "")
-    with Database() as db:
+    with Database() as db, UsersDAO() as dao:
         total_tokens_used, total_cost = db.get_token_usage(message.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             message.username, True
         )
-        display_name = db.get_display_name(message.username)
+        display_name = dao.get_display_name(message.username)
         daily_limit = db.get_daily_limit()
         has_access = db.get_user_access(message.username)
-        user_id = db.get_user_id(message.username)[0]
+        user_id = dao.get_user_id(message.username)[0]
         tab_data = db.get_tab_data(user_id)
         active_tab_data = db.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
@@ -626,9 +627,9 @@ async def delete_chat_tab(request: Request, user: RecentMessages):
 
 @router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
 async def get_recent_messages(request: Request, message: RecentMessages):
-    with Database() as db:
-        has_access = db.get_user_access(message.username)
-        user_id = db.get_user_id(message.username)[0]
+    with Database() as db, UsersDAO() as dao:
+        has_access = dao.get_user_access(message.username)
+        user_id = dao.get_user_id(message.username)
         tab_data = db.get_tab_data(user_id)
         active_tab_data = db.get_active_tab_data(user_id) or {}
 
@@ -1120,7 +1121,8 @@ async def update_user(
         )
     else:
         with Database() as db:
-            db.update_user(user_id, has_access, role)
+            has_access_bool = True if has_access == "true" else False
+            db.update_user(user_id, has_access_bool, role)
             logger.info(f"User {username} (role: {role_db}) updated user: {user_id}")
             return {"message": f"User {user_id} updated successfully"}
 
@@ -1142,11 +1144,11 @@ async def get_statistics(
             status_code=403, detail="You are not authorized to view this page"
         )
     else:
-        with Database() as db:
+        with Database() as db, UsersDAO() as users:
             global_stats = json.loads(db.get_global_statistics())
             # Fetch data based on page number and items per page
             page_statistics = json.loads(db.get_statistics(page, items_per_page))
-            total_pages = db.get_total_statistics_pages(items_per_page)
+            total_pages = users.get_total_statistics_pages(items_per_page)
             admin_controls = json.loads(db.get_admin_controls())
             return templates.TemplateResponse(
                 "stats.html",
@@ -1213,10 +1215,10 @@ async def update_controls(
 async def get_user_profile(
     request: Request, username: str = Depends(get_current_username)
 ):
-    with Database() as db:
+    with Database() as db, UsersDAO() as users:
         user_id = db.get_user_id(username)
         daily_stats = json.loads(db.get_user_statistics(user_id))
-        user_profile = json.loads(db.get_user_profile(username))
+        user_profile = json.loads(users.get_user_profile(username))
         return templates.TemplateResponse(
             "user_profile.html",
             {"request": request, "profile": user_profile, "daily_stats": daily_stats},

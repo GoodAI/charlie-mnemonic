@@ -3,7 +3,7 @@ import json
 import pytest
 
 from user_management.dao import UsersDAO
-from user_management.models import Base, Users
+from user_management.models import Users
 
 # Use an in-memory SQLite database for tests
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -159,4 +159,85 @@ def test_get_user_profile(dao_session):
 
     # Test for a non-existent user
     non_existent_profile = dao_session.get_user_profile("non_existent_user")
+    assert non_existent_profile == json.dumps({})
+
+
+def test_allow_user_access(dao_session):
+    # Assuming there is already a user with username 'testuser' in the database
+    # If not, create one here
+    test_username = "testuser"
+    test_password = "testpassword"  # Make sure to hash the password if your DAO expects it
+    test_display_name = "Test User"
+    dao_session.add_user(test_username, test_password, "token", test_display_name)
+
+    # Fetch the user_id for 'testuser'
+    user_id = dao_session.get_user_id(test_username)
+    assert user_id is not None, "Test user should exist"
+
+    # Update user access and role
+    dao_session.update_user(user_id, True, "admin")
+
+    # Fetch updated role and access
+    updated_user = dao_session.get_user(test_username)
+    assert updated_user.role == "admin"
+    assert updated_user.has_access is True
+
+
+def test_update_display_name(dao_session):
+    # Setup: create a test user
+    test_username = "testuser"
+    test_password = "testpassword"
+    test_display_name = "Original Name"
+    dao_session.add_user(test_username, test_password, "token", test_display_name)
+
+    # Test updating the display name
+    new_display_name = "New Name"
+    success = dao_session.update_display_name(test_username, new_display_name)
+    assert success, "Update should be successful"
+
+    # Verify the update
+    updated_user = dao_session.get_user(test_username)
+    assert updated_user.display_name == new_display_name, "Display name should be updated"
+
+    # Test updating a non-existent user
+    non_existent_update = dao_session.update_display_name("nonexistentuser", "Name")
+    assert not non_existent_update, "Update should fail for non-existent user"
+
+
+def test_get_total_statistics_pages(dao_session):
+    # Add some test users
+    for i in range(10):  # Add 10 users for testing
+        dao_session.add_user(f"testuser{i}", "testpassword", "token", f"Test User {i}")
+
+    # Test with 2 items per page, expecting 5 pages for 10 users
+    pages = dao_session.get_total_statistics_pages(2)
+    assert pages == 5, "Should be 5 pages for 10 users with 2 users per page"
+
+    # Test with 5 items per page, expecting 2 pages for 10 users
+    pages = dao_session.get_total_statistics_pages(5)
+    assert pages == 2, "Should be 2 pages for 10 users with 5 users per page"
+
+    # Test with more items per page than total users
+    pages = dao_session.get_total_statistics_pages(15)
+    assert pages == 1, "Should be 1 page for 10 users with 15 users per page"
+
+
+def test_get_user_profile(dao_session):
+    # Setup: create a test user
+    test_username = "testuser"
+    test_password = "testpassword"
+    test_display_name = "Test User"
+    dao_session.add_user(test_username, test_password, "token", test_display_name)
+
+    # Fetch user profile
+    profile_json = dao_session.get_user_profile(test_username)
+    profile = json.loads(profile_json)
+
+    # Assertions to ensure the profile contains expected data
+    assert profile['username'] == test_username
+    assert profile['display_name'] == test_display_name
+    # Add more assertions as needed for other fields
+
+    # Test for a non-existent user
+    non_existent_profile = dao_session.get_user_profile("nonexistentuser")
     assert non_existent_profile == json.dumps({})

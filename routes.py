@@ -505,7 +505,7 @@ async def handle_message_image(
 # openAI response route without modules
 @router.post(
     "/message_no_modules/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send a message to the AI without modules",
     description="This endpoint allows you to send a message to the AI by providing a username, session token, and prompt. If the token is valid, the AI will respond to the prompt. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the AI's response if the token is valid, else returns an HTTPException with status code 401.",
@@ -548,7 +548,7 @@ async def handle_message_no_modules(
 # message route with audio
 @router.post(
     "/message_audio/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send an Audio message and get a transcript",
     description="This endpoint allows you to send an audio message to the AI by providing a username, session token, and audio file. If the token is valid, a transcript of the audio is sent back. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a transcript of the audio if the token is valid, else returns an HTTPException with status code 401.",
@@ -570,21 +570,12 @@ async def handle_message_no_modules(
     },
 )
 async def handle_message_audio(request: Request, audio_file: UploadFile):
-    session_token = request.cookies.get("session_token")
-    username = request.cookies.get("username")
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-
-    result = await AudioProcessor.upload_audio(users_dir, username, audio_file)
-
-    return result
+    return await AudioProcessor.upload_audio(users_dir, request.state.user.username, audio_file)
 
 
 @router.post(
     "/generate_audio/",
-    tags=["Text to Speech"],
+    tags=["Text to Speech", LOGIN_REQUIRED],
     summary="Generate audio from text",
     description="This endpoint allows you to generate audio from text by providing a username, session token, and prompt. If the token is valid, an audio file is sent back. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns an audio file if the token is valid, else returns an HTTPException with status code 401.",
@@ -606,18 +597,14 @@ async def handle_message_audio(request: Request, audio_file: UploadFile):
     },
 )
 async def handle_generate_audio(request: Request, message: generateAudioMessage):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
+    user = request.state.user
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
-        message.prompt, message.username, users_dir
+        message.prompt, user.username, users_dir
     )
     with Database() as db:
-        db.add_voice_usage(message.username, len(message.prompt))
+        db.add_voice_usage(user.username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")
 
 
@@ -642,7 +629,9 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
         },
     },
 )
-async def handle_save_data(request: Request, user: UserName):
+async def handle_save_data(request: Request):
+    user = request.state.user
+
     # Paths for memory file and settings file
     json_file_path = os.path.join(users_dir, user.username, "memory.json")
     settings_file = os.path.join(users_dir, user.username, "settings.json")
@@ -705,7 +694,7 @@ async def handle_save_data(request: Request, user: UserName):
 
 @router.post(
     "/upload_data/",
-    tags=["Data"],
+    tags=["Data", LOGIN_REQUIRED],
     summary="Upload user data",
     description="This endpoint allows you to upload the user's data by providing a username, session token, and data file. If the token is valid, the user's data will be uploaded. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
@@ -727,13 +716,10 @@ async def handle_save_data(request: Request, user: UserName):
     },
 )
 async def handle_upload_data(
-    request: Request, username: str = Form(...), data_file: UploadFile = File(...)
+    request: Request, data_file: UploadFile = File(...)
 ):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
+    user = request.state.user
+    username = user.username
 
     # Save the uploaded file to the user's directory
     file_path = os.path.join(users_dir, username, data_file.filename)
@@ -816,7 +802,7 @@ async def handle_abort_button(request: Request, user: UserName):
 # no token message route
 @router.post(
     "/notoken_message/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send a message without token",
     description="This endpoint allows the user to send a message to the AI by providing a prompt, username and password. The AI will respond to the prompt.",
     response_description="Returns the AI's response.",
@@ -831,14 +817,11 @@ async def handle_abort_button(request: Request, user: UserName):
         },
     },
 )
-async def handle_notoken_message(message: noTokenMessage):
-    auth = Authentication()
-    session_token = auth.login(message.username, message.password)
-    if not session_token:
-        raise HTTPException(status_code=401, detail="User login failed")
+async def handle_notoken_message(request: Request, message: noTokenMessage):
+    user = request.state.user
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, message.username, None, users_dir)
+    return await process_message(message.prompt, user.username, None, users_dir)
 
 
 @router.post(
@@ -864,15 +847,12 @@ async def handle_notoken_message(message: noTokenMessage):
         },
     },
 )
-async def handle_notoken_generate_audio(message: noTokenMessage):
-    auth = Authentication()
-    session_token = auth.login(message.username, message.password)
-    if not session_token:
-        raise HTTPException(status_code=401, detail="User login failed")
+async def handle_notoken_generate_audio(request: Request, message: noTokenMessage):
+    user = request.state.user
     if count_tokens(message.prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
-        message.prompt, message.username, users_dir
+        message.prompt, user.username, users_dir
     )
     return FileResponse(audio_path, media_type="audio/wav")
 

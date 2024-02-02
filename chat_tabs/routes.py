@@ -12,7 +12,6 @@ import logs
 from agentmemory import wipe_all_memories, stop_database
 from chat_tabs.dao import ChatTabsDAO
 from classes import (
-    UserName,
     RecentMessages,
 )
 from routes import users_dir
@@ -87,7 +86,8 @@ async def get_recent_messages(request: Request, message: RecentMessages):
 
 
 @router.post("/delete_data_keep_settings/", tags=[LOGIN_REQUIRED])
-async def handle_delete_data_keep_settings(request: Request, user: UserName):
+async def handle_delete_data_keep_settings(request: Request):
+    user = request.state.user
     wipe_all_memories(user.username)
     stop_database(user.username)
     # remove all users recent messages

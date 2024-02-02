@@ -17,10 +17,6 @@ router = APIRouter()
 async def configuration(request: Request):
     # TODO: security check for login
     version = SettingsManager.get_version()
-    with Database() as db:
-        daily_limit = db.get_daily_limit()
-        maintenance_mode = db.get_maintenance_mode()
-
     config = ConfigurationData.for_frontend()
 
     return templates.TemplateResponse(

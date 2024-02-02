@@ -127,44 +127,6 @@ class Database:
         self.chat_tabs_dao.create_tables()
         self.users_dao.create_default_user()
 
-    def get_admin_controls(self):
-        dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)
-        dict_cursor.execute("SELECT * FROM admin_controls")
-        rows = dict_cursor.fetchall()
-        if not rows:
-            return json.dumps({"id": 1, "daily_spending_limit": 10}, default=str)
-        return json.dumps(rows[0], default=str)
-
-    def get_daily_limit(self):
-        self.cursor.execute("SELECT daily_spending_limit FROM admin_controls")
-        row = self.cursor.fetchone()
-        if row is not None:
-            daily_limit = row[0]
-        else:
-            daily_limit = 1
-        return daily_limit
-
-    def update_admin_controls(
-        self, id, daily_spending_limit, allow_access, maintenance
-    ):
-        self.cursor.execute(
-            """
-            INSERT INTO admin_controls (id, daily_spending_limit, allow_access, maintenance)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (id) DO UPDATE SET daily_spending_limit = EXCLUDED.daily_spending_limit, allow_access = EXCLUDED.allow_access, maintenance = EXCLUDED.maintenance
-        """,
-            (id, daily_spending_limit, allow_access, maintenance),
-        )
-        self.conn.commit()
-
-    def get_maintenance_mode(self):
-        self.cursor.execute("SELECT maintenance FROM admin_controls")
-        row = self.cursor.fetchone()
-        if row is not None:
-            maintenance = row[0]
-            return maintenance == "true" or maintenance == "True" or maintenance == True
-        return False
-
     def get_global_statistics(self):
         """Get the global statistics.
 
@@ -423,37 +385,6 @@ class Database:
 
     def delete_daily_stats(self, user_id):
         self.cursor.execute("DELETE FROM daily_stats WHERE user_id = %s", (user_id,))
-        self.conn.commit()
-
-    def get_admin_control(self, id):
-        self.cursor.execute("SELECT * FROM admin_controls WHERE id = %s", (id,))
-        return self.cursor.fetchone()
-
-    def add_admin_control(self, **kwargs):
-        columns = ", ".join(kwargs.keys())
-        values = ", ".join(["%s"] * len(kwargs))
-        self.cursor.execute(
-            f"""
-        INSERT INTO admin_controls ({columns}) 
-        VALUES ({values})
-        """,
-            (*kwargs.values(),),
-        )
-        self.conn.commit()
-
-    def update_admin_control(self, id, **kwargs):
-        set_clause = ", ".join([f"{k} = %s" for k in kwargs.keys()])
-        self.cursor.execute(
-            f"""
-        UPDATE admin_controls SET {set_clause} 
-        WHERE id = %s
-        """,
-            (*kwargs.values(), id),
-        )
-        self.conn.commit()
-
-    def delete_admin_control(self, id):
-        self.cursor.execute("DELETE FROM admin_controls WHERE id = %s", (id,))
         self.conn.commit()
 
     def update_token_usage(self, username, **kwargs):

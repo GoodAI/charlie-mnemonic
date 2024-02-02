@@ -1,11 +1,11 @@
 import json
 import math
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 
 from common.dao import AbstractDAO
-from user_management.models import Users
+from user_management.models import Users, AdminControls
 
 
 class UsersDAO(AbstractDAO):
@@ -180,3 +180,63 @@ class UsersDAO(AbstractDAO):
         if user:
             return user.role
         return None
+
+
+class AdminControlsDAO(AbstractDAO):
+    def __init__(self):
+        super().__init__(AdminControls)
+
+    def get_admin_controls(self) -> str:
+        rows = self.session.query(AdminControls).all()
+        if not rows:
+            return json.dumps({"id": 1, "daily_spending_limit": 10}, default=str)
+        # Assuming rows[0] is an instance of AdminControls
+        return json.dumps(rows[0].__dict__, default=str)
+
+    def get_daily_limit(self) -> int:
+        row = self.session.query(AdminControls).first()
+        if row:
+            return row.daily_spending_limit
+        else:
+            return 1
+
+    def update_admin_controls(
+        self, id: int, daily_spending_limit: int, allow_access: bool, maintenance: bool
+    ) -> None:
+        obj = self.session.merge(
+            AdminControls(
+                id=id,
+                daily_spending_limit=daily_spending_limit,
+                allow_access=allow_access,
+                maintenance=maintenance,
+            )
+        )
+        self.session.add(obj)
+        self.session.commit()
+
+    def get_maintenance_mode(self) -> bool:
+        row = self.session.query(AdminControls).first()
+        if row:
+            return row.maintenance
+        else:
+            return False
+
+    def get_admin_control(self, id: int) -> Dict[str, Any]:
+        row = self.session.query(AdminControls).filter_by(id=id).first()
+        if row:
+            return row.__dict__
+        else:
+            return {}
+
+    def add_admin_control(self, **kwargs) -> None:
+        admin_control = AdminControls(**kwargs)
+        self.session.add(admin_control)
+        self.session.commit()
+
+    def update_admin_control(self, id: int, **kwargs) -> None:
+        self.session.query(AdminControls).filter_by(id=id).update(kwargs)
+        self.session.commit()
+
+    def delete_admin_control(self, id: int) -> None:
+        self.session.query(AdminControls).filter(AdminControls.id == id).delete()
+        self.session.commit()

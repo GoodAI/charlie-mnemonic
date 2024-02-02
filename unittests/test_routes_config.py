@@ -143,7 +143,5 @@ def test_redirect_on_missing_openai_key_none(client, none_openai_key):
 
 
 def test_no_redirect_openai_key(client, fake_openai_key):
-    # used to be "/", but currently that path requires Database class and therefore
-    # cannot easily run on gitlab so we use a different path
-    response = client.get("/asdf/")
-    assert response.url.path == "/asdf/"
+    response = client.get("/")
+    assert response.url.path == "/"

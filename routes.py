@@ -50,7 +50,7 @@ from memory import (
     import_file_to_memory,
 )
 from simple_utils import get_root, convert_name
-from user_management.dao import UsersDAO
+from user_management.dao import UsersDAO, AdminControlsDAO
 from user_management.routes import set_login_cookies
 from utils import (
     process_message,
@@ -94,7 +94,7 @@ async def read_did(file: str):
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     version = SettingsManager.get_version()
-    with Database() as db:
+    with AdminControlsDAO() as db:
         daily_limit = db.get_daily_limit()
         template_name = (
             "maintenance.html" if db.get_maintenance_mode() else "index.html"
@@ -331,13 +331,13 @@ async def handle_message(request: Request, message: userMessage):
         total_daily_cost,
         display_name,
     ) = (0, 0, 0, 0, 0, "")
-    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
         total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             user.username, True
         )
         display_name = dao.get_display_name(user.username)
-        daily_limit = db.get_daily_limit()
+        daily_limit = admin_controls_dao.get_daily_limit()
         has_access = dao.get_user_access(user.username)
         user_id = dao.get_user_id(user.username)
         tab_data = chat_tabs_dao.get_tab_data(user_id)
@@ -391,11 +391,11 @@ async def handle_message_image(
         raise HTTPException(status_code=400, detail="Prompt is too long")
     user = request.state.user
     username = user.username
-    with Database() as db:
+    with Database() as db, AdminControlsDAO() as admin_controls_dao:
         total_tokens_used, total_cost = db.get_token_usage(username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
         display_name = db.get_display_name(username)[0]
-        daily_limit = db.get_daily_limit()
+        daily_limit = admin_controls_dao.get_daily_limit()
         has_access = db.get_user_access(username)
         user_id = db.get_user_id(username)[0]
         tab_data = db.get_tab_data(user_id)
@@ -821,12 +821,12 @@ async def get_statistics(
     page: int,
     items_per_page: int = 5,
 ):
-    with Database() as db, UsersDAO() as users:
+    with Database() as db, UsersDAO() as users, AdminControlsDAO() as admin_controls:
         global_stats = json.loads(db.get_global_statistics())
         # Fetch data based on page number and items per page
         page_statistics = json.loads(db.get_statistics(page, items_per_page))
         total_pages = users.get_total_statistics_pages(items_per_page)
-        admin_controls = json.loads(db.get_admin_controls())
+        admin_controls = json.loads(admin_controls.get_admin_controls())
         return templates.TemplateResponse(
             "stats.html",
             {
@@ -859,12 +859,12 @@ async def get_user_statistics(request: Request, user_id: int):
 async def update_controls(
     request: Request,
     id: int = Form(...),
-    daily_spending_limit: str = Form(...),
-    allow_access: str = Form(...),
-    maintenance: str = Form(...),
+    daily_spending_limit: int = Form(...),
+    allow_access: bool = Form(...),
+    maintenance: bool = Form(...),
 ):
-    with Database() as db:
-        if id == "" or id == None:
+    with AdminControlsDAO() as db:
+        if id == "" or id is None:
             id = 1
         db.update_admin_controls(id, daily_spending_limit, allow_access, maintenance)
     return RedirectResponse(url="/admin/statistics/1", status_code=303)

@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from launcher import create_app
 from user_management.session import session_factory
-from user_management.test_dao import dao_session
+from user_management.test_dao_user import dao_session
 
 
 @pytest.fixture

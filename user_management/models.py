@@ -27,3 +27,16 @@ class Users(Base):
     cot_loops = Column(Integer, default=1)
     receive_mails = Column(Boolean, default=True)
     password_reset_token = Column(String(255))
+
+
+class AdminControls(Base):
+    __tablename__ = "admin_controls"
+    id = Column(Integer, primary_key=True)
+    daily_spending_limit = Column(Integer, default=0)
+    user_admin = Column(Boolean, default=False)
+    allow_access = Column(Boolean, default=False)
+    server_reboot = Column(Boolean, default=False)
+    maintenance = Column(Boolean, default=False)
+    allow_avatar_usage = Column(Boolean, default=False)
+    welcome_message = Column(String(255))
+    allowed_addons = Column(String(255))

@@ -5,6 +5,7 @@ import pytest
 
 from user_management.dao import UsersDAO
 from user_management.models import Users
+from user_management.session import session_factory
 
 # Use an in-memory SQLite database for tests
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -12,7 +13,8 @@ TEST_DATABASE_URL = "sqlite:///:memory:"
 
 @pytest.fixture(scope="function")
 def dao_session():
-    os.environ["NEW_DATABASE_URL"] = "sqlite:///:memory:?mode=memory&cache=shared"
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///:memory:"
+    session_factory.get_refreshed()
 
     dao = UsersDAO()
     dao.create_tables()
@@ -20,6 +22,7 @@ def dao_session():
     yield dao
 
     dao.drop_tables()
+    dao.close_session()
 
 
 def test_add_user(dao_session):

@@ -120,14 +120,12 @@ class Database:
             self.execute_migration(migration)
 
     def setup_database(self):
-        self.open()
         self.create_table()
         self.create_migrations_table()
         self.migrate_table()
         self.users_dao.create_tables()
         self.chat_tabs_dao.create_tables()
         self.users_dao.create_default_user()
-        self.close()
 
     def get_admin_controls(self):
         dict_cursor = self.conn.cursor(cursor_factory=RealDictCursor)

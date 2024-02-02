@@ -613,7 +613,7 @@ async def delete_chat_tab(request: Request, user: RecentMessages):
 
 @router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
 async def get_recent_messages(request: Request, message: RecentMessages):
-    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
+    with UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
         has_access = dao.get_user_access(message.username)
         user_id = dao.get_user_id(message.username)
         tab_data = chat_tabs_dao.get_tab_data(user_id)

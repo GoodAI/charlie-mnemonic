@@ -1,35 +1,13 @@
 import datetime
 from typing import List
 
-from sqlalchemy.orm import Session
-
 from chat_tabs.models import ChatTabs
+from common.dao import AbstractDAO
 
 
-class ChatTabsDAO:
+class ChatTabsDAO(AbstractDAO):
     def __init__(self):
-        from user_management.session import engine
-
-        self.engine = engine
-        from user_management.session import SessionLocal
-
-        self.session: Session = SessionLocal()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-        # self.close_session()
-
-    def create_tables(self):
-        ChatTabs.metadata.create_all(self.engine)
-
-    def drop_tables(self):
-        ChatTabs.metadata.drop_all(self.engine)
-
-    def close_session(self) -> None:
-        self.session.close()
+        super().__init__(ChatTabs)
 
     def get_tab_data(self, user_id: int) -> List[ChatTabs]:
         return (

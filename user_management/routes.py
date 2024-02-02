@@ -15,7 +15,7 @@ from classes import (
     LoginUser,
 )
 from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins
-from configuration_page.middleware import login_user_request
+from configuration_page.middleware import set_user_as_logged_in
 from simple_utils import get_root
 
 templates = Jinja2Templates(directory=get_root(STATIC))
@@ -51,7 +51,7 @@ async def login(request: Request, user: LoginUser, response: Response):
     session_token = auth.login(user.username, user.password)
     if session_token:
         set_login_cookies(session_token, user.username, response)
-        login_user_request(session_token, user.username, request)
+        set_user_as_logged_in(session_token, user.username, request)
         return {"message": "User logged in successfully"}
     else:
         raise HTTPException(status_code=401, detail="User login failed")

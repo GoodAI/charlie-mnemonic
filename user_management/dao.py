@@ -3,31 +3,14 @@ import math
 from typing import Optional
 
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
-from sqlalchemy.orm import Session
 
+from common.dao import AbstractDAO
 from user_management.models import Users
 
 
-class UsersDAO:
+class UsersDAO(AbstractDAO):
     def __init__(self):
-        from user_management.session import engine
-
-        self.engine = engine
-        from user_management.session import SessionLocal
-
-        self.session: Session = SessionLocal()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close_session()
-
-    def create_tables(self):
-        Users.metadata.create_all(self.engine)
-
-    def drop_tables(self):
-        Users.metadata.drop_all(self.engine)
+        super().__init__(Users)
 
     def get_user_count(self) -> int:
         return self.session.query(Users).count()
@@ -84,9 +67,6 @@ class UsersDAO:
         affected_rows = self.session.query(Users).filter_by(username=username).delete()
         self.session.commit()
         return affected_rows > 0
-
-    def close_session(self) -> None:
-        self.session.close()
 
     def update_session_token(self, username: str, session_token: str) -> None:
         self.session.query(Users).filter_by(username=username).update(
@@ -166,7 +146,7 @@ class UsersDAO:
         except NoResultFound:
             return json.dumps({})
 
-    def get_user(self, username: str):
+    def get_user(self, username: str) -> Optional[Users]:
         return self.session.query(Users).filter(Users.username == username).first()
 
     def update_display_name(self, username: str, display_name: str) -> bool:

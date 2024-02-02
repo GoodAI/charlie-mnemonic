@@ -37,7 +37,6 @@ def create_app(
 
     reload_configuration()
     from fastapi.middleware.cors import CORSMiddleware
-    import os
     import nltk
     import logs
     import utils
@@ -47,8 +46,8 @@ def create_app(
 
     version = utils.SettingsManager.get_version()
 
-    db = Database()
-    db.setup_database()
+    with Database() as db:
+        db.setup_database()
 
     # Defining the FastAPI app and metadata
     app = FastAPI(

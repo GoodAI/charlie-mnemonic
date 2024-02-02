@@ -22,9 +22,9 @@ templates = Jinja2Templates(directory=get_root(STATIC))
 
 
 @router.post("/get_chat_tabs/", tags=[LOGIN_REQUIRED])
-async def get_chat_tabs(request: Request, user: UserName):
-    with UsersDAO() as users_dao, ChatTabsDAO() as chat_tabs_dao:
-        user_id = users_dao.get_user_id(user.username)
+async def get_chat_tabs(request: Request):
+    with ChatTabsDAO() as chat_tabs_dao:
+        user_id = request.state.user.id
         tab_data = chat_tabs_dao.get_tab_data(user_id) or []
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         processed_tab_data = [tab for tab in tab_data if tab.is_enabled]

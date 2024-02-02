@@ -1,20 +1,26 @@
 import os
+import uuid
 
 import pytest
 
 from chat_tabs.dao import ChatTabsDAO
+from user_management.dao import UsersDAO
+from user_management.session import session_factory
 
 
 @pytest.fixture(scope="function")
 def chat_tabs_dao():
-    os.environ["NEW_DATABASE_URL"] = "sqlite:///:memory:?mode=memory&cache=shared"
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///:memory:"
+    session_factory.get_refreshed()
 
     dao = ChatTabsDAO()
+    UsersDAO().create_tables()
     dao.create_tables()
 
     yield dao
 
     dao.drop_tables()
+    dao.close_session()
 
 
 def test_get_tab_data(chat_tabs_dao):
@@ -22,6 +28,7 @@ def test_get_tab_data(chat_tabs_dao):
     chat_tabs_dao.insert_tab_data(1, "chat123", "Test Chat", "tab123", True)
     tabs = chat_tabs_dao.get_tab_data(1)
     assert len(tabs) > 0, "Should have at least one tab"
+    print("after assert")
 
 
 def test_get_tab_count(chat_tabs_dao):
@@ -37,6 +44,11 @@ def test_insert_and_get_tab_data(chat_tabs_dao):
 
 
 def test_get_tab_count(chat_tabs_dao):
+    users_dao = UsersDAO()
+    users_dao.create_tables()
+    print("xxx")
+    print(users_dao.get_user_count())
+
     user_id, tab_id, chat_id, chat_name = 1, "tab1", "chat1", "Test Chat"
     chat_tabs_dao.insert_tab_data(user_id, chat_id, chat_name, tab_id, True)
 

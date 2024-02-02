@@ -12,6 +12,7 @@ from user_management.session import session_factory
 
 @pytest.fixture
 def app():
+    os.environ["ORIGINS"] = "*"
     os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
     if os.path.exists("test.db"):
         os.remove("test.db")

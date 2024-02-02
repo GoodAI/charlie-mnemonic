@@ -10,6 +10,7 @@ from user_management.test_dao import dao_session
 
 @pytest.fixture
 def client():
+    os.environ["ORIGINS"] = "*"
     os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
 
     if os.path.exists("user.db"):

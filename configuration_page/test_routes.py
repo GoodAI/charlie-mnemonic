@@ -11,6 +11,7 @@ from user_management.session import session_factory
 
 @pytest.fixture
 def client(tmp_path):
+    os.environ["ORIGINS"] = "*"
     tmp_user_env_file = tmp_path / "user.env"
     os.environ["SINGLE_USER"] = "true"
     os.environ["OPENAI_API_KEY"] = ""

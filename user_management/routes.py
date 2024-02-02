@@ -10,7 +10,9 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
+from starlette import status
 from starlette.responses import RedirectResponse
+from starlette.websockets import WebSocket
 
 import logs
 from authentication import Authentication
@@ -19,6 +21,7 @@ from classes import (
     User,
     UserCheckToken,
 )
+from common.websocket import authenticate_websocket
 from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins, ADMIN_REQUIRED
 from configuration_page.middleware import set_user_as_logged_in
 from simple_utils import get_root
@@ -213,3 +216,9 @@ async def update_controls(
             id, daily_spending_limit, allow_access=allow_access, maintenance=maintenance
         )
     return RedirectResponse(url="/admin/statistics/1", status_code=303)
+
+
+@router.websocket("/ws/authtest")
+async def websocket_endpoint(websocket: WebSocket):
+    await authenticate_websocket(websocket)
+    await websocket.close()

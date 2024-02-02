@@ -91,7 +91,7 @@ class LoginAdminMiddleware(BaseHTTPMiddleware):
             from authentication import Authentication
 
             auth = Authentication()
-            new_session_token = auth.force_login(username)
+            new_session_token = auth.force_login(username, regenerate_token=False)
             set_user_as_logged_in(new_session_token, username, request)
 
         response = await call_next(request)

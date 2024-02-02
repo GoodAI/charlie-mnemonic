@@ -113,10 +113,9 @@ class UsersDAO(AbstractDAO):
     def validate_and_clear_session_token(self, username: str) -> bool:
         user = self.session.query(Users).filter_by(username=username).first()
         if user:
-            user.session_token = ""  # Clear session token
+            user.session_token = ""
             self.session.commit()
             return True
-        user = self.session.query(Users).filter_by(username=username).first()
         return False
 
     def check_session_token(self, username: str, session_token: str) -> bool:

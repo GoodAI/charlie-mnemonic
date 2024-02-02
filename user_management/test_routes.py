@@ -2,6 +2,7 @@ import os
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from launcher import create_app
 from user_management.session import session_factory
@@ -37,6 +38,14 @@ def authentication(client):
     from authentication import Authentication
 
     return Authentication()
+
+
+@pytest.fixture
+def logged_in_client(client, authentication):
+    authentication.register("testuser", "testpassword", "Test User")
+
+    client.post("/login/", json={"username": "testuser", "password": "testpassword"})
+    return client
 
 
 def test_logout(dao_session, client: TestClient, authentication):
@@ -99,3 +108,18 @@ def test_login_no_password(dao_session, client: TestClient, authentication):
 Expected status code to be 422, but got {login_response.status_code}
 Json: {login_response.json()}
 """
+
+
+def test_websocket_endpoint(logged_in_client, authentication):
+    with logged_in_client.websocket_connect("/ws/authtest") as websocket:
+        data = websocket.receive_text()
+        assert data == "Connection successful"
+
+        with pytest.raises(WebSocketDisconnect):
+            websocket.receive_text()
+
+
+def test_websocket_endpoint_not_logged_in(client):
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/authtest"):
+            pass

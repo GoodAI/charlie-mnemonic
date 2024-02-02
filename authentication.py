@@ -35,9 +35,11 @@ class Authentication:
     def delete_user(self, username: str) -> None:
         self.dao.delete_user_by_username(username)
 
-    def force_login(self, username: str) -> str:
-        session_token = binascii.hexlify(os.urandom(24)).decode()
-        self.dao.update_session_token(username, session_token)
+    def force_login(self, username: str, regenerate_token: bool) -> str:
+        session_token = self.dao.get_user(username).session_token
+        if regenerate_token or not session_token:
+            session_token = binascii.hexlify(os.urandom(24)).decode()
+            self.dao.update_session_token(username, session_token)
         logger.debug(f"User: {username} - Session token: {session_token}")
         return session_token
 
@@ -46,7 +48,7 @@ class Authentication:
         if stored_password and bcrypt.checkpw(
             password.encode("utf-8"), stored_password.encode("utf-8")
         ):
-            return self.force_login(username)
+            return self.force_login(username, regenerate_token=True)
         return None
 
     def convert_name(self, name: str) -> str:

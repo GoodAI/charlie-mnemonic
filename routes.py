@@ -914,8 +914,8 @@ async def get_user_statistics(
     request: Request, user_id: int, username: str = Depends(get_current_username)
 ):
     # get the user's role from the database
-    with Database() as db:
-        role = db.get_user_role(username)[0]
+    with UsersDAO() as db:
+        role = db.get_user_role(username)
     if role != "admin":
         logger.warning(
             f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/user/{user_id}"
@@ -1028,7 +1028,7 @@ async def google_login(request: UserGoogle, response: Response):
     logger.debug(f"User {username} logged in with Google:\n{id_info}")
 
     # check if email is verified
-    if id_info["email_verified"] == False:
+    if not id_info["email_verified"]:
         raise HTTPException(
             status_code=401, detail="User login failed, email not verified"
         )
@@ -1040,43 +1040,9 @@ async def google_login(request: UserGoogle, response: Response):
     auth = Authentication()
     session_token = auth.google_login(id_info)
     if session_token:
-        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION:
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=origins(),
-            )
-            response.set_cookie(
-                key="username",
-                value=username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=origins(),
-            )
-        else:
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
-            response.set_cookie(
-                key="username",
-                value=username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
+        set_login_cookies(
+            session_token=session_token, username=username, response=response
+        )
         return {"message": "User logged in successfully"}
     else:
         raise HTTPException(status_code=401, detail="User login failed")

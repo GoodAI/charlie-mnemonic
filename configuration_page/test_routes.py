@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from config import CONFIGURATION_URL
 from launcher import create_app
+from user_management.session import session_factory
 
 
 @pytest.fixture
@@ -15,7 +16,15 @@ def client(tmp_path):
     os.environ["OPENAI_API_KEY"] = ""
     openai.api_key = ""
     os.environ["CLANG_SYSTEM_CONFIGURATION_FILE"] = str(tmp_user_env_file)
-    return TestClient(create_app())
+    if os.path.exists("config.db"):
+        os.remove("config.db")
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///config.db"
+    session_factory.get_refreshed()
+
+    yield TestClient(create_app())
+
+    if os.path.exists("config.db"):
+        os.remove("config.db")
 
 
 def test_configuration(client):

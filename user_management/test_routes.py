@@ -25,8 +25,10 @@ def client():
         middlewares=[RedirectToConfigurationMiddleware, LoginRequiredCheckMiddleware],
         routers=[user_management_router],
     )
-    client = TestClient(app)
-    return client
+    yield TestClient(app)
+
+    if os.path.exists("user.db"):
+        os.remove("user.db")
 
 
 @pytest.fixture

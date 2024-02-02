@@ -20,9 +20,12 @@ def app():
     session_factory.get_refreshed()
     from chat_tabs.routes import router as chat_tabs_router
 
-    return create_app(
+    yield create_app(
         routers=[chat_tabs_router],
     )
+
+    if os.path.exists("test.db"):
+        os.remove("test.db")
 
 
 @pytest.fixture

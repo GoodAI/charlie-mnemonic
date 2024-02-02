@@ -54,7 +54,7 @@ async def get_recent_messages(request: Request, message: RecentMessages):
     with ChatTabsDAO() as chat_tabs_dao:
         user = request.state.user
         tab_data = chat_tabs_dao.get_tab_data(user.id)
-        active_tab_data = chat_tabs_dao.get_active_tab_data(user.id) or {}
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user.id)
 
         tab_exists = False
         for tab in tab_data:
@@ -70,7 +70,7 @@ async def get_recent_messages(request: Request, message: RecentMessages):
                 message.chat_id,
                 False,
             )
-        if message.chat_id != active_tab_data.chat_id:
+        if active_tab_data is None or message.chat_id != active_tab_data.chat_id:
             chat_tabs_dao.set_active_tab(user.id, message.chat_id)
 
         recent_messages = await MessageParser.get_recent_messages(

@@ -42,6 +42,7 @@ class UsersDAO(AbstractDAO):
         self.session.query(Users).filter(Users.id == user_id).update(
             {Users.has_access: access, Users.role: role}
         )
+        self.session.commit()
 
     def get_password_by_username(self, username: str) -> str:
         user = self.session.query(Users).filter_by(username=username).first()
@@ -49,7 +50,7 @@ class UsersDAO(AbstractDAO):
 
     def add_user(
         self, username: str, password: str, session_token: str, display_name: str
-    ) -> None:
+    ) -> int:
         new_user = Users(
             username=username,
             password=password,
@@ -59,6 +60,7 @@ class UsersDAO(AbstractDAO):
         self.session.add(new_user)
         try:
             self.session.commit()
+            return new_user.id
         except SQLAlchemyError:
             self.session.rollback()
             raise

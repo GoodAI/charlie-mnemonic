@@ -603,53 +603,6 @@ async def handle_message_image(
     )
 
 
-@router.post("/delete_chat_tab/", tags=[LOGIN_REQUIRED])
-async def delete_chat_tab(request: Request, user: RecentMessages):
-    with UsersDAO() as user_dao, ChatTabsDAO() as chat_tabs_dao:
-        user_id = user_dao.get_user_id(user.username)
-        chat_tabs_dao.disable_tab(user_id, user.chat_id)
-        return {"message": "Tab deleted successfully"}
-
-
-@router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
-async def get_recent_messages(request: Request, message: RecentMessages):
-    with UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
-        has_access = dao.get_user_access(message.username)
-        user_id = dao.get_user_id(message.username)
-        tab_data = chat_tabs_dao.get_tab_data(user_id)
-        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id) or {}
-
-        # check if the db has a row with message.chat_id
-        tab_exists = False
-        for tab in tab_data:
-            if tab.chat_id == message.chat_id:
-                tab_exists = True
-                break
-        if not tab_exists:
-            # if not, insert a new row
-            chat_tabs_dao.insert_tab_data(
-                user_id,
-                message.chat_id,
-                f"New Chat",
-                message.chat_id,
-                False,
-            )
-        if message.chat_id != active_tab_data.chat_id:
-            chat_tabs_dao.set_active_tab(user_id, message.chat_id)
-        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
-
-        recent_messages = await MessageParser.get_recent_messages(
-            message.username, message.chat_id
-        )
-    if not has_access or has_access in ["false", "False"]:
-        logger.info(f"user {message.username} does not have access")
-        raise HTTPException(
-            status_code=400,
-            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
-        )
-    return {"recent_messages": recent_messages}
-
-
 # openAI response route without modules
 @router.post(
     "/message_no_modules/",
@@ -849,56 +802,6 @@ async def handle_save_data(request: Request, user: UserName):
     response = Response(content, media_type="application/zip")
     response.headers["Content-Disposition"] = f'attachment; filename="{zip_filename}"'
     return response
-
-
-@router.post(
-    "/delete_data/",
-    tags=["Data", LOGIN_REQUIRED],
-    summary="Delete user data",
-    description="This endpoint allows you to delete the user's data by providing a username and session token. If the token is valid, the user's data will be deleted. If the token is invalid, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User data deleted successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User data deleted successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "Token is invalid",
-            "content": {
-                "application/json": {"example": {"detail": "Token is invalid"}}
-            },
-        },
-    },
-)
-async def handle_delete_data(request: Request, user: UserName):
-    wipe_all_memories(user.username)
-    stop_database(user.username)
-    # remove all users recent messages
-    await BrainProcessor.delete_recent_messages(user.username)
-    # remove chat tabs from the database
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.delete_tab_data(user_id)
-    # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
-    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
-    return {"message": "User data deleted successfully"}
-
-
-@router.post("/delete_data_keep_settings/", tags=[LOGIN_REQUIRED])
-async def handle_delete_data_keep_settings(request: Request, user: UserName):
-    wipe_all_memories(user.username)
-    stop_database(user.username)
-    # remove all users recent messages
-    await BrainProcessor.delete_recent_messages(user.username)
-    # remove chat tabs from the database
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.delete_tab_data(user_id)
-    return {"message": "User data deleted successfully"}
 
 
 @router.post(

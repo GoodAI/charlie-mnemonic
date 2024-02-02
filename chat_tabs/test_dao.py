@@ -115,6 +115,6 @@ def test_delete_tab_data(chat_tabs_dao):
 def test_disable_tab(chat_tabs_dao):
     user_id, tab_id = 1, "tab1"
     chat_tabs_dao.insert_tab_data(user_id, "chat1", "Test Chat", tab_id, True)
-    chat_tabs_dao.disable_tab(user_id, tab_id)
+    chat_tabs_dao.disable_tab(user_id, chat_id="chat1")
     disabled_tab = chat_tabs_dao.get_tab_data(user_id)[0]
     assert not disabled_tab.is_enabled

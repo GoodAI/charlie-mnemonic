@@ -77,11 +77,14 @@ class ChatTabsDAO(AbstractDAO):
         self.session.query(ChatTabs).filter(ChatTabs.user_id == user_id).delete()
         self.session.commit()
 
-    def disable_tab(self, user_id: int, tab_id: str):
-        self.session.query(ChatTabs).filter(
-            ChatTabs.user_id == user_id, ChatTabs.tab_id == tab_id
-        ).update({"is_enabled": False})
+    def disable_tab(self, user_id: int, chat_id: str) -> bool:
+        updated_rows = (
+            self.session.query(ChatTabs)
+            .filter(ChatTabs.user_id == user_id, ChatTabs.chat_id == chat_id)
+            .update({"is_enabled": False})
+        )
         self.session.commit()
+        return updated_rows > 0
 
     def needs_tab_description(self, chat_id):
         tab_description = self.get_tab_description(chat_id)

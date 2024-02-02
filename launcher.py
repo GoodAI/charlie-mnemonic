@@ -5,6 +5,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import origins
+from user_management.dao import UsersDAO
 
 
 def default_middleware() -> List[Type[BaseHTTPMiddleware]]:
@@ -46,8 +47,9 @@ def create_app(
 
     version = utils.SettingsManager.get_version()
 
-    with Database() as db:
-        db.setup_database()
+    with UsersDAO() as users_dao:
+        users_dao.create_all_tables()
+        users_dao.create_default_user()
 
     # Defining the FastAPI app and metadata
     app = FastAPI(

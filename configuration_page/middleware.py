@@ -31,7 +31,12 @@ def check_token_login(request: Request) -> bool:
         auth = Authentication()
         if auth.check_token(username=username, session_token=session_token):
             return True
-    return request.state.user is not None
+    try:
+        return request.state.user is not None
+    except AttributeError:
+        # shouldn't really happen, only if LoginAdminMiddleware and LoginRequiredCheckMiddleware are
+        # missing (in some test setup for example)
+        return False
 
 
 class LoginRequiredCheckMiddleware(BaseHTTPMiddleware):
@@ -48,6 +53,8 @@ class LoginRequiredCheckMiddleware(BaseHTTPMiddleware):
             username = request.cookies.get("username")
             session_token = request.cookies.get("session_token")
             user_check_token = set_user_as_logged_in(session_token, username, request)
+        else:
+            request.state.user = None
 
         route = get_route(request)
         if route and getattr(route, "tags", None):

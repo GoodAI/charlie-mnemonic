@@ -123,8 +123,6 @@ class Database:
         self.create_table()
         self.create_migrations_table()
         self.migrate_table()
-        self.users_dao.create_tables()
-        self.chat_tabs_dao.create_tables()
         self.users_dao.create_default_user()
 
     def get_global_statistics(self):

@@ -31,6 +31,25 @@ def default_routers() -> List[APIRouter]:
     return [user_management_router, chat_tabs_router, configuration_router, router]
 
 
+def load_data():
+    """
+    This is only temporary solution to build database. In the end, DAO should be used for everything, once
+    all tables are migrated to sqlalchemy. It helps running tests against part of codebase that is already migrated
+    without having dependency on the rest of the codebase/running postgresql server.
+    """
+    import sys
+
+    if "pytest" in sys.modules:
+        with UsersDAO() as users_dao:
+            users_dao.create_all_tables()
+            users_dao.create_default_user()
+    else:
+        from database import Database
+
+        with Database() as db:
+            db.setup_database()
+
+
 def create_app(
     middlewares: List[BaseHTTPMiddleware] = None, routers: List[APIRouter] = None
 ) -> FastAPI:
@@ -41,15 +60,12 @@ def create_app(
     import nltk
     import logs
     import utils
-    from database import Database
 
     nltk.download("punkt")
 
     version = utils.SettingsManager.get_version()
 
-    with UsersDAO() as users_dao:
-        users_dao.create_all_tables()
-        users_dao.create_default_user()
+    load_data()
 
     # Defining the FastAPI app and metadata
     app = FastAPI(

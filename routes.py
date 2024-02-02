@@ -570,7 +570,9 @@ async def handle_message_no_modules(
     },
 )
 async def handle_message_audio(request: Request, audio_file: UploadFile):
-    return await AudioProcessor.upload_audio(users_dir, request.state.user.username, audio_file)
+    return await AudioProcessor.upload_audio(
+        users_dir, request.state.user.username, audio_file
+    )
 
 
 @router.post(
@@ -715,9 +717,7 @@ async def handle_save_data(request: Request):
         },
     },
 )
-async def handle_upload_data(
-    request: Request, data_file: UploadFile = File(...)
-):
+async def handle_upload_data(request: Request, data_file: UploadFile = File(...)):
     user = request.state.user
     username = user.username
 
@@ -869,30 +869,6 @@ def get_current_username(
     if not success:
         raise HTTPException(status_code=403, detail="Invalid authorization code")
     return username
-
-
-@router.post("/admin/update_user/{user_id}")
-async def update_user(
-    user_id: int,
-    has_access: str = Form(...),
-    role: str = Form(...),
-    username: str = Depends(get_current_username),
-):
-    with Database() as db:
-        role_db = db.get_user_role(username)[0]
-    if role_db != "admin":
-        logger.warning(
-            f"User {username} (role: {role_db}) is not authorized to update this user: {user_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to update this user"
-        )
-    else:
-        with Database() as db:
-            has_access_bool = True if has_access == "true" else False
-            db.update_user(user_id, has_access_bool, role)
-            logger.info(f"User {username} (role: {role_db}) updated user: {user_id}")
-            return {"message": f"User {user_id} updated successfully"}
 
 
 @router.get("/admin/statistics/{page}", response_class=HTMLResponse)

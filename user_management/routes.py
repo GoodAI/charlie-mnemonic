@@ -5,11 +5,13 @@ from fastapi import (
     HTTPException,
     Request,
 )
+from fastapi.params import Form
 from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
 
+import logs
 from authentication import Authentication
 from classes import (
     LoginUser,
@@ -19,9 +21,12 @@ from classes import (
 from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins
 from configuration_page.middleware import set_user_as_logged_in
 from simple_utils import get_root
+from user_management.dao import UsersDAO
 
 templates = Jinja2Templates(directory=get_root(STATIC))
 router = APIRouter()
+
+logger = logs.Log("routes-users", "routes.log").get_logger()
 
 
 # login route
@@ -175,3 +180,27 @@ async def check_token(user: UserCheckToken):
         return {"message": "Token is valid"}
     else:
         raise HTTPException(status_code=401, detail="Token is invalid")
+
+
+@router.post("/admin/update_user/{user_id}")
+async def update_user(
+    request: Request,
+    user_id: int,
+    has_access: str = Form(...),
+    role: str = Form(...),
+):
+    user = request.state.user
+    with UsersDAO() as db:
+        role_db = db.get_user_role(user.username)
+    if role_db != "admin":
+        logger.warning(
+            f"User {user.username} (role: {role_db}) is not authorized to update this user: {user_id}"
+        )
+        raise HTTPException(
+            status_code=403, detail="You are not authorized to update this user"
+        )
+    with UsersDAO() as db:
+        has_access_bool = True if has_access == "true" else False
+        db.update_user(user_id, has_access_bool, role)
+        logger.info(f"User {user.username} (role: {role_db}) updated user: {user_id}")
+        return {"message": f"User {user_id} updated successfully"}

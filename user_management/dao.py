@@ -1,6 +1,6 @@
 import json
 import math
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from sqlalchemy.exc import SQLAlchemyError, NoResultFound
 
@@ -186,12 +186,15 @@ class AdminControlsDAO(AbstractDAO):
     def __init__(self):
         super().__init__(AdminControls)
 
-    def get_admin_controls(self) -> str:
+    def get_admin_controls_json(self) -> str:
         rows = self.session.query(AdminControls).all()
         if not rows:
             return json.dumps({"id": 1, "daily_spending_limit": 10}, default=str)
         # Assuming rows[0] is an instance of AdminControls
         return json.dumps(rows[0].__dict__, default=str)
+
+    def get_admin_controls(self) -> List[AdminControls]:
+        return self.session.query(AdminControls).all()
 
     def get_daily_limit(self) -> int:
         row = self.session.query(AdminControls).first()
@@ -221,12 +224,8 @@ class AdminControlsDAO(AbstractDAO):
         else:
             return False
 
-    def get_admin_control(self, id: int) -> Dict[str, Any]:
-        row = self.session.query(AdminControls).filter_by(id=id).first()
-        if row:
-            return row.__dict__
-        else:
-            return {}
+    def get_admin_control(self, id: int) -> AdminControls:
+        return self.session.query(AdminControls).filter_by(id=id).first()
 
     def add_admin_control(self, **kwargs) -> None:
         admin_control = AdminControls(**kwargs)

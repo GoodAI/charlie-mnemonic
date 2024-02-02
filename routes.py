@@ -797,20 +797,6 @@ async def handle_notoken_generate_audio(request: Request, message: noTokenMessag
     return FileResponse(audio_path, media_type="audio/wav")
 
 
-security = HTTPBearer()
-
-
-def get_current_username(
-    username: Optional[str] = Depends(APIKeyCookie(name="username")),
-    session_token: Optional[str] = Depends(APIKeyCookie(name="session_token")),
-):
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=403, detail="Invalid authorization code")
-    return username
-
-
 @router.get(
     "/admin/statistics/{page}",
     response_class=HTMLResponse,
@@ -826,7 +812,7 @@ async def get_statistics(
         # Fetch data based on page number and items per page
         page_statistics = json.loads(db.get_statistics(page, items_per_page))
         total_pages = users.get_total_statistics_pages(items_per_page)
-        admin_controls = json.loads(admin_controls.get_admin_controls())
+        admin_controls = json.loads(admin_controls.get_admin_controls_json())
         return templates.TemplateResponse(
             "stats.html",
             {
@@ -855,21 +841,6 @@ async def get_user_statistics(request: Request, user_id: int):
         )
 
 
-@router.post("/admin/update_controls", tags=[LOGIN_REQUIRED, ADMIN_REQUIRED])
-async def update_controls(
-    request: Request,
-    id: int = Form(...),
-    daily_spending_limit: int = Form(...),
-    allow_access: bool = Form(...),
-    maintenance: bool = Form(...),
-):
-    with AdminControlsDAO() as db:
-        if id == "" or id is None:
-            id = 1
-        db.update_admin_controls(id, daily_spending_limit, allow_access, maintenance)
-    return RedirectResponse(url="/admin/statistics/1", status_code=303)
-
-
 @router.get("/profile", response_class=HTMLResponse)
 async def get_user_profile(request: Request):
     with Database() as db, UsersDAO() as users:
@@ -882,8 +853,9 @@ async def get_user_profile(request: Request):
         )
 
 
-@router.get("/data/{file_path:path}")
-async def read_file(file_path: str, username: str = Depends(get_current_username)):
+@router.get("/data/{file_path:path}", tags=[LOGIN_REQUIRED])
+async def read_file(request: Request, file_path: str):
+    username = request.state.user.username
     converted_name = convert_name(username)
     host_path = os.path.join(os.getcwd(), "users", converted_name, "data", file_path)
     if os.path.exists(host_path):

@@ -27,14 +27,14 @@ def dao_session():
 
 def test_get_admin_controls(dao_session):
     # Assuming the AdminControls table is initially empty
-    controls_json = dao_session.get_admin_controls()
+    controls_json = dao_session.get_admin_controls_json()
     assert controls_json == json.dumps({"id": 1, "daily_spending_limit": 10})
 
     # Add an admin control record
     dao_session.add_admin_control(
         id=1, daily_spending_limit=100, allow_access=True, maintenance=False
     )
-    controls_json = dao_session.get_admin_controls()
+    controls_json = dao_session.get_admin_controls_json()
     controls = json.loads(controls_json)
     assert controls["daily_spending_limit"] == 100
     assert controls["allow_access"] is True

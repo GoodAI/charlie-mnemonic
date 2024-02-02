@@ -10,6 +10,7 @@ from fastapi.responses import (
     Response,
 )
 from fastapi.templating import Jinja2Templates
+from starlette.responses import RedirectResponse
 
 import logs
 from authentication import Authentication
@@ -21,7 +22,7 @@ from classes import (
 from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins, ADMIN_REQUIRED
 from configuration_page.middleware import set_user_as_logged_in
 from simple_utils import get_root
-from user_management.dao import UsersDAO
+from user_management.dao import UsersDAO, AdminControlsDAO
 
 templates = Jinja2Templates(directory=get_root(STATIC))
 router = APIRouter()
@@ -195,3 +196,20 @@ async def update_user(
         db.update_user(user_id, has_access_bool, role)
         logger.info(f"User {user.username} (role: {user.role}) updated user: {user_id}")
         return {"message": f"User {user_id} updated successfully"}
+
+
+@router.post("/admin/update_controls")
+async def update_controls(
+    request: Request,
+    id: int = Form(...),
+    daily_spending_limit: int = Form(...),
+    allow_access: bool = Form(...),
+    maintenance: bool = Form(...),
+):
+    with AdminControlsDAO() as db:
+        if id == "" or id == None:
+            id = 1
+        db.update_admin_controls(
+            id, daily_spending_limit, allow_access=allow_access, maintenance=maintenance
+        )
+    return RedirectResponse(url="/admin/statistics/1", status_code=303)

@@ -115,3 +115,4 @@ moviepy==1.0.3
 decorator==4.4.2
 replicate==0.22.0
 djlint==1.34.1
+sqlalchemy==2.0.25

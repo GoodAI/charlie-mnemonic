@@ -29,8 +29,9 @@ def check_token_login(request: Request) -> bool:
         from authentication import Authentication
 
         auth = Authentication()
-        return auth.check_token(username=username, session_token=session_token)
-    return False
+        if auth.check_token(username=username, session_token=session_token):
+            return True
+    return request.state.user is not None
 
 
 class LoginRequiredCheckMiddleware(BaseHTTPMiddleware):
@@ -66,6 +67,7 @@ class LoginAdminMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
+        request.state.user = None
         username = SINGLE_USER_USERNAME
 
         new_session_token = None

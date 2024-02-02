@@ -64,7 +64,7 @@ from utils import (
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION
+from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION, ADMIN_REQUIRED
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
@@ -94,35 +94,20 @@ async def read_did(file: str):
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     version = SettingsManager.get_version()
-    daily_limit = 0
     with Database() as db:
         daily_limit = db.get_daily_limit()
-        maintenance_mode = db.get_maintenance_mode()
+        template_name = (
+            "maintenance.html" if db.get_maintenance_mode() else "index.html"
+        )
 
-    if (
-        maintenance_mode == "true"
-        or maintenance_mode == "True"
-        or maintenance_mode == True
-    ):
-        return templates.TemplateResponse(
-            "maintenance.html",
-            {
-                "request": request,
-                "version": version,
-                "daily_limit": daily_limit,
-                "production": PRODUCTION,
-            },
-        )
-    else:
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "version": version,
-                "daily_limit": daily_limit,
-                "production": PRODUCTION,
-            },
-        )
+    context = {
+        "request": request,
+        "version": version,
+        "daily_limit": daily_limit,
+        "production": PRODUCTION,
+    }
+
+    return templates.TemplateResponse(template_name, context)
 
 
 @router.get("/styles.css")
@@ -200,19 +185,18 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
         },
     },
 )
-async def handle_get_settings(request: Request, user: UserName):
-    await AddonManager.load_addons(user.username, users_dir)
-    with open(os.path.join(users_dir, user.username, "settings.json"), "r") as f:
+async def handle_get_settings(request: Request):
+    username = request.state.user.username
+    await AddonManager.load_addons(username, users_dir)
+    with open(os.path.join(users_dir, username, "settings.json"), "r") as f:
         settings = json.load(f)
-    logger.debug(f"Loaded settings for user {user.username}")
+    logger.debug(f"Loaded settings for user {username}")
     logger.debug(settings)
     total_tokens_used, total_cost = 0, 0
     with Database() as db, UsersDAO() as dao:
-        total_tokens_used, total_cost = db.get_token_usage(user.username)
-        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            user.username, True
-        )
-        display_name = dao.get_display_name(user.username)
+        total_tokens_used, total_cost = db.get_token_usage(username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
+        display_name = dao.get_display_name(username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -259,8 +243,9 @@ def count_tokens(message):
     },
 )
 async def handle_update_settings(request: Request, user: editSettings):
+    username = request.state.user.username
     # create the directory if it doesn't exist
-    user_dir = os.path.join(users_dir, user.username)
+    user_dir = os.path.join(users_dir, username)
     if not os.path.exists(user_dir):
         os.makedirs(user_dir)
     # check if the settings file exists
@@ -291,7 +276,7 @@ async def handle_update_settings(request: Request, user: editSettings):
     elif user.category == "db":
         with UsersDAO() as db:
             if user.setting == "display_name":
-                db.update_display_name(user.username, user.value)
+                db.update_display_name(username, user.value)
             else:
                 raise HTTPException(status_code=400, detail="Setting not found")
     else:
@@ -299,11 +284,9 @@ async def handle_update_settings(request: Request, user: editSettings):
     with open(settings_file, "w") as f:
         json.dump(settings, f)
     with Database() as db:
-        total_tokens_used, total_cost = db.get_token_usage(user.username)
-        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            user.username, True
-        )
-        display_name = db.get_display_name(user.username)
+        total_tokens_used, total_cost = db.get_token_usage(username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
+        display_name = db.get_display_name(username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -335,7 +318,8 @@ async def handle_update_settings(request: Request, user: editSettings):
     },
 )
 async def handle_message(request: Request, message: userMessage):
-    with open(os.path.join(users_dir, message.username, "settings.json"), "r") as f:
+    user = request.state.user
+    with open(os.path.join(users_dir, user.username, "settings.json"), "r") as f:
         settings = json.load(f)
     if count_tokens(message.prompt) > settings["memory"]["output"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
@@ -348,14 +332,14 @@ async def handle_message(request: Request, message: userMessage):
         display_name,
     ) = (0, 0, 0, 0, 0, "")
     with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
-        total_tokens_used, total_cost = db.get_token_usage(message.username)
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            message.username, True
+            user.username, True
         )
-        display_name = dao.get_display_name(message.username)
+        display_name = dao.get_display_name(user.username)
         daily_limit = db.get_daily_limit()
-        has_access = dao.get_user_access(message.username)
-        user_id = dao.get_user_id(message.username)
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
         tab_data = chat_tabs_dao.get_tab_data(user_id)
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
@@ -370,20 +354,20 @@ async def handle_message(request: Request, message: userMessage):
             chat_tabs_dao.update_created_at(user_id, message.chat_id)
             message.chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
-        logger.info(f"user {message.username} does not have access")
+        logger.info(f"user {user.username} does not have access")
         raise HTTPException(
             status_code=400,
             detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
         )
     if total_daily_cost >= daily_limit:
-        logger.info(f"user {message.username} reached daily limit")
+        logger.info(f"user {user.username} reached daily limit")
         raise HTTPException(
             status_code=400,
             detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
         )
     return await process_message(
         message.prompt,
-        message.username,
+        user.username,
         users_dir,
         message.display_name,
         chat_id=message.chat_id,
@@ -401,12 +385,12 @@ async def handle_message_image(
     request: Request,
     image_file: UploadFile,
     prompt: str = Form(...),
-    username: str = Form(...),
     chat_id: str = Form(...),
 ):
-    username = request.cookies.get("username")
     if count_tokens(prompt) > 1000:
         raise HTTPException(status_code=400, detail="Prompt is too long")
+    user = request.state.user
+    username = user.username
     with Database() as db:
         total_tokens_used, total_cost = db.get_token_usage(username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
@@ -489,16 +473,12 @@ async def handle_message_image(
 async def handle_message_no_modules(
     request: Request, message: userMessage, audio_path: str = None
 ):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, message.username)
+    user = request.state.user
+    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, user.username)
     messages = [
         {
             "role": "system",
-            "content": message.username + ": " + message.prompt + "\nAssistant: ",
+            "content": user.username + ": " + message.prompt + "\nAssistant: ",
         }
     ]
     response = await openai_response.get_response(messages)
@@ -831,98 +811,71 @@ def get_current_username(
     return username
 
 
-@router.get("/admin/statistics/{page}", response_class=HTMLResponse)
+@router.get(
+    "/admin/statistics/{page}",
+    response_class=HTMLResponse,
+    tags=[LOGIN_REQUIRED, ADMIN_REQUIRED],
+)
 async def get_statistics(
     request: Request,
     page: int,
     items_per_page: int = 5,
-    username: str = Depends(get_current_username),
 ):
+    with Database() as db, UsersDAO() as users:
+        global_stats = json.loads(db.get_global_statistics())
+        # Fetch data based on page number and items per page
+        page_statistics = json.loads(db.get_statistics(page, items_per_page))
+        total_pages = users.get_total_statistics_pages(items_per_page)
+        admin_controls = json.loads(db.get_admin_controls())
+        return templates.TemplateResponse(
+            "stats.html",
+            {
+                "request": request,
+                "rows": page_statistics,
+                "chart_data": json.dumps(page_statistics).replace('"', '\\"'),
+                "page": page,
+                "items_per_page": items_per_page,
+                "total_pages": total_pages,
+                "statistics": global_stats,
+                "admin_controls": admin_controls,
+            },
+        )
+
+
+@router.get(
+    "/admin/statistics/user/{user_id}",
+    response_class=HTMLResponse,
+    tags=[LOGIN_REQUIRED, ADMIN_REQUIRED],
+)
+async def get_user_statistics(request: Request, user_id: int):
     with Database() as db:
-        role = db.get_user_role(username)[0]
-    if role != "admin":
-        logger.warning(
-            f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/{page}"
+        user_stats = json.loads(db.get_user_statistics(user_id))
+        return templates.TemplateResponse(
+            "user_stats.html", {"request": request, "rows": user_stats}
         )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to view this page"
-        )
-    else:
-        with Database() as db, UsersDAO() as users:
-            global_stats = json.loads(db.get_global_statistics())
-            # Fetch data based on page number and items per page
-            page_statistics = json.loads(db.get_statistics(page, items_per_page))
-            total_pages = users.get_total_statistics_pages(items_per_page)
-            admin_controls = json.loads(db.get_admin_controls())
-            return templates.TemplateResponse(
-                "stats.html",
-                {
-                    "request": request,
-                    "rows": page_statistics,
-                    "chart_data": json.dumps(page_statistics).replace('"', '\\"'),
-                    "page": page,
-                    "items_per_page": items_per_page,
-                    "total_pages": total_pages,
-                    "statistics": global_stats,
-                    "admin_controls": admin_controls,
-                },
-            )
 
 
-@router.get("/admin/statistics/user/{user_id}", response_class=HTMLResponse)
-async def get_user_statistics(
-    request: Request, user_id: int, username: str = Depends(get_current_username)
-):
-    # get the user's role from the database
-    with UsersDAO() as db:
-        role = db.get_user_role(username)
-    if role != "admin":
-        logger.warning(
-            f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/user/{user_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to view this page"
-        )
-    else:
-        with Database() as db:
-            user_stats = json.loads(db.get_user_statistics(user_id))
-            return templates.TemplateResponse(
-                "user_stats.html", {"request": request, "rows": user_stats}
-            )
-
-
-@router.post("/admin/update_controls")
+@router.post("/admin/update_controls", tags=[LOGIN_REQUIRED, ADMIN_REQUIRED])
 async def update_controls(
     request: Request,
-    username: str = Depends(get_current_username),
     id: int = Form(...),
     daily_spending_limit: str = Form(...),
     allow_access: str = Form(...),
     maintenance: str = Form(...),
 ):
     with Database() as db:
-        role = db.get_user_role(username)[0]
-        if role != "admin":
-            raise HTTPException(
-                status_code=403, detail="You are not authorized to perform this action"
-            )
-        with Database() as db:
-            if id == "" or id == None:
-                id = 1
-            db.update_admin_controls(
-                id, daily_spending_limit, allow_access, maintenance
-            )
-        return RedirectResponse(url="/admin/statistics/1", status_code=303)
+        if id == "" or id == None:
+            id = 1
+        db.update_admin_controls(id, daily_spending_limit, allow_access, maintenance)
+    return RedirectResponse(url="/admin/statistics/1", status_code=303)
 
 
 @router.get("/profile", response_class=HTMLResponse)
-async def get_user_profile(
-    request: Request, username: str = Depends(get_current_username)
-):
+async def get_user_profile(request: Request):
     with Database() as db, UsersDAO() as users:
-        user_id = db.get_user_id(username)
-        daily_stats = json.loads(db.get_user_statistics(user_id))
-        user_profile = json.loads(users.get_user_profile(username))
+        user = request.state.user
+        daily_stats = json.loads(db.get_user_statistics(user.id))
+        user_profile = json.loads(users.get_user_profile(user.username))
         return templates.TemplateResponse(
             "user_profile.html",
             {"request": request, "profile": user_profile, "daily_stats": daily_stats},

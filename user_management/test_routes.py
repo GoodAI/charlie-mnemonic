@@ -61,3 +61,41 @@ Expected status code to be 200, but got {logout_response.status_code}
 Json: {logout_response.json()}
 """
     assert "User logged out successfully" in logout_response.json()["message"]
+
+
+def test_login_bad_password(dao_session, client: TestClient, authentication):
+    authentication.dao.create_tables()
+    authentication.register("testuser", "testpassword", "Test User")
+
+    login_response = client.post(
+        "/login/", json={"username": "testuser", "password": "incorrect_password"}
+    )
+    assert (
+        login_response.status_code == 401
+    ), f"""
+Expected status code to be 401, but got {login_response.status_code}
+Json: {login_response.json()}
+"""
+
+
+def test_login_nonexitent_user(dao_session, client: TestClient, authentication):
+    login_response = client.post(
+        "/login/",
+        json={"username": "non-existent-user", "password": "incorrect_password"},
+    )
+    assert (
+        login_response.status_code == 401
+    ), f"""
+Expected status code to be 401, but got {login_response.status_code}
+Json: {login_response.json()}
+"""
+
+
+def test_login_no_password(dao_session, client: TestClient, authentication):
+    login_response = client.post("/login/", json={"username": "non-existent-user"})
+    assert (
+        login_response.status_code == 422
+    ), f"""
+Expected status code to be 422, but got {login_response.status_code}
+Json: {login_response.json()}
+"""

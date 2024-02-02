@@ -32,6 +32,7 @@ update_api_keys()
 STATIC = "static"
 CONFIGURATION_URL = "/configuration/"
 LOGIN_REQUIRED = "login_required"
+ADMIN_REQUIRED = "admin_required"
 SINGLE_USER_USERNAME = os.environ.get("SINGLE_USER_USERNAME", "admin")
 SINGLE_USER_DISPLAY_NAME = os.environ.get("SINGLE_USER_DISPLAY_NAME", "admin")
 SINGLE_USER_PASSWORD = os.environ.get("SINGLE_USER_PASSWORD", "admin")

@@ -1,9 +1,10 @@
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 from starlette.routing import Match
 
 from classes import UserCheckToken
-from config import LOGIN_REQUIRED, SINGLE_USER_USERNAME
+from config import LOGIN_REQUIRED, SINGLE_USER_USERNAME, ADMIN_REQUIRED
 from user_management.dao import UsersDAO
 from user_management.models import Users
 
@@ -60,8 +61,16 @@ class LoginRequiredCheckMiddleware(BaseHTTPMiddleware):
         if route and getattr(route, "tags", None):
             tags = route.tags
             if LOGIN_REQUIRED in tags and not user_check_token:
-                raise HTTPException(
-                    status_code=401, detail=f"Not authenticated for {route}"
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": f"Not authenticated for {route.path}"},
+                )
+            if ADMIN_REQUIRED in tags and not user_check_token.role == "admin":
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": f"Not authorized for {route.path} with role '{user_check_token.role}'"
+                    },
                 )
 
         return await call_next(request)

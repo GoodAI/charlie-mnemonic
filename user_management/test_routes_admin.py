@@ -63,4 +63,21 @@ def test_update_user_by_non_admin_failure(client: TestClient, setup_users):
     )
 
     assert response.status_code == 403
-    assert "not authorized to update this user" in response.json().get("detail", "")
+    assert (
+        "Not authorized for /admin/update_user/{user_id} with role 'user'"
+        in response.json().get("detail", "")
+    )
+
+
+def test_update_user_no_login(client: TestClient, setup_users):
+    _, _, target_user_id = setup_users
+
+    response = client.post(
+        f"/admin/update_user/{target_user_id}",
+        data={"has_access": "true", "role": "user"},
+    )
+
+    assert response.status_code == 401
+    assert "Not authenticated for /admin/update_user/{user_id}" in response.json().get(
+        "detail", ""
+    )

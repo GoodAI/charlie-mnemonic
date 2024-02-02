@@ -18,7 +18,7 @@ from classes import (
     User,
     UserCheckToken,
 )
-from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins
+from config import STATIC, LOGIN_REQUIRED, PRODUCTION, origins, ADMIN_REQUIRED
 from configuration_page.middleware import set_user_as_logged_in
 from simple_utils import get_root
 from user_management.dao import UsersDAO
@@ -182,7 +182,7 @@ async def check_token(user: UserCheckToken):
         raise HTTPException(status_code=401, detail="Token is invalid")
 
 
-@router.post("/admin/update_user/{user_id}")
+@router.post("/admin/update_user/{user_id}", tags=[LOGIN_REQUIRED, ADMIN_REQUIRED])
 async def update_user(
     request: Request,
     user_id: int,
@@ -191,16 +191,7 @@ async def update_user(
 ):
     user = request.state.user
     with UsersDAO() as db:
-        role_db = db.get_user_role(user.username)
-    if role_db != "admin":
-        logger.warning(
-            f"User {user.username} (role: {role_db}) is not authorized to update this user: {user_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to update this user"
-        )
-    with UsersDAO() as db:
         has_access_bool = True if has_access == "true" else False
         db.update_user(user_id, has_access_bool, role)
-        logger.info(f"User {user.username} (role: {role_db}) updated user: {user_id}")
+        logger.info(f"User {user.username} (role: {user.role}) updated user: {user_id}")
         return {"message": f"User {user_id} updated successfully"}

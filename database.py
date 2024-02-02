@@ -162,9 +162,8 @@ class Database:
         row = self.cursor.fetchone()
         if row is not None:
             maintenance = row[0]
-        else:
-            maintenance = False
-        return maintenance
+            return maintenance == "true" or maintenance == "True" or maintenance == True
+        return False
 
     def get_global_statistics(self):
         """Get the global statistics.

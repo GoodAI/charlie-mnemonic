@@ -5,7 +5,7 @@ import signal
 import tempfile
 import urllib.parse
 import zipfile
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Optional
 
 import logs
@@ -33,14 +33,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from google.auth.transport import requests
 from google.oauth2 import id_token
-from unidecode import unidecode
 
 from authentication import Authentication
 from chat_tabs.dao import ChatTabsDAO
 from classes import (
-    RecentMessages,
-    User,
-    UserCheckToken,
     UserName,
     editSettings,
     userMessage,
@@ -52,10 +48,8 @@ from database import Database
 from memory import (
     export_memory_to_file,
     import_file_to_memory,
-    wipe_all_memories,
-    stop_database,
 )
-from simple_utils import get_root
+from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO
 from user_management.routes import set_login_cookies
 from utils import (
@@ -70,7 +64,7 @@ from utils import (
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION, origins
+from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
@@ -95,40 +89,6 @@ async def read_did(file: str):
         return FileResponse(f"d-id/{file}")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
-
-
-# @router.get("/", response_class=HTMLResponse)
-# async def read_root(request: Request):
-#     version = SettingsManager.get_version()
-#     daily_limit = 0
-#     with Database() as db:
-#         daily_limit = db.get_daily_limit()
-#         maintenance_mode = db.get_maintenance_mode()
-
-#     if (
-#         maintenance_mode == "true"
-#         or maintenance_mode == "True"
-#         or maintenance_mode == True
-#     ):
-#         return templates.TemplateResponse(
-#             "maintenance.html",
-#             {
-#                 "request": request,
-#                 "version": version,
-#                 "daily_limit": daily_limit,
-#                 "production": PRODUCTION,
-#             },
-#         )
-#     else:
-#         return templates.TemplateResponse(
-#             "landing.html",
-#             {
-#                 "request": request,
-#                 "version": version,
-#                 "daily_limit": daily_limit,
-#                 "production": PRODUCTION,
-#             },
-#         )
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -1053,14 +1013,3 @@ async def delete_recent_messages(request: Request, message: UserName):
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(message.username)
     return {"message": "Recent messages deleted successfully"}
-
-
-def convert_name(name):
-    # Convert non-ASCII characters to ASCII
-    name = unidecode(name)
-    # replace spaces with underscores
-    name = name.replace(" ", "_")
-    name = name.replace("@", "_")
-    name = name.replace(".", "_")
-    # lowercase the name
-    return name.lower()

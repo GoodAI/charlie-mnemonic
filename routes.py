@@ -572,9 +572,8 @@ async def handle_update_settings(request: Request, user: editSettings):
     },
 )
 async def handle_message(request: Request, message: userMessage):
-    with open(os.path.join(users_dir, message.username, "settings.json"), "r") as f:
-        settings = json.load(f)
-    if count_tokens(message.prompt) > settings["memory"]["output"]:
+    settings = await SettingsManager.load_settings(users_dir, message.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     (
         total_tokens_used,
@@ -642,7 +641,8 @@ async def handle_message_image(
     chat_id: str = Form(...),
 ):
     username = request.cookies.get("username")
-    if count_tokens(prompt) > 1000:
+    settings = await SettingsManager.load_settings(users_dir, username)
+    if count_tokens(prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     with Database() as db:
         total_tokens_used, total_cost = db.get_token_usage(username)
@@ -870,7 +870,8 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
     success = auth.check_token(message.username, session_token)
     if not success:
         raise HTTPException(status_code=401, detail="Token is invalid")
-    if count_tokens(message.prompt) > 1000:
+    settings = await SettingsManager.load_settings(users_dir, message.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
         message.prompt, message.username, users_dir
@@ -1145,7 +1146,8 @@ async def handle_notoken_message(message: noTokenMessage):
     session_token = auth.login(message.username, message.password)
     if not session_token:
         raise HTTPException(status_code=401, detail="User login failed")
-    if count_tokens(message.prompt) > 1000:
+    settings = await SettingsManager.load_settings(users_dir, message.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     return await process_message(message.prompt, message.username, None, users_dir)
 
@@ -1178,7 +1180,8 @@ async def handle_notoken_generate_audio(message: noTokenMessage):
     session_token = auth.login(message.username, message.password)
     if not session_token:
         raise HTTPException(status_code=401, detail="User login failed")
-    if count_tokens(message.prompt) > 1000:
+    settings = await SettingsManager.load_settings(users_dir, message.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
         message.prompt, message.username, users_dir

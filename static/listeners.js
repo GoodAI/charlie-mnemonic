@@ -70,8 +70,8 @@ message.addEventListener("input", function () {
     const tokens = GPTTokenizer_cl100k_base.encode(message.value);
     tokens_used = tokens.length;
     message_lenght = message.value.length;
-    // $0.03 / 1K tokens
-    cost = tokens_used * 0.03 / 1000;
+    // $0.01 / 1K tokens
+    cost = tokens_used * 0.01 / 1000;
     updateCounterDiv(message_lenght, tokens_used, max_message_tokens, cost);
     // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
     if (tokens_used > max_message_tokens && message.value.trim() != '') {
@@ -466,6 +466,7 @@ document.getElementById('messages').addEventListener('scroll', function() {
 document.addEventListener("DOMContentLoaded", () => {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
+    const tabsState = localStorage.getItem("tabsState");
 
     if (currentTheme) {
         document.body.classList.add(currentTheme);
@@ -475,7 +476,14 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.toggle('dark-theme');
         localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark-theme' : '');
     });
-})
+    // Hacky way, this still shows the animation when the page loads
+    if (tabsState === "open") {
+        openTabs();
+    } else if (tabsState === "closed") {
+        closeTabs();
+    }
+});
+
 
 document.addEventListener('DOMContentLoaded', function () {
     const tooltipElements = document.querySelectorAll('[data-tooltip]');

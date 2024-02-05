@@ -149,6 +149,10 @@ a {
     display: flex;
 }
 
+#toggle-chat-tabs.no-transition span {
+    transition: none;
+}
+
 #toggle-chat-tabs {
     position: absolute;
     left: 15vw;
@@ -165,11 +169,13 @@ a {
 #toggle-chat-tabs.open span {
     display: inline-block;
     transform: rotate(0deg);
-    transition: left 0.5s, transform 0.5s;
 }
 #toggle-chat-tabs.closed span {
     display: inline-block;
     transform: rotate(60deg);
+}
+
+.transition-enabled span {
     transition: left 0.5s, transform 0.5s;
 }
 

@@ -763,8 +763,8 @@ class Database:
                 prompt_tokens = row["prompt_tokens"]
                 completion_tokens = row["completion_tokens"]
                 total_tokens_used = row["total_tokens_used"]
-            prompt_cost = round(prompt_tokens * 0.03 / 1000, 5)
-            completion_cost = round(completion_tokens * 0.06 / 1000, 5)
+            prompt_cost = round(prompt_tokens * 0.01 / 1000, 5)
+            completion_cost = round(completion_tokens * 0.03 / 1000, 5)
             total_cost = round(prompt_cost + completion_cost, 5)
             return total_tokens_used, total_cost
 

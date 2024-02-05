@@ -117,6 +117,8 @@ function openTabs() {
     document.getElementById("sideNav").style.left = "0";
     document.getElementById("chat-container").style.marginLeft = "13vw";
     toggle.setAttribute("data-tooltip", "Hide Chat tabs");
+
+    localStorage.setItem("tabsState", "open");
 }
 
 function closeTabs() {
@@ -129,6 +131,8 @@ function closeTabs() {
 
     document.getElementById("sideNav").style.left = "-18vw";
     document.getElementById("chat-container").style.marginLeft = "0";
+    
+    localStorage.setItem("tabsState", "closed");
 }
 
 

@@ -18,24 +18,21 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from elevenlabs import generate, play, set_api_key
 from werkzeug.utils import secure_filename
 from pathlib import Path
-from config import api_keys
+from config import api_keys, default_params, fakedata
 from database import Database
 import tiktoken
 from pydub import audio_segment
 import logs
 import prompts
 from unidecode import unidecode
+import llmcalls
 
 from simple_utils import get_root
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
-
 # Parameters for OpenAI
-openai_model = api_keys["chatgpt_model"]
 max_responses = 1
-temperature = 0.2
-max_tokens = 1000
 COT_RETRIES = {}
 stopPressed = {}
 
@@ -279,23 +276,23 @@ class AddonManager:
 
                     spec.loader.exec_module(module)
 
-                    # Add the functions to the function dict
+                    # Check for the function in the module and add it with the required structure
                     if module.__name__ in module.__dict__:
-                        function_dict[module.__name__] = module.__dict__[
-                            module.__name__
-                        ]
-
-                        function_metadata.append(
-                            {
-                                "name": module.__name__,
-                                "description": getattr(
-                                    module, "description", "No description"
-                                ),
-                                "parameters": getattr(
-                                    module, "parameters", "No parameters"
-                                ),
-                            }
-                        )
+                        function_detail = {
+                            "name": module.__name__,
+                            "description": getattr(
+                                module, "description", "No description"
+                            ),
+                            "parameters": getattr(
+                                module, "parameters", "No parameters"
+                            ),
+                        }
+                        # Wrap the function detail in the required structure
+                        tool_metadata = {
+                            "type": "function",
+                            "function": function_detail,
+                        }
+                        function_metadata.append(tool_metadata)
                     else:
                         await MessageSender.send_debug(
                             f"Module {module.__name__} does not have a function with the same name.",
@@ -308,16 +305,7 @@ class AddonManager:
             json.dump(settings, f)
 
         if not function_metadata:
-            function_metadata.append(
-                {
-                    "name": "none",
-                    "description": "you have no available functions",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                    },
-                }
-            )
+            function_metadata = fakedata
 
         return function_dict, function_metadata
 
@@ -780,18 +768,30 @@ class MessageParser:
                                 },
                                 {"role": "user", "content": f"{message}"},
                             ]
-                            openai_response = OpenAIResponser(
-                                openai_model, temperature, 1000, max_responses, username
+                            # openai_response = OpenAIResponser(
+                            #     openai_model, temperature, 1000, max_responses, username
+                            # )
+                            # response = await openai_response.get_response(
+                            #     username,
+                            #     messages,
+                            #     stream=False,
+                            #     function_metadata=None,
+                            #     function_call="auto",
+                            # )
+                            response = None
+                            openai_response = llmcalls.OpenAIResponser(
+                                api_keys["openai"], default_params
                             )
-                            response = await openai_response.get_response(
+                            async for resp in openai_response.get_response(
                                 username,
                                 messages,
                                 stream=False,
-                                function_metadata=None,
+                                function_metadata=fakedata,
                                 function_call="auto",
-                            )
+                            ):
+                                response = resp
                             await MessageParser.convert_function_call_arguments(
-                                response["choices"][0]["message"]["content"],
+                                response,
                                 username,
                                 False,
                             )
@@ -834,6 +834,7 @@ class MessageParser:
         users_dir="users/",
         steps_string="",
         full_response=None,
+        chat_id=None,
     ):
         converted_function_call_arguments = (
             await MessageParser.convert_function_call_arguments(
@@ -859,10 +860,24 @@ class MessageParser:
                 "function": function_call_name,
                 "arguments": function_call_arguments,
             },
+            chat_id: chat_id,
         }
         await MessageSender.send_message(new_message, "red", username)
         try:
-            function = function_dict[function_call_name]
+            # we are here, continue fix the function execution
+            print(f"function dict: {function_dict}")
+            # Initialize function to None
+            function = None
+            # Iterate over each function dictionary in the list
+            for func_dict in function_dict:
+                print(f'f d: {func_dict["function"]["name"]}')
+                if (
+                    "function" in func_dict
+                    and func_dict["function"]["name"] == function_call_name
+                ):
+                    # If the function name matches the one you're looking for, assign it to function
+                    function = func_dict["function"]
+                    break  # Break the loop as we've found the matching function
             if inspect.iscoroutinefunction(function):
                 function_response = await MessageParser.ahandle_function_response(
                     function, converted_function_call_arguments
@@ -969,46 +984,47 @@ class MessageParser:
             encoding = tiktoken.encoding_for_model(model)
         except (KeyError, ValueError):
             logger.warning("Warning: model not found. Using cl100k_base encoding.")
-            # encoding = tiktoken.get_encoding("cl100k_base")
             return 0
 
         num_tokens = 0
-        for function in functions:
-            function_tokens = len(encoding.encode(function["name"]))
-            function_tokens += len(encoding.encode(function["description"]))
+        for tool in functions:  # Iterate over the tools
+            if tool["type"] == "function":  # Ensure it's a function type
+                function = tool["function"]  # Extract the function details
+                function_tokens = len(encoding.encode(function["name"]))
+                function_tokens += len(encoding.encode(function["description"]))
 
-            if "parameters" in function:
-                parameters = function["parameters"]
-                if "properties" in parameters:
-                    for propertiesKey in parameters["properties"]:
-                        function_tokens += len(encoding.encode(propertiesKey))
-                        v = parameters["properties"][propertiesKey]
-                        for field in v:
-                            if field == "type":
-                                function_tokens += 2
-                                function_tokens += len(encoding.encode(v["type"]))
-                            elif field == "description":
-                                function_tokens += 2
-                                function_tokens += len(
-                                    encoding.encode(v["description"])
-                                )
-                            elif field == "default":
-                                # true or false so adding 2 tokens
-                                function_tokens += 2
-                            elif field == "enum":
-                                function_tokens -= 3
-                                for o in v["enum"]:
-                                    function_tokens += 3
-                                    function_tokens += len(encoding.encode(o))
-                            elif field == "items":
-                                function_tokens += 10
-                            else:
-                                logger.warning(f"Warning: not supported field {field}")
-                    function_tokens += 11
+                if "parameters" in function:
+                    parameters = function["parameters"]
+                    if "properties" in parameters:
+                        for propertiesKey, v in parameters["properties"].items():
+                            function_tokens += len(encoding.encode(propertiesKey))
+                            for field in v:
+                                if field == "type":
+                                    function_tokens += 2
+                                    function_tokens += len(encoding.encode(v["type"]))
+                                elif field == "description":
+                                    function_tokens += 2
+                                    function_tokens += len(
+                                        encoding.encode(v["description"])
+                                    )
+                                elif field == "default":
+                                    function_tokens += 2
+                                elif field == "enum":
+                                    function_tokens -= 3
+                                    for o in v["enum"]:
+                                        function_tokens += 3
+                                        function_tokens += len(encoding.encode(o))
+                                elif field == "items":
+                                    function_tokens += 10
+                                else:
+                                    logger.warning(
+                                        f"Warning: not supported field {field}"
+                                    )
+                        function_tokens += 11
 
-            num_tokens += function_tokens
+                num_tokens += function_tokens
 
-        num_tokens += 12
+        num_tokens += 12  # Account for any additional overhead
         return num_tokens
 
     async def generate_full_message(username, merged_result_string, instruction_string):
@@ -1064,7 +1080,7 @@ async def process_message(
 ):
     """Process the message and generate a response"""
     # reset the stopPressed variable
-    OpenAIResponser.reset_stop_stream(username)
+    llmcalls.OpenAIResponser.reset_stop_stream(username)
     if display_name is None:
         display_name = username
 
@@ -1131,17 +1147,7 @@ async def process_message(
     all_messages = last_messages_string + "\n" + og_message
 
     if needsTabDescription(chat_id) and len(last_messages) >= 2:
-        fakedata = [
-            {
-                "name": "none",
-                "description": "you have no available functions",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                },
-            }
-        ]
-
+        response = None
         messages = [
             {
                 "role": "system",
@@ -1149,22 +1155,25 @@ async def process_message(
             },
             {"role": "user", "content": all_messages},
         ]
-        openai_response = OpenAIResponser(
-            openai_model, temperature, 30, max_responses, username
-        )
-        response = await openai_response.get_response(
-            username, messages, function_metadata=fakedata
-        )
+        response = "New Chat"
+        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        async for resp in openai_response.get_response(
+            username,
+            messages,
+            stream=False,
+            function_metadata=fakedata,
+            chat_id=chat_id,
+        ):
+            response = resp
+            print(f"tab description: {response}")
 
         with Database() as db:
-            db.update_tab_description(
-                chat_id, response["choices"][0]["message"]["content"]
-            )
+            db.update_tab_description(chat_id, response)
 
         await MessageSender.send_message(
             {
                 "tab_id": chat_id,
-                "tab_description": response["choices"][0]["message"]["content"],
+                "tab_description": response,
             },
             "blue",
             username,
@@ -1303,6 +1312,7 @@ async def process_message(
             history_messages,
             chat_id=chat_id,
         )
+    print(f"gen response: {response}")
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
     response = json.loads(response)
@@ -1422,155 +1432,30 @@ async def generate_response(
     #     else:
     #         prettyprint(f"System: {message['content']}", "green")
 
-    openai_response = OpenAIResponser(
-        openai_model, temperature, max_allowed_tokens, max_responses, username
-    )
-    response = await openai_response.get_response(
+    # openai_response = OpenAIResponser(
+    #     openai_model, temperature, max_allowed_tokens, max_responses, username
+    # )
+    # response = await openai_response.get_response(
+    #     username,
+    #     messages,
+    #     function_metadata=function_metadata,
+    #     stream=True,
+    #     chat_id=chat_id,
+    # )
+    response = ""
+    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+    async for resp in openai_response.get_response(
         username,
         messages,
-        function_metadata=function_metadata,
         stream=True,
+        function_metadata=function_metadata,
         chat_id=chat_id,
-    )
-    # check if the response is a stream or not
-    if (
-        isinstance(response, dict)
-        and "choices" in response
-        and isinstance(response["choices"], list)
-        and len(response["choices"]) > 0
-        and "function_call" in response["choices"][0].get("message", {})
     ):
-        response = response
-    elif isinstance(response, str):
-        response = {"choices": [{"message": {"content": response}}]}
-    else:
-        response = await response.__anext__()
-    await MessageSender.send_debug(f"response: {response}", 1, "green", username)
-    final_response = await process_chain_thoughts(
-        response,
-        og_message,
-        og_message,
-        function_dict,
-        function_metadata,
-        username,
-        users_dir,
-        max_allowed_tokens,
-    )
-    return final_response
+        response = resp
+        # print(f"Generate response: {response}")
+        await MessageSender.send_debug(f"response: {response}", 1, "green", username)
 
-
-async def process_chain_thoughts(
-    full_response,
-    message,
-    og_message,
-    function_dict,
-    function_metadata,
-    username,
-    users_dir,
-    max_allowed_tokens,
-):
-    response = full_response["choices"][0]["message"]
-    # if its a function call anyway, process it
-    if "function_call" in response:
-        function_call_name = response["function_call"]["name"]
-        function_call_arguments = response["function_call"]["arguments"]
-        response = await MessageParser.process_function_call(
-            function_call_name,
-            function_call_arguments,
-            function_dict,
-            function_metadata,
-            message,
-            og_message,
-            username,
-            process_chain_thoughts,
-            False,
-            users_dir,
-            "",
-            full_response,
-        )
-
-        return response
-
-    # check if the final response starts with SAY: or PLAN:
-    final_response = full_response["choices"][0]["message"]["content"]
-    if final_response.startswith("SAY:"):
-        # remove SAY: from the final response
-        final_response = final_response.replace("SAY:", "")
-        # remove leading and trailing whitespace
-        final_response = final_response.strip()
-        # send the final response to the user
-        return final_response
-
-    elif final_response.startswith("PLAN:"):
-        await MessageSender.send_message(
-            {"type": "plan", "content": response}, "green", username
-        )
-        # remove PLAN: from the final response
-        final_response = final_response.replace("PLAN:", "")
-        # remove leading and trailing whitespace
-        final_response = final_response.strip()
-
-        # parse the plan as json
-        try:
-            plan = json.loads(final_response)
-            # get the steps
-            steps = list(plan.keys())
-            steps.sort()
-            # create a string of the steps
-            steps_list = []
-            # go through each step
-            for i, step in enumerate(steps):
-                await MessageSender.send_debug(
-                    f"processing step: {step}", 1, "green", username
-                )
-                # convert the list to a string before passing it to process_cot_messages
-                steps_string = "".join(steps_list)
-                response = await process_cot_messages(
-                    plan[step],
-                    function_dict,
-                    function_metadata,
-                    username,
-                    users_dir,
-                    steps_string,
-                    message,
-                    og_message,
-                )
-                # truncate the response string if it's not one of the last three steps
-                response_str = str(response)
-                if i < len(steps) - 3:
-                    truncated_response = response_str
-                else:
-                    truncated_response = response_str
-                steps_list.append(
-                    "step:" + step + "\nresponse:" + truncated_response + "\n"
-                )
-            # convert the final list to a string
-            steps_string = "".join(steps_list)
-        except:
-            # we cant load the plan as json, so use the whole response as the plan
-            plan = final_response
-            response = await process_cot_messages(
-                plan,
-                function_dict,
-                function_metadata,
-                username,
-                users_dir,
-                "",
-                message,
-                og_message,
-            )
-            response_str = str(response)
-            steps_string = f"Plan: {plan}\nresponse: {response_str}\n"
-
-        return await summarize_cot_responses(
-            steps_string, message, og_message, username, users_dir, max_allowed_tokens
-        )
-
-    else:
-        return final_response
-        # return await summarize_cot_responses(
-        #     final_response, message, og_message, username, users_dir, max_allowed_tokens
-        # )
+    return response
 
 
 async def process_cot_messages(
@@ -1730,12 +1615,18 @@ async def process_function_reply(
             "content": str(function_response),
         },
     ]
-    openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
-    )
-    second_response = await openai_response.get_response(
-        username, messages, stream=True
-    )
+    # openai_response = OpenAIResponser(
+    #     openai_model, temperature, max_tokens, max_responses, username
+    # )
+    # second_response = await openai_response.get_response(
+    #     username, messages, stream=True
+    # )
+    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+    async for resp in openai_response.get_response(
+        username, messages, stream=True, function_metadata=function_metadata
+    ):
+        second_response = resp
+        print(f"Function response: {second_response}")
     return second_response
 
     # final_response = second_response["choices"][0]["message"]["content"]

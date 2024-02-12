@@ -32,6 +32,7 @@ import textwrap
 from nltk.tokenize import sent_tokenize
 import config
 import logs
+import llmcalls
 
 logger = logs.Log("memory", "memory.log").get_logger()
 
@@ -208,19 +209,27 @@ class MemoryManager:
         process_dict = {"input": new_messages}
         # todo: extract the needed date from the message and use that as the date
         # add the date-extractor
-        self.openai_manager.set_username(username)
-        timeline = await self.openai_manager.ask_openai(
-            all_messages, "date-extractor", self.model_used, 100, 0.1, username=username
+        # self.openai_manager.set_username(username)
+        # timeline = await self.openai_manager.ask_openai(
+        #     all_messages, "date-extractor", self.model_used, 100, 0.1, username=username
+        # )
+        subject = "none"
+        openai_response = llmcalls.OpenAIResponser(
+            config.api_keys["openai"], config.default_params
         )
-        if (
-            "choices" in timeline
-            and len(timeline["choices"]) > 0
-            and "message" in timeline["choices"][0]
-            and "content" in timeline["choices"][0]["message"]
+        async for resp in openai_response.get_response(
+            username,
+            all_messages,
+            function_metadata=config.fakedata,
+            role="date-extractor",
         ):
-            subject = timeline["choices"][0]["message"]["content"]
-        else:
-            process_dict["error"] = "timeline does not contain the required elements"
+            print("timeline", resp)
+            if resp:
+                subject = resp
+            else:
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -315,27 +324,41 @@ class MemoryManager:
             )
             process_dict["created_new_memory"] = "yes"
         if remaining_tokens > 100:
-            self.openai_manager.set_username(username)
-            subject_query = await self.openai_manager.ask_openai(
-                all_messages, "retriever", self.model_used, 100, 0.1, username=username
+            openai_response = llmcalls.OpenAIResponser(
+                config.api_keys["openai"], config.default_params
             )
-            if (
-                "choices" in subject_query
-                and len(subject_query["choices"]) > 0
-                and "message" in subject_query["choices"][0]
-                and "content" in subject_query["choices"][0]["message"]
+            subject_query = None
+            response = ""
+            async for resp in openai_response.get_response(
+                username,
+                all_messages,
+                function_metadata=config.fakedata,
+                role="retriever",
             ):
-                subject = subject_query["choices"][0]["message"]["content"]
-            else:
-                process_dict[
-                    "error"
-                ] = "subject_query does not contain the required elements"
+                if resp:
+                    subject_query = resp
+            # self.openai_manager.set_username(username)
+            # subject_query = await self.openai_manager.ask_openai(
+            #     all_messages, "retriever", self.model_used, 100, 0.1, username=username
+            # )
+            # if (
+            #     "choices" in subject_query
+            #     and len(subject_query["choices"]) > 0
+            #     and "message" in subject_query["choices"][0]
+            #     and "content" in subject_query["choices"][0]["message"]
+            # ):
+            #     subject = subject_query["choices"][0]["message"]["content"]
+            # else:
+            #     process_dict["error"] = (
+            #         "subject_query does not contain the required elements"
+            #     )
 
-            if subject.lower() == "none":
-                subject = new_messages
+            if subject_query:
+                if subject_query.lower() == "none":
+                    response = new_messages
 
             process_dict[category] = {}
-            parsed_data = self.process_observation(subject)
+            parsed_data = self.process_observation(response)
             results_list = []
             process_dict[category]["query_results"] = {}
             for data in parsed_data:
@@ -417,21 +440,31 @@ class MemoryManager:
         process_dict = {"input": content}
         unique_results = set()
         logger.debug(f"Processing incoming memory: {content}")
-        self.openai_manager.set_username(username)
-        subject_query = await self.openai_manager.ask_openai(
-            content, "categorise_query", self.model_used, 100, 0.1, username=username
+        # self.openai_manager.set_username(username)
+        # subject_query = await self.openai_manager.ask_openai(
+        #     content, "categorise_query", self.model_used, 100, 0.1, username=username
+        # )
+        subject_query = "none"
+        openai_response = llmcalls.OpenAIResponser(
+            config.api_keys["openai"], config.default_params
         )
-        if "choices" in subject_query and len(subject_query["choices"]) > 0:
-            choice = subject_query["choices"][0]
-            if "message" in choice and "content" in choice["message"]:
-                subject = choice["message"]["content"]
+        async for resp in openai_response.get_response(
+            username,
+            content,
+            function_metadata=config.fakedata,
+            role="categorise_query",
+        ):
+            print("cat response", resp)
+            if resp:
+                subject_query = resp
+                print("subject_query", subject_query)
             else:
                 logger.error("Error: choice does not contain 'message' or 'content'")
         else:
             logger.error(
                 "Error: subject_query does not contain 'choices' or 'choices' is empty"
             )
-        subject = subject_query["choices"][0]["message"]["content"]
+        subject = subject_query
 
         if (
             subject.lower() == "none"
@@ -515,22 +548,31 @@ class MemoryManager:
                     f"({similar_message['id']}){similar_message['metadata']['created_at']} - {similar_message['document']} - score: {similar_message['distance']}"
                 )
         else:
-            self.openai_manager.set_username(username)
-            subject_category = await self.openai_manager.ask_openai(
-                content, "categorise", self.model_used, 100, 0.1, username=username
+            # self.openai_manager.set_username(username)
+            # subject_category = await self.openai_manager.ask_openai(
+            #     content, "categorise", self.model_used, 100, 0.1, username=username
+            # )
+            subject_category = "none"
+            openai_response = llmcalls.OpenAIResponser(
+                config.api_keys["openai"], config.default_params
             )
-            if (
-                "choices" in subject_category
-                and len(subject_category["choices"]) > 0
-                and "message" in subject_category["choices"][0]
-                and "content" in subject_category["choices"][0]["message"]
+            async for resp in openai_response.get_response(
+                username,
+                content,
+                function_metadata=config.fakedata,
+                role="categorise",
             ):
-                category = subject_category["choices"][0]["message"]["content"]
+                if resp:
+                    subject_category = resp
+                else:
+                    logger.error(
+                        "Error: subject_query does not contain the required elements"
+                    )
             else:
                 logger.error(
                     "Error: subject_query does not contain the required elements"
                 )
-            category = subject_category["choices"][0]["message"]["content"]
+            category = subject_category
 
             if category.lower() == "none":
                 category = content
@@ -698,17 +740,33 @@ class MemoryManager:
                 current_file = f"{filedir}/{file}"
                 with open(current_file, "r") as f:
                     file_content = f.read()
-                    self.openai_manager.set_username(username)
-                    summary = await self.openai_manager.ask_openai(
-                        file_content,
-                        "summary_memory",
-                        self.model_used,
-                        int(max_tokens_per_file),
-                        0.1,
-                        username=username,
+                    # self.openai_manager.set_username(username)
+                    # summary = await self.openai_manager.ask_openai(
+                    #     file_content,
+                    #     "summary_memory",
+                    #     self.model_used,
+                    #     int(max_tokens_per_file),
+                    #     0.1,
+                    #     username=username,
+                    # )
+                    openai_response = llmcalls.OpenAIResponser(
+                        config.api_keys["openai"], config.default_params
                     )
+                    async for response in openai_response.get_response(
+                        username,
+                        file_content,
+                        function_metadata=config.fakedata,
+                        role="summary_memory",
+                    ):
+                        print(f"note response: {response}")
+                        if response:
+                            summary = response
+                        else:
+                            logger.error(
+                                "Error: summary does not contain the required elements"
+                            )
                     with open(current_file, "w") as f:
-                        new_content = summary["choices"][0]["message"]["content"]
+                        new_content = summary
                         f.write(new_content)
                         new_files_content_string += f"{file}:\n{new_content}\n\n"
             files_content_string = new_files_content_string
@@ -724,11 +782,26 @@ class MemoryManager:
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
                 # summarize the message
-                self.openai_manager.set_username(username)
-                message = await self.openai_manager.ask_openai(
-                    message, "summarize", self.model_used, 500, 0.1, username=username
+                # self.openai_manager.set_username(username)
+                # message = await self.openai_manager.ask_openai(
+                #     message, "summarize", self.model_used, 500, 0.1, username=username
+                # )
+                # message = message["choices"][0]["message"]["content"]
+                openai_response = llmcalls.OpenAIResponser(
+                    config.api_keys["openai"], config.default_params
                 )
-                message = message["choices"][0]["message"]["content"]
+                async for response in openai_response.get_response(
+                    username,
+                    message,
+                    function_metadata=config.fakedata,
+                    role="summarize",
+                ):
+                    if response:
+                        message = response
+                    else:
+                        logger.error(
+                            "Error: message does not contain the required elements"
+                        )
 
             final_message = f"Current Time: {timestamp}\nCurrent Notes:\n{files_content_string}\n\nRelated messages:\n{content}\n\nLast Message:{message}\n"
             process_dict["final_message"] = final_message
@@ -737,15 +810,31 @@ class MemoryManager:
             while retry_count < 5:
                 try:
                     # todo: inform gpt about the remaining tokens available, if it exceeds the limit, summarize the existing list and purge unneeded items
-                    self.openai_manager.set_username(username)
-                    note_taking_query = await self.openai_manager.ask_openai(
-                        final_message,
-                        "notetaker",
-                        self.model_used,
-                        1000,
-                        0.1,
-                        username=username,
+                    # self.openai_manager.set_username(username)
+                    # note_taking_query = await self.openai_manager.ask_openai(
+                    #     final_message,
+                    #     "notetaker",
+                    #     self.model_used,
+                    #     1000,
+                    #     0.1,
+                    #     username=username,
+                    # )
+                    note_taking_query = {}
+                    openai_response = llmcalls.OpenAIResponser(
+                        config.api_keys["openai"], config.default_params
                     )
+                    async for resp in openai_response.get_response(
+                        username,
+                        final_message,
+                        function_metadata=config.fakedata,
+                        role="notetaker",
+                    ):
+                        if resp:
+                            note_taking_query = resp
+                        else:
+                            logger.error(
+                                "Error: note_taking_query does not contain the required elements"
+                            )
                     process_dict["note_taking_query"] = json.dumps(note_taking_query)
                     actions = self.process_note_taking_query(note_taking_query)
                     break  # If no error, break the loop

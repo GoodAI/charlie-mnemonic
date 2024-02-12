@@ -3,6 +3,26 @@ from typing import Dict, Optional
 
 api_keys: Dict[str, Optional[str]] = {}
 
+default_params = {
+    "model": "gpt-4-turbo-preview",
+    "temperature": 0.3,
+    "max_tokens": 1000,
+}
+
+fakedata = [
+    {
+        "type": "function",
+        "function": {
+            "name": "none",
+            "description": "you have no available functions",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    }
+]
+
 
 # Get API keys from environment variables
 def update_api_keys() -> Dict[str, Optional[str]]:

@@ -44,17 +44,17 @@
                                         </td>
                                         <td>
                                             <select name="allow_access">
-                                                <option value="yes" {% if admin_controls.allow_access==True %}selected{%
+                                                <option value="true" {% if admin_controls.allow_access==True %}selected{%
                                                     endif %}>Yes</option>
-                                                <option value="no" {% if admin_controls.allow_access==False %}selected{%
+                                                <option value="false" {% if admin_controls.allow_access==False %}selected{%
                                                     endif %}>No</option>
                                             </select>
                                         </td>
                                         <td>
                                             <select name="maintenance">
-                                                <option value="yes" {% if admin_controls.maintenance==True %}selected{%
+                                                <option value="true" {% if admin_controls.maintenance==True %}selected{%
                                                     endif %}>Yes</option>
-                                                <option value="no" {% if admin_controls.maintenance==False %}selected{%
+                                                <option value="false" {% if admin_controls.maintenance==False %}selected{%
                                                     endif %}>No</option>
                                             </select>
                                         </td>

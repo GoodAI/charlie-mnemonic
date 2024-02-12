@@ -1,13 +1,17 @@
-from datetime import datetime, timedelta, timezone
 import json
 import os
+import shutil
 import signal
-from json import JSONDecodeError
+import tempfile
+import urllib.parse
+import zipfile
+from datetime import datetime
+from typing import Optional
 
+import logs
 from fastapi import (
     APIRouter,
     HTTPException,
-    BackgroundTasks,
     File,
     Request,
     UploadFile,
@@ -23,16 +27,31 @@ from fastapi.responses import (
     Response,
     JSONResponse,
 )
+from fastapi.security import HTTPBearer
+from fastapi.security.api_key import APIKeyCookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.security.api_key import APIKeyCookie
-import urllib.parse
-from unidecode import unidecode
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
-from configuration_page import modify_settings
-from configuration_page.middleware import login_user_request
-from simple_utils import get_root
+from authentication import Authentication
+from chat_tabs.dao import ChatTabsDAO
+from classes import (
+    UserName,
+    editSettings,
+    userMessage,
+    noTokenMessage,
+    UserGoogle,
+    generateAudioMessage,
+)
+from database import Database
+from memory import (
+    export_memory_to_file,
+    import_file_to_memory,
+)
+from simple_utils import get_root, convert_name
+from user_management.dao import UsersDAO, AdminControlsDAO
+from user_management.routes import set_login_cookies
 from utils import (
     process_message,
     OpenAIResponser,
@@ -42,49 +61,15 @@ from utils import (
     BrainProcessor,
     MessageParser,
 )
-from authentication import Authentication
-from classes import (
-    LoginUser,
-    RecentMessages,
-    User,
-    UserCheckToken,
-    UserName,
-    editSettings,
-    userMessage,
-    noTokenMessage,
-    UserGoogle,
-    generateAudioMessage,
-    ConfigurationData,
-)
-import shutil
-from database import Database
-from memory import (
-    export_memory_to_file,
-    import_file_to_memory,
-    wipe_all_memories,
-    stop_database,
-)
-import tempfile
-import zipfile
-import logs
-from typing import Optional
-from jose import jwt
-from jose.exceptions import JWTError
-from google.oauth2 import id_token
-from google.auth.transport import requests
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, CONFIGURATION_URL, LOGIN_REQUIRED
+from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION, ADMIN_REQUIRED
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
 
 connections = {}
-
-PRODUCTION = os.environ["PRODUCTION"]
-
-ORIGINS = os.environ["ORIGINS"]
 
 users_dir = "users"
 
@@ -106,72 +91,23 @@ async def read_did(file: str):
         raise HTTPException(status_code=404, detail="Item not found")
 
 
-# @router.get("/", response_class=HTMLResponse)
-# async def read_root(request: Request):
-#     version = SettingsManager.get_version()
-#     daily_limit = 0
-#     with Database() as db:
-#         daily_limit = db.get_daily_limit()
-#         maintenance_mode = db.get_maintenance_mode()
-
-#     if (
-#         maintenance_mode == "true"
-#         or maintenance_mode == "True"
-#         or maintenance_mode == True
-#     ):
-#         return templates.TemplateResponse(
-#             "maintenance.html",
-#             {
-#                 "request": request,
-#                 "version": version,
-#                 "daily_limit": daily_limit,
-#                 "production": PRODUCTION,
-#             },
-#         )
-#     else:
-#         return templates.TemplateResponse(
-#             "landing.html",
-#             {
-#                 "request": request,
-#                 "version": version,
-#                 "daily_limit": daily_limit,
-#                 "production": PRODUCTION,
-#             },
-#         )
-
-
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     version = SettingsManager.get_version()
-    daily_limit = 0
-    with Database() as db:
+    with AdminControlsDAO() as db:
         daily_limit = db.get_daily_limit()
-        maintenance_mode = db.get_maintenance_mode()
+        template_name = (
+            "maintenance.html" if db.get_maintenance_mode() else "index.html"
+        )
 
-    if (
-        maintenance_mode == "true"
-        or maintenance_mode == "True"
-        or maintenance_mode == True
-    ):
-        return templates.TemplateResponse(
-            "maintenance.html",
-            {
-                "request": request,
-                "version": version,
-                "daily_limit": daily_limit,
-                "production": PRODUCTION,
-            },
-        )
-    else:
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "version": version,
-                "daily_limit": daily_limit,
-                "production": PRODUCTION,
-            },
-        )
+    context = {
+        "request": request,
+        "version": version,
+        "daily_limit": daily_limit,
+        "production": PRODUCTION,
+    }
+
+    return templates.TemplateResponse(template_name, context)
 
 
 @router.get("/styles.css")
@@ -222,194 +158,6 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
         logger.error(f"An error occurred with user {username}: {e}")
 
 
-# register route
-@router.post(
-    "/register/",
-    tags=["Authentication"],
-    summary="Register a new user",
-    description="This endpoint allows you to register a new user by providing a username and password. If the registration is successful, a session token and username will be set in cookies which expire after 90 days. The cookies' secure attribute is set to True, httponly is set to False, and samesite is set to 'None'. If the registration fails, an HTTP 400 error will be returned.",
-    response_description="Returns a success message if the user is registered successfully, else returns an HTTPException with status code 400.",
-    responses={
-        200: {
-            "description": "User registered successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User registered successfully"}
-                }
-            },
-        },
-        400: {
-            "description": "User registration failed",
-            "content": {
-                "application/json": {"example": {"detail": "User registration failed"}}
-            },
-        },
-    },
-)
-async def register(user: User, response: Response):
-    auth = Authentication()
-    session_token = auth.register(user.username, user.password, user.display_name)
-    if session_token:
-        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION == "true":
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-            response.set_cookie(
-                key="username",
-                value=user.username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-        else:
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
-            response.set_cookie(
-                key="username",
-                value=user.username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
-        return {
-            "message": "User registered successfully",
-            "display_name": user.display_name,
-        }
-    else:
-        raise HTTPException(status_code=400, detail="User registration failed")
-
-
-# login route
-@router.post(
-    "/login/",
-    tags=["Authentication"],
-    summary="Login a user",
-    description="This endpoint allows you to login a user by providing a username and password. If the login is successful, a session token and username will be set in cookies which expire after 90 days. The cookies' secure attribute is set to True, httponly is set to False, and samesite is set to 'None'. If the login fails, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the user is logged in successfully, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User logged in successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User logged in successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "User login failed",
-            "content": {
-                "application/json": {"example": {"detail": "User login failed"}}
-            },
-        },
-    },
-)
-async def login(request: Request, user: LoginUser, response: Response):
-    auth = Authentication()
-    session_token = auth.login(user.username, user.password)
-    if session_token:
-        set_login_cookies(session_token, user.username, response)
-        login_user_request(session_token, user.username, request)
-        return {"message": "User logged in successfully"}
-    else:
-        raise HTTPException(status_code=401, detail="User login failed")
-
-
-def set_login_cookies(
-    session_token: str, username: str, response: Response, duration_days: int = 90
-) -> None:
-    expiracy_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
-    cookie_params = {
-        "secure": True,
-        "httponly": False,
-        "samesite": "None",
-        "expires": expiracy_date,
-    }
-
-    if PRODUCTION == "true":
-        cookie_params["domain"] = ORIGINS
-
-    response.set_cookie(key="session_token", value=session_token, **cookie_params)
-    response.set_cookie(key="username", value=username, **cookie_params)
-
-
-# logout route
-@router.post(
-    "/logout/",
-    tags=["Authentication"],
-    summary="Logout a user",
-    description="This endpoint allows you to logout a user by providing a username and session token. If the logout is successful, the session token and username cookies will be deleted. If the logout fails, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the user is logged out successfully, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User logged out successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User logged out successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "User logout failed",
-            "content": {
-                "application/json": {"example": {"detail": "User logout failed"}}
-            },
-        },
-    },
-)
-async def logout(user: UserCheckToken):
-    auth = Authentication()
-    success = auth.logout(user.username, user.session_token)
-    if success:
-        return {"message": "User logged out successfully"}
-    else:
-        raise HTTPException(status_code=401, detail="User logout failed")
-
-
-# check token route
-@router.post(
-    "/check_token/",
-    tags=["Authentication"],
-    summary="Check if a token is valid",
-    description="This endpoint allows you to check if a token is valid by providing a username and session token. If the token is valid, a success message will be returned. If the token is invalid, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "Token is valid",
-            "content": {"application/json": {"example": {"message": "Token is valid"}}},
-        },
-        401: {
-            "description": "Token is invalid",
-            "content": {
-                "application/json": {"example": {"detail": "Token is invalid"}}
-            },
-        },
-    },
-)
-async def check_token(user: UserCheckToken):
-    auth = Authentication()
-    success = auth.check_token(user.username, user.session_token)
-    if success:
-        return {"message": "Token is valid"}
-    else:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-
-
 # load settings route
 @router.post(
     "/load_settings/",
@@ -437,19 +185,18 @@ async def check_token(user: UserCheckToken):
         },
     },
 )
-async def handle_get_settings(request: Request, user: UserName):
-    await AddonManager.load_addons(user.username, users_dir)
-    with open(os.path.join(users_dir, user.username, "settings.json"), "r") as f:
+async def handle_get_settings(request: Request):
+    username = request.state.user.username
+    await AddonManager.load_addons(username, users_dir)
+    with open(os.path.join(users_dir, username, "settings.json"), "r") as f:
         settings = json.load(f)
-    logger.debug(f"Loaded settings for user {user.username}")
+    logger.debug(f"Loaded settings for user {username}")
     logger.debug(settings)
     total_tokens_used, total_cost = 0, 0
-    with Database() as db:
-        total_tokens_used, total_cost = db.get_token_usage(user.username)
-        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            user.username, True
-        )
-        display_name = db.get_display_name(user.username)
+    with Database() as db, UsersDAO() as dao:
+        total_tokens_used, total_cost = db.get_token_usage(username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
+        display_name = dao.get_display_name(username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -496,8 +243,9 @@ def count_tokens(message):
     },
 )
 async def handle_update_settings(request: Request, user: editSettings):
+    username = request.state.user.username
     # create the directory if it doesn't exist
-    user_dir = os.path.join(users_dir, user.username)
+    user_dir = os.path.join(users_dir, username)
     if not os.path.exists(user_dir):
         os.makedirs(user_dir)
     # check if the settings file exists
@@ -526,9 +274,9 @@ async def handle_update_settings(request: Request, user: editSettings):
         else:
             raise HTTPException(status_code=400, detail="Setting not found")
     elif user.category == "db":
-        with Database() as db:
+        with UsersDAO() as db:
             if user.setting == "display_name":
-                db.update_display_name(user.username, user.value)
+                db.update_display_name(username, user.value)
             else:
                 raise HTTPException(status_code=400, detail="Setting not found")
     else:
@@ -536,11 +284,9 @@ async def handle_update_settings(request: Request, user: editSettings):
     with open(settings_file, "w") as f:
         json.dump(settings, f)
     with Database() as db:
-        total_tokens_used, total_cost = db.get_token_usage(user.username)
-        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            user.username, True
-        )
-        display_name = db.get_display_name(user.username)
+        total_tokens_used, total_cost = db.get_token_usage(username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
+        display_name = db.get_display_name(username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -572,7 +318,8 @@ async def handle_update_settings(request: Request, user: editSettings):
     },
 )
 async def handle_message(request: Request, message: userMessage):
-    settings = await SettingsManager.load_settings(users_dir, message.username)
+    user = request.state.user
+    settings = await SettingsManager.load_settings(users_dir, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     (
@@ -583,43 +330,43 @@ async def handle_message(request: Request, message: userMessage):
         total_daily_cost,
         display_name,
     ) = (0, 0, 0, 0, 0, "")
-    with Database() as db:
-        total_tokens_used, total_cost = db.get_token_usage(message.username)
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
-            message.username, True
+            user.username, True
         )
-        display_name = db.get_display_name(message.username)
-        daily_limit = db.get_daily_limit()
-        has_access = db.get_user_access(message.username)
-        user_id = db.get_user_id(message.username)[0]
-        tab_data = db.get_tab_data(user_id)
-        active_tab_data = db.get_active_tab_data(user_id)
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
             message.chat_id = "0"
             # put the data in the database
-            db.insert_tab_data(
+            chat_tabs_dao.insert_tab_data(
                 user_id, message.chat_id, "new chat", message.chat_id, True
             )
         # if there is an active tab, set chat_id to the active tab's chat_id
         else:
-            db.update_created_at(user_id, message.chat_id)
-            message.chat_id = active_tab_data["chat_id"]
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+            message.chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
-        logger.info(f"user {message.username} does not have access")
+        logger.info(f"user {user.username} does not have access")
         raise HTTPException(
             status_code=400,
             detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
         )
     if total_daily_cost >= daily_limit:
-        logger.info(f"user {message.username} reached daily limit")
+        logger.info(f"user {user.username} reached daily limit")
         raise HTTPException(
             status_code=400,
             detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
         )
     return await process_message(
         message.prompt,
-        message.username,
+        user.username,
         users_dir,
         message.display_name,
         chat_id=message.chat_id,
@@ -637,18 +384,18 @@ async def handle_message_image(
     request: Request,
     image_file: UploadFile,
     prompt: str = Form(...),
-    username: str = Form(...),
     chat_id: str = Form(...),
 ):
-    username = request.cookies.get("username")
+    user = request.state.user
+    username = user.username
     settings = await SettingsManager.load_settings(users_dir, username)
     if count_tokens(prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    with Database() as db:
+    with Database() as db, AdminControlsDAO() as admin_controls_dao:
         total_tokens_used, total_cost = db.get_token_usage(username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
         display_name = db.get_display_name(username)[0]
-        daily_limit = db.get_daily_limit()
+        daily_limit = admin_controls_dao.get_daily_limit()
         has_access = db.get_user_access(username)
         user_id = db.get_user_id(username)[0]
         tab_data = db.get_tab_data(user_id)
@@ -699,72 +446,10 @@ async def handle_message_image(
     )
 
 
-@router.post("/get_chat_tabs/", tags=[LOGIN_REQUIRED])
-async def get_chat_tabs(request: Request, user: UserName):
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        tab_data = db.get_tab_data(user_id) or []
-        active_tab_data = db.get_active_tab_data(user_id) or {}
-        processed_tab_data = [tab for tab in tab_data if tab["is_enabled"]]
-        if active_tab_data is None:
-            active_tab_data = {}
-        return {
-            "tab_data": processed_tab_data,
-            "active_tab_data": active_tab_data,
-        }
-
-
-@router.post("/delete_chat_tab/", tags=[LOGIN_REQUIRED])
-async def delete_chat_tab(request: Request, user: RecentMessages):
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.disable_tab(user_id, user.chat_id)
-        return {"message": "Tab deleted successfully"}
-
-
-@router.post("/get_recent_messages/", tags=[LOGIN_REQUIRED])
-async def get_recent_messages(request: Request, message: RecentMessages):
-    with Database() as db:
-        has_access = db.get_user_access(message.username)
-        user_id = db.get_user_id(message.username)[0]
-        tab_data = db.get_tab_data(user_id)
-        active_tab_data = db.get_active_tab_data(user_id) or {}
-
-        # check if the db has a row with message.chat_id
-        tab_exists = False
-        for tab in tab_data:
-            if tab["chat_id"] == message.chat_id:
-                tab_exists = True
-                break
-        if not tab_exists:
-            # if not, insert a new row
-            db.insert_tab_data(
-                user_id,
-                message.chat_id,
-                f"New Chat",
-                message.chat_id,
-                False,
-            )
-        if message.chat_id != active_tab_data.get("chat_id"):
-            db.set_active_tab(user_id, message.chat_id)
-        active_tab_data = db.get_active_tab_data(user_id)
-
-        recent_messages = await MessageParser.get_recent_messages(
-            message.username, message.chat_id
-        )
-    if not has_access or has_access in ["false", "False"]:
-        logger.info(f"user {message.username} does not have access")
-        raise HTTPException(
-            status_code=400,
-            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
-        )
-    return {"recent_messages": recent_messages}
-
-
 # openAI response route without modules
 @router.post(
     "/message_no_modules/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send a message to the AI without modules",
     description="This endpoint allows you to send a message to the AI by providing a username, session token, and prompt. If the token is valid, the AI will respond to the prompt. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns the AI's response if the token is valid, else returns an HTTPException with status code 401.",
@@ -788,16 +473,12 @@ async def get_recent_messages(request: Request, message: RecentMessages):
 async def handle_message_no_modules(
     request: Request, message: userMessage, audio_path: str = None
 ):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, message.username)
+    user = request.state.user
+    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, user.username)
     messages = [
         {
             "role": "system",
-            "content": message.username + ": " + message.prompt + "\nAssistant: ",
+            "content": user.username + ": " + message.prompt + "\nAssistant: ",
         }
     ]
     response = await openai_response.get_response(messages)
@@ -807,7 +488,7 @@ async def handle_message_no_modules(
 # message route with audio
 @router.post(
     "/message_audio/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send an Audio message and get a transcript",
     description="This endpoint allows you to send an audio message to the AI by providing a username, session token, and audio file. If the token is valid, a transcript of the audio is sent back. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a transcript of the audio if the token is valid, else returns an HTTPException with status code 401.",
@@ -829,21 +510,14 @@ async def handle_message_no_modules(
     },
 )
 async def handle_message_audio(request: Request, audio_file: UploadFile):
-    session_token = request.cookies.get("session_token")
-    username = request.cookies.get("username")
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-
-    result = await AudioProcessor.upload_audio(users_dir, username, audio_file)
-
-    return result
+    return await AudioProcessor.upload_audio(
+        users_dir, request.state.user.username, audio_file
+    )
 
 
 @router.post(
     "/generate_audio/",
-    tags=["Text to Speech"],
+    tags=["Text to Speech", LOGIN_REQUIRED],
     summary="Generate audio from text",
     description="This endpoint allows you to generate audio from text by providing a username, session token, and prompt. If the token is valid, an audio file is sent back. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns an audio file if the token is valid, else returns an HTTPException with status code 401.",
@@ -865,19 +539,15 @@ async def handle_message_audio(request: Request, audio_file: UploadFile):
     },
 )
 async def handle_generate_audio(request: Request, message: generateAudioMessage):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(message.username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
-    settings = await SettingsManager.load_settings(users_dir, message.username)
+    user = request.state.user
+    settings = await SettingsManager.load_settings(users_dir, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
-        message.prompt, message.username, users_dir
+        message.prompt, user.username, users_dir
     )
     with Database() as db:
-        db.add_voice_usage(message.username, len(message.prompt))
+        db.add_voice_usage(user.username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")
 
 
@@ -902,7 +572,9 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
         },
     },
 )
-async def handle_save_data(request: Request, user: UserName):
+async def handle_save_data(request: Request):
+    user = request.state.user
+
     # Paths for memory file and settings file
     json_file_path = os.path.join(users_dir, user.username, "memory.json")
     settings_file = os.path.join(users_dir, user.username, "settings.json")
@@ -964,58 +636,8 @@ async def handle_save_data(request: Request, user: UserName):
 
 
 @router.post(
-    "/delete_data/",
-    tags=["Data", LOGIN_REQUIRED],
-    summary="Delete user data",
-    description="This endpoint allows you to delete the user's data by providing a username and session token. If the token is valid, the user's data will be deleted. If the token is invalid, an HTTP 401 error will be returned.",
-    response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
-    responses={
-        200: {
-            "description": "User data deleted successfully",
-            "content": {
-                "application/json": {
-                    "example": {"message": "User data deleted successfully"}
-                }
-            },
-        },
-        401: {
-            "description": "Token is invalid",
-            "content": {
-                "application/json": {"example": {"detail": "Token is invalid"}}
-            },
-        },
-    },
-)
-async def handle_delete_data(request: Request, user: UserName):
-    wipe_all_memories(user.username)
-    stop_database(user.username)
-    # remove all users recent messages
-    await BrainProcessor.delete_recent_messages(user.username)
-    # remove chat tabs from the database
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.delete_tab_data(user_id)
-    # delete the whole user directory, using ignore_errors=True to avoid errors for the db file that is still open
-    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
-    return {"message": "User data deleted successfully"}
-
-
-@router.post("/delete_data_keep_settings/", tags=[LOGIN_REQUIRED])
-async def handle_delete_data_keep_settings(request: Request, user: UserName):
-    wipe_all_memories(user.username)
-    stop_database(user.username)
-    # remove all users recent messages
-    await BrainProcessor.delete_recent_messages(user.username)
-    # remove chat tabs from the database
-    with Database() as db:
-        user_id = db.get_user_id(user.username)[0]
-        db.delete_tab_data(user_id)
-    return {"message": "User data deleted successfully"}
-
-
-@router.post(
     "/upload_data/",
-    tags=["Data"],
+    tags=["Data", LOGIN_REQUIRED],
     summary="Upload user data",
     description="This endpoint allows you to upload the user's data by providing a username, session token, and data file. If the token is valid, the user's data will be uploaded. If the token is invalid, an HTTP 401 error will be returned.",
     response_description="Returns a success message if the token is valid, else returns an HTTPException with status code 401.",
@@ -1036,14 +658,9 @@ async def handle_delete_data_keep_settings(request: Request, user: UserName):
         },
     },
 )
-async def handle_upload_data(
-    request: Request, username: str = Form(...), data_file: UploadFile = File(...)
-):
-    session_token = request.cookies.get("session_token")
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=401, detail="Token is invalid")
+async def handle_upload_data(request: Request, data_file: UploadFile = File(...)):
+    user = request.state.user
+    username = user.username
 
     # Save the uploaded file to the user's directory
     file_path = os.path.join(users_dir, username, data_file.filename)
@@ -1126,7 +743,7 @@ async def handle_abort_button(request: Request, user: UserName):
 # no token message route
 @router.post(
     "/notoken_message/",
-    tags=["Messaging"],
+    tags=["Messaging", LOGIN_REQUIRED],
     summary="Send a message without token",
     description="This endpoint allows the user to send a message to the AI by providing a prompt, username and password. The AI will respond to the prompt.",
     response_description="Returns the AI's response.",
@@ -1141,15 +758,12 @@ async def handle_abort_button(request: Request, user: UserName):
         },
     },
 )
-async def handle_notoken_message(message: noTokenMessage):
-    auth = Authentication()
-    session_token = auth.login(message.username, message.password)
-    if not session_token:
-        raise HTTPException(status_code=401, detail="User login failed")
-    settings = await SettingsManager.load_settings(users_dir, message.username)
+async def handle_notoken_message(request: Request, message: noTokenMessage):
+    user = request.stat.user
+    settings = await SettingsManager.load_settings(users_dir, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, message.username, None, users_dir)
+    return await process_message(message.prompt, user.username, None, users_dir)
 
 
 @router.post(
@@ -1175,184 +789,76 @@ async def handle_notoken_message(message: noTokenMessage):
         },
     },
 )
-async def handle_notoken_generate_audio(message: noTokenMessage):
-    auth = Authentication()
-    session_token = auth.login(message.username, message.password)
-    if not session_token:
-        raise HTTPException(status_code=401, detail="User login failed")
-    settings = await SettingsManager.load_settings(users_dir, message.username)
+async def handle_notoken_generate_audio(request: Request, message: noTokenMessage):
+    user = request.stat.user
+    settings = await SettingsManager.load_settings(users_dir, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
-        message.prompt, message.username, users_dir
+        message.prompt, user.username, users_dir
     )
     return FileResponse(audio_path, media_type="audio/wav")
 
 
-security = HTTPBearer()
-
-
-def get_current_username(
-    username: Optional[str] = Depends(APIKeyCookie(name="username")),
-    session_token: Optional[str] = Depends(APIKeyCookie(name="session_token")),
-):
-    auth = Authentication()
-    success = auth.check_token(username, session_token)
-    if not success:
-        raise HTTPException(status_code=403, detail="Invalid authorization code")
-    return username
-
-
-@router.post("/admin/update_user/{user_id}")
-async def update_user(
-    user_id: int,
-    has_access: str = Form(...),
-    role: str = Form(...),
-    username: str = Depends(get_current_username),
-):
-    with Database() as db:
-        role_db = db.get_user_role(username)[0]
-    if role_db != "admin":
-        logger.warning(
-            f"User {username} (role: {role_db}) is not authorized to update this user: {user_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to update this user"
-        )
-    else:
-        with Database() as db:
-            db.update_user(user_id, has_access, role)
-            logger.info(f"User {username} (role: {role_db}) updated user: {user_id}")
-            return {"message": f"User {user_id} updated successfully"}
-
-
-@router.get("/admin/statistics/{page}", response_class=HTMLResponse)
+@router.get(
+    "/admin/statistics/{page}",
+    response_class=HTMLResponse,
+    tags=[LOGIN_REQUIRED, ADMIN_REQUIRED],
+)
 async def get_statistics(
     request: Request,
     page: int,
     items_per_page: int = 5,
-    username: str = Depends(get_current_username),
 ):
+    with Database() as db, UsersDAO() as users, AdminControlsDAO() as admin_controls:
+        global_stats = json.loads(db.get_global_statistics())
+        # Fetch data based on page number and items per page
+        page_statistics = json.loads(db.get_statistics(page, items_per_page))
+        total_pages = users.get_total_statistics_pages(items_per_page)
+        admin_controls = json.loads(admin_controls.get_admin_controls_json())
+        return templates.TemplateResponse(
+            "stats.html",
+            {
+                "request": request,
+                "rows": page_statistics,
+                "chart_data": json.dumps(page_statistics).replace('"', '\\"'),
+                "page": page,
+                "items_per_page": items_per_page,
+                "total_pages": total_pages,
+                "statistics": global_stats,
+                "admin_controls": admin_controls,
+            },
+        )
+
+
+@router.get(
+    "/admin/statistics/user/{user_id}",
+    response_class=HTMLResponse,
+    tags=[LOGIN_REQUIRED, ADMIN_REQUIRED],
+)
+async def get_user_statistics(request: Request, user_id: int):
     with Database() as db:
-        role = db.get_user_role(username)[0]
-    if role != "admin":
-        logger.warning(
-            f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/{page}"
+        user_stats = json.loads(db.get_user_statistics(user_id))
+        return templates.TemplateResponse(
+            "user_stats.html", {"request": request, "rows": user_stats}
         )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to view this page"
-        )
-    else:
-        with Database() as db:
-            global_stats = json.loads(db.get_global_statistics())
-            # Fetch data based on page number and items per page
-            page_statistics = json.loads(db.get_statistics(page, items_per_page))
-            total_pages = db.get_total_statistics_pages(items_per_page)
-            admin_controls = json.loads(db.get_admin_controls())
-            return templates.TemplateResponse(
-                "stats.html",
-                {
-                    "request": request,
-                    "rows": page_statistics,
-                    "chart_data": json.dumps(page_statistics).replace('"', '\\"'),
-                    "page": page,
-                    "items_per_page": items_per_page,
-                    "total_pages": total_pages,
-                    "statistics": global_stats,
-                    "admin_controls": admin_controls,
-                },
-            )
-
-
-@router.get("/admin/statistics/user/{user_id}", response_class=HTMLResponse)
-async def get_user_statistics(
-    request: Request, user_id: int, username: str = Depends(get_current_username)
-):
-    # get the user's role from the database
-    with Database() as db:
-        role = db.get_user_role(username)[0]
-    if role != "admin":
-        logger.warning(
-            f"User {username} (role: {role}) is not authorized to view this page: /admin/statistics/user/{user_id}"
-        )
-        raise HTTPException(
-            status_code=403, detail="You are not authorized to view this page"
-        )
-    else:
-        with Database() as db:
-            user_stats = json.loads(db.get_user_statistics(user_id))
-            return templates.TemplateResponse(
-                "user_stats.html", {"request": request, "rows": user_stats}
-            )
-
-
-@router.post("/admin/update_controls")
-async def update_controls(
-    request: Request,
-    username: str = Depends(get_current_username),
-    id: int = Form(...),
-    daily_spending_limit: str = Form(...),
-    allow_access: str = Form(...),
-    maintenance: str = Form(...),
-):
-    with Database() as db:
-        role = db.get_user_role(username)[0]
-        if role != "admin":
-            raise HTTPException(
-                status_code=403, detail="You are not authorized to perform this action"
-            )
-        with Database() as db:
-            if id == "" or id == None:
-                id = 1
-            db.update_admin_controls(
-                id, daily_spending_limit, allow_access, maintenance
-            )
-        return RedirectResponse(url="/admin/statistics/1", status_code=303)
 
 
 @router.get("/profile", response_class=HTMLResponse)
-async def get_user_profile(
-    request: Request, username: str = Depends(get_current_username)
-):
-    with Database() as db:
-        user_id = db.get_user_id(username)
-        daily_stats = json.loads(db.get_user_statistics(user_id))
-        user_profile = json.loads(db.get_user_profile(username))
+async def get_user_profile(request: Request):
+    with Database() as db, UsersDAO() as users:
+        user = request.state.user
+        daily_stats = json.loads(db.get_user_statistics(user.id))
+        user_profile = json.loads(users.get_user_profile(user.username))
         return templates.TemplateResponse(
             "user_profile.html",
             {"request": request, "profile": user_profile, "daily_stats": daily_stats},
         )
 
 
-@router.get(CONFIGURATION_URL, response_class=HTMLResponse)
-async def configuration(request: Request):
-    # TODO: security check for login
-    version = SettingsManager.get_version()
-    with Database() as db:
-        daily_limit = db.get_daily_limit()
-        maintenance_mode = db.get_maintenance_mode()
-
-    config = ConfigurationData.for_frontend()
-
-    return templates.TemplateResponse(
-        "configuration.html",
-        context=locals(),
-    )
-
-
-@router.post(CONFIGURATION_URL, response_class=JSONResponse)
-async def update_configuration(config_data: ConfigurationData):
-    # TODO: security check for login
-    try:
-        filtered = {k: v for k, v in config_data.dict().items() if v is not None}
-        modify_settings(filtered)
-        return {"message": "Configuration updated successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/data/{file_path:path}")
-async def read_file(file_path: str, username: str = Depends(get_current_username)):
+@router.get("/data/{file_path:path}", tags=[LOGIN_REQUIRED])
+async def read_file(request: Request, file_path: str):
+    username = request.state.user.username
     converted_name = convert_name(username)
     host_path = os.path.join(os.getcwd(), "users", converted_name, "data", file_path)
     if os.path.exists(host_path):
@@ -1410,7 +916,7 @@ async def google_login(request: UserGoogle, response: Response):
     logger.debug(f"User {username} logged in with Google:\n{id_info}")
 
     # check if email is verified
-    if id_info["email_verified"] == False:
+    if not id_info["email_verified"]:
         raise HTTPException(
             status_code=401, detail="User login failed, email not verified"
         )
@@ -1422,43 +928,9 @@ async def google_login(request: UserGoogle, response: Response):
     auth = Authentication()
     session_token = auth.google_login(id_info)
     if session_token:
-        expiracy_date = datetime.now(timezone.utc) + timedelta(days=90)
-        if PRODUCTION == "true":
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-            response.set_cookie(
-                key="username",
-                value=username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-                domain=ORIGINS,
-            )
-        else:
-            response.set_cookie(
-                key="session_token",
-                value=session_token,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
-            response.set_cookie(
-                key="username",
-                value=username,
-                secure=True,
-                httponly=False,
-                samesite="None",
-                expires=expiracy_date,
-            )
+        set_login_cookies(
+            session_token=session_token, username=username, response=response
+        )
         return {"message": "User logged in successfully"}
     else:
         raise HTTPException(status_code=401, detail="User login failed")
@@ -1469,14 +941,3 @@ async def delete_recent_messages(request: Request, message: UserName):
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(message.username)
     return {"message": "Recent messages deleted successfully"}
-
-
-def convert_name(name):
-    # Convert non-ASCII characters to ASCII
-    name = unidecode(name)
-    # replace spaces with underscores
-    name = name.replace(" ", "_")
-    name = name.replace("@", "_")
-    name = name.replace(".", "_")
-    # lowercase the name
-    return name.lower()

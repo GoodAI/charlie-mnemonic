@@ -4,12 +4,28 @@ import tempfile
 import dotenv
 import openai
 import pytest
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 
 from config import CONFIGURATION_URL
-from main import app
+from launcher import create_app
+from user_management.session import session_factory
 
-client = TestClient(app)
+
+@pytest.fixture
+def client():
+    os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
+
+    if os.path.exists("user.db"):
+        os.remove("user.db")
+    os.environ["NEW_DATABASE_URL"] = "sqlite:///user.db?cache=shared"
+
+    session_factory.get_refreshed()
+
+    app = create_app()
+    yield TestClient(app)
+
+    if os.path.exists("user.db"):
+        os.remove("user.db")
 
 
 @pytest.fixture(autouse=True)
@@ -40,12 +56,12 @@ def none_openai_key():
     yield
 
 
-def test_configuration_page_working(fake_openai_key):
+def test_configuration_page_working(client, fake_openai_key):
     response = client.get(CONFIGURATION_URL)
     assert response.status_code == 200
 
 
-def test_updating_invalid_key(fake_openai_key):
+def test_updating_invalid_key(client, fake_openai_key):
     response = client.post(CONFIGURATION_URL, json={"testkey": "value"})
     content = response.json()
     assert (
@@ -65,7 +81,7 @@ def test_updating_invalid_key(fake_openai_key):
     ]
 
 
-def test_updating_set_openai_key(config_file_path, fake_openai_key):
+def test_updating_set_openai_key(client, config_file_path, fake_openai_key):
     response = client.post(CONFIGURATION_URL, json={"OPENAI_API_KEY": "value"})
     content = response.json()
     assert response.status_code == 200
@@ -81,7 +97,7 @@ OPENAI_API_KEY=value
     assert openai.api_key == "value"
 
 
-def test_blank_elevenlabs_resets(config_file_path, fake_openai_key):
+def test_blank_elevenlabs_resets(client, config_file_path, fake_openai_key):
     response = client.post(
         CONFIGURATION_URL, json={"OPENAI_API_KEY": "value", "ELEVENLABS_API_KEY": ""}
     )
@@ -100,7 +116,7 @@ Content:
     assert loaded_values["ELEVENLABS_API_KEY"] == ""
 
 
-def test_missing_json_body(fake_openai_key):
+def test_missing_json_body(client, fake_openai_key):
     response = client.post(CONFIGURATION_URL)
     content = response.json()
     assert (
@@ -116,16 +132,16 @@ Content:
     ]
 
 
-def test_redirect_on_missing_openai_key(no_openai_key):
+def test_redirect_on_missing_openai_key(client, no_openai_key):
     response = client.get("/")
     assert response.url.path == CONFIGURATION_URL
 
 
-def test_redirect_on_missing_openai_key_none(none_openai_key):
+def test_redirect_on_missing_openai_key_none(client, none_openai_key):
     response = client.get("/")
     assert response.url.path == CONFIGURATION_URL
 
 
-def test_no_redirect_openai_key(fake_openai_key):
+def test_no_redirect_openai_key(client, fake_openai_key):
     response = client.get("/")
     assert response.url.path == "/"

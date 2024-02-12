@@ -18,6 +18,8 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from elevenlabs import generate, play, set_api_key
 from werkzeug.utils import secure_filename
 from pathlib import Path
+
+from chat_tabs.dao import ChatTabsDAO
 from config import api_keys
 from database import Database
 import tiktoken
@@ -27,6 +29,7 @@ import prompts
 from unidecode import unidecode
 
 from simple_utils import get_root
+from user_management.dao import UsersDAO
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -732,8 +735,8 @@ class MessageParser:
 
     @staticmethod
     def get_message(type, parameters):
-        with Database() as db:
-            display_name = db.get_display_name(parameters["username"])[0]
+        with UsersDAO() as db:
+            display_name = db.get_display_name(parameters["username"])
         """Parse the message based on the type and parameters"""
         if type == "start_message":
             return prompts.start_message.format(
@@ -950,8 +953,8 @@ class MessageParser:
                 f"Assistant: {response['content']}", 1, "pink", username
             )
             if response["content"] is not None:
-                with Database() as db:
-                    display_name = db.get_display_name(username)[0]
+                with UsersDAO() as db:
+                    display_name = db.get_display_name(username)
                 memory = _memory.MemoryManager()
                 await memory.process_incoming_memory_assistant(
                     "active_brain", response["content"], username, chat_id=chat_id
@@ -1138,7 +1141,9 @@ async def process_message(
 
     all_messages = last_messages_string + "\n" + og_message
 
-    if needsTabDescription(chat_id) and len(last_messages) >= 2:
+    with ChatTabsDAO() as dao:
+        needs_tab_description = dao.needs_tab_description(chat_id)
+    if needs_tab_description and len(last_messages) >= 2:
         fakedata = [
             {
                 "name": "none",
@@ -1164,7 +1169,7 @@ async def process_message(
             username, messages, function_metadata=fakedata, chat_id=chat_id
         )
 
-        with Database() as db:
+        with ChatTabsDAO() as db:
             db.update_tab_description(
                 chat_id, response["choices"][0]["message"]["content"]
             )

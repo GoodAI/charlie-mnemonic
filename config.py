@@ -1,6 +1,8 @@
 import os
 from typing import Dict, Optional
 
+from simple_utils import get_root
+
 api_keys: Dict[str, Optional[str]] = {}
 
 
@@ -30,6 +32,21 @@ update_api_keys()
 STATIC = "static"
 CONFIGURATION_URL = "/configuration/"
 LOGIN_REQUIRED = "login_required"
+ADMIN_REQUIRED = "admin_required"
 SINGLE_USER_USERNAME = os.environ.get("SINGLE_USER_USERNAME", "admin")
 SINGLE_USER_DISPLAY_NAME = os.environ.get("SINGLE_USER_DISPLAY_NAME", "admin")
 SINGLE_USER_PASSWORD = os.environ.get("SINGLE_USER_PASSWORD", "admin")
+DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE = get_root("users/user.env")
+PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
+
+
+def origins():
+    return os.environ["ORIGINS"]
+
+
+def database_url():
+    return os.environ["DATABASE_URL"]
+
+
+def new_database_url():
+    return os.environ["NEW_DATABASE_URL"]

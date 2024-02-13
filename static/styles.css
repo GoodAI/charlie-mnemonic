@@ -61,14 +61,22 @@
 }
 
 
+@-ms-viewport{
+    width: device-width;
+}
+
+html {
+    height:100%;
+}
+
 body {
-    font-family: 'Lexend', 'Poppins', sans-serif;
+    font-family: 'Lexend', 'Mulish', sans-serif;
     background: var(--background-color);
     /* background: #111; */
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    height: 100%;
     margin: 0;
     overflow: hidden;
     flex-direction: column;
@@ -122,7 +130,7 @@ a {
 }
 
 .sub_title {
-    margin: 0 0 50px;
+    margin: 0 0 10px;
     text-align: center;
     color: var(--text-color);
     font-size: 18px;
@@ -251,6 +259,13 @@ a {
 .chat-tab.active {
     background-color: #5084d8;
     color: white;
+}
+
+table {
+    height: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 table tr {
@@ -1150,10 +1165,6 @@ pre {
 
 .streamingState-empty {
     color: grey;
-}
-
-body * {
-    font-family: 'Lexend', 'Mulish', sans-serif;
 }
 
 #content {

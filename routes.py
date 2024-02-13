@@ -283,10 +283,10 @@ async def handle_update_settings(request: Request, user: editSettings):
         raise HTTPException(status_code=400, detail="Category not found")
     with open(settings_file, "w") as f:
         json.dump(settings, f)
-    with Database() as db:
+    with Database() as db, UsersDAO() as dao:
         total_tokens_used, total_cost = db.get_token_usage(username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
-        display_name = db.get_display_name(username)
+        display_name = dao.get_display_name(username)
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
@@ -391,20 +391,20 @@ async def handle_message_image(
     settings = await SettingsManager.load_settings(users_dir, username)
     if count_tokens(prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    with Database() as db, AdminControlsDAO() as admin_controls_dao:
+    with Database() as db, AdminControlsDAO() as admin_controls_dao, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
         total_tokens_used, total_cost = db.get_token_usage(username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
-        display_name = db.get_display_name(username)[0]
+        display_name = dao.get_display_name(username)[0]
         daily_limit = admin_controls_dao.get_daily_limit()
-        has_access = db.get_user_access(username)
-        user_id = db.get_user_id(username)[0]
-        tab_data = db.get_tab_data(user_id)
-        active_tab_data = db.get_active_tab_data(user_id)
+        has_access = dao.get_user_access(username)
+        user_id = dao.get_user_id(username)[0]
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
             chat_id = 0
             # put the data in the database
-            db.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
+            chat_tabs_dao.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
         # if there is an active tab, set chat_id to the active tab's chat_id
         else:
             chat_id = active_tab_data["chat_id"]

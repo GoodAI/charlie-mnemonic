@@ -7,9 +7,8 @@ import openai
 from dotenv import load_dotenv
 from elevenlabs import set_api_key as set_elevenlabs_api_key
 
-from config import update_api_keys, api_keys
+from config import update_api_keys, DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
-from simple_utils import get_root
 
 
 def update_openai_api_key(value: str):
@@ -18,7 +17,7 @@ def update_openai_api_key(value: str):
 
 def reload_configuration():
     load_dotenv()
-    load_dotenv(dotenv_path=CONFIGURATION_FILE, override=True)
+    load_dotenv(dotenv_path=configuration_file(), override=True)
     update_api_keys()
     for config_meta_item in configuration_meta_list:
         value = os.environ.get(config_meta_item.key, None)
@@ -53,7 +52,11 @@ configuration_meta_list = [
 
 configuration_meta = OrderedDict([(meta.key, meta) for meta in configuration_meta_list])
 
-CONFIGURATION_FILE = get_root("users/user.env")
+
+def configuration_file() -> str:
+    return os.environ.get(
+        "CLANG_SYSTEM_CONFIGURATION_FILE", DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE
+    )
 
 
 def modify_settings(settings: Dict[str, str], path: Optional[str] = None):
@@ -68,7 +71,7 @@ def modify_settings(settings: Dict[str, str], path: Optional[str] = None):
             meta.validate_callback(settings[key])
 
     # TODO: callbacks for certain key updates (update API key in libraries where necessary)
-    path = path or os.environ.get("CLANG_SYSTEM_CONFIGURATION_FILE", CONFIGURATION_FILE)
+    path = path or configuration_file()
     update_dotenv_file(path=path, updates=settings)
     for key, value in settings.items():
         os.environ[key] = value

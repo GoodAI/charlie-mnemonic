@@ -18,6 +18,8 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from elevenlabs import generate, play, set_api_key
 from werkzeug.utils import secure_filename
 from pathlib import Path
+
+from chat_tabs.dao import ChatTabsDAO
 from config import api_keys, default_params, fakedata
 from database import Database
 import tiktoken
@@ -28,6 +30,7 @@ from unidecode import unidecode
 import llmcalls
 
 from simple_utils import get_root
+from user_management.dao import UsersDAO
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -80,17 +83,17 @@ class MessageSender:
                         "red",
                         username,
                     )
-                    # cost based on these formulas prompt: $0.03 / 1K tokens completion: $0.06 / 1K tokens
+                    # cost based on these formulas prompt: $0.01 / 1K tokens completion: $0.03 / 1K tokens
                     prompt_cost = round(
-                        response["usage"]["prompt_tokens"] * 0.03 / 1000, 5
+                        response["usage"]["prompt_tokens"] * 0.01 / 1000, 5
                     )
                     completion_cost = round(
-                        response["usage"]["completion_tokens"] * 0.06 / 1000, 5
+                        response["usage"]["completion_tokens"] * 0.03 / 1000, 5
                     )
                     this_message_total_cost = round(prompt_cost + completion_cost, 5)
 
-                    total_prompt_cost = round(result[1] * 0.03 / 1000, 5)
-                    total_completion_cost = round(result[2] * 0.06 / 1000, 5)
+                    total_prompt_cost = round(result[1] * 0.01 / 1000, 5)
+                    total_completion_cost = round(result[2] * 0.03 / 1000, 5)
                     total_cost = round(total_prompt_cost + total_completion_cost, 5)
                     await MessageSender.send_message(
                         {
@@ -720,8 +723,8 @@ class MessageParser:
 
     @staticmethod
     def get_message(type, parameters):
-        with Database() as db:
-            display_name = db.get_display_name(parameters["username"])[0]
+        with UsersDAO() as db:
+            display_name = db.get_display_name(parameters["username"])
         """Parse the message based on the type and parameters"""
         if type == "start_message":
             return prompts.start_message.format(
@@ -736,7 +739,9 @@ class MessageParser:
             )
 
     @staticmethod
-    async def convert_function_call_arguments(arguments, username, tryAgain=True):
+    async def convert_function_call_arguments(
+        arguments, username, tryAgain=True, chat_id=None
+    ):
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
@@ -788,12 +793,14 @@ class MessageParser:
                                 stream=False,
                                 function_metadata=fakedata,
                                 function_call="auto",
+                                chat_id=chat_id,
                             ):
                                 response = resp
                             await MessageParser.convert_function_call_arguments(
                                 response,
                                 username,
                                 False,
+                                chat_id=chat_id,
                             )
                         else:
                             logger.exception(
@@ -838,7 +845,7 @@ class MessageParser:
     ):
         converted_function_call_arguments = (
             await MessageParser.convert_function_call_arguments(
-                function_call_arguments, username
+                function_call_arguments, username, chat_id=chat_id
             )
         )
         # add the username to the arguments
@@ -860,7 +867,7 @@ class MessageParser:
                 "function": function_call_name,
                 "arguments": function_call_arguments,
             },
-            chat_id: chat_id,
+            "chat_id": chat_id,
         }
         await MessageSender.send_message(new_message, "red", username)
         try:
@@ -903,6 +910,7 @@ class MessageParser:
             username,
             merge,
             users_dir,
+            chat_id,
         )
 
     @staticmethod
@@ -950,6 +958,7 @@ class MessageParser:
                 "users/",
                 "",
                 None,
+                chat_id=chat_id,
             )
         else:
             await MessageSender.send_debug(f"{message}", 1, "green", username)
@@ -957,8 +966,8 @@ class MessageParser:
                 f"Assistant: {response['content']}", 1, "pink", username
             )
             if response["content"] is not None:
-                with Database() as db:
-                    display_name = db.get_display_name(username)[0]
+                with UsersDAO() as db:
+                    display_name = db.get_display_name(username)
                 memory = _memory.MemoryManager()
                 await memory.process_incoming_memory_assistant(
                     "active_brain", response["content"], username, chat_id=chat_id
@@ -1146,7 +1155,9 @@ async def process_message(
 
     all_messages = last_messages_string + "\n" + og_message
 
-    if needsTabDescription(chat_id) and len(last_messages) >= 2:
+    with ChatTabsDAO() as dao:
+        needs_tab_description = dao.needs_tab_description(chat_id)
+    if needs_tab_description and len(last_messages) >= 2:
         response = None
         messages = [
             {
@@ -1167,7 +1178,7 @@ async def process_message(
             response = resp
             print(f"tab description: {response}")
 
-        with Database() as db:
+        with ChatTabsDAO() as db:
             db.update_tab_description(chat_id, response)
 
         await MessageSender.send_message(
@@ -1358,7 +1369,7 @@ async def start_chain_thoughts(
         openai_model, temperature, max_tokens_allowed, max_responses, username
     )
     response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata
+        username, messages, function_metadata=function_metadata, chat_id=chat_id
     )
 
     final_response = response
@@ -1375,6 +1386,7 @@ async def start_chain_thoughts(
         username,
         users_dir,
         max_tokens_allowed,
+        chat_id=chat_id,
     )
     await MessageSender.send_debug(
         f"cot_response: {cot_response}", 1, "green", username
@@ -1525,7 +1537,13 @@ async def process_cot_messages(
 
 
 async def summarize_cot_responses(
-    steps_string, message, og_message, username, users_dir, max_allowed_tokens
+    steps_string,
+    message,
+    og_message,
+    username,
+    users_dir,
+    max_allowed_tokens,
+    chat_id=None,
 ):
     global COT_RETRIES
     global last_messages
@@ -1573,7 +1591,13 @@ async def summarize_cot_responses(
     else:
         COT_RETRIES[username] += 1
         return await process_final_message(
-            message, og_message, response, username, users_dir, max_allowed_tokens
+            message,
+            og_message,
+            response,
+            username,
+            users_dir,
+            max_allowed_tokens,
+            chat_id,
         )
 
 
@@ -1587,6 +1611,7 @@ async def process_function_reply(
     username,
     merge=True,
     users_dir="users/",
+    chat_id=None,
 ):
     await MessageSender.send_debug(
         f"processing function {function_call_name} response: {str(function_response)}",
@@ -1598,6 +1623,7 @@ async def process_function_reply(
         "functionresponse": "yes",
         "color": "red",
         "message": function_response,
+        "chat_id": chat_id,
     }
     await MessageSender.send_message(new_message, "red", username)
 
@@ -1619,7 +1645,7 @@ async def process_function_reply(
     #     openai_model, temperature, max_tokens, max_responses, username
     # )
     # second_response = await openai_response.get_response(
-    #     username, messages, stream=True
+    #     username, messages, stream=True, chat_id=chat_id
     # )
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
     async for resp in openai_response.get_response(
@@ -1639,7 +1665,7 @@ async def process_function_reply(
 
 
 async def process_final_message(
-    message, og_message, response, username, users_dir, max_allowed_tokens
+    message, og_message, response, username, users_dir, max_allowed_tokens, chat_id=None
 ):
     if response.startswith("YES: "):
         # remove the YES: part
@@ -1672,7 +1698,7 @@ async def process_final_message(
 
     # response = generate_response(messages, function_dict, function_metadata)
     response = await start_chain_thoughts(
-        full_message, og_message, username, users_dir, max_allowed_tokens
+        full_message, og_message, username, users_dir, max_allowed_tokens, chat_id
     )
 
     fc_check = None
@@ -1703,6 +1729,7 @@ async def process_final_message(
             users_dir,
             "",
             None,
+            chat_id,
         )
         return new_fc_check
     else:

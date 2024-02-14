@@ -109,13 +109,13 @@ function closeNav() {
 
 function openTabs() {
     const toggle = document.getElementById("toggle-chat-tabs");
-    toggle.style.left = "15vw";
+    toggle.style.left = "13vw";
     toggle.classList.remove("closed");
     toggle.classList.add("open");
     toggle.onclick = closeTabs;
 
     document.getElementById("sideNav").style.left = "0";
-    document.getElementById("chat-container").style.marginLeft = "13vw";
+    document.getElementById("chat-container").style.marginLeft = "8vw";
     toggle.setAttribute("data-tooltip", "Hide Chat tabs");
 
     localStorage.setItem("tabsState", "open");

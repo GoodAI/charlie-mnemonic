@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import importlib
 import inspect
 import json
@@ -598,46 +599,48 @@ class AudioProcessor:
 
     @staticmethod
     async def transcribe_audio(audio_file_path, language):
-        with open(audio_file_path, "rb") as audio_file:
-            transcription = await openai.Audio.atranscribe(
-                model="whisper-1",
-                file=audio_file,
-                language=language,
-                api_key=api_keys["openai"],
-            )
-        return transcription["text"]
+        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        transcription = await openai_response.get_audio_transcription(
+            audio_file_path, language, "audio"
+        )
+        print(f"Transcription: {transcription}")
+        return transcription.text
 
     @staticmethod
     async def generate_audio(text, username, users_dir):
-        # Make sure the directory exists
-        audio_dir = os.path.join(users_dir, username, "audio")
-        Path(audio_dir).mkdir(parents=True, exist_ok=True)
-        audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
+        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        audio_path = await openai_response.generate_audio(text, username, users_dir)
+        return audio_path
 
-        # Strip code blocks from text
-        text = MessageParser.strip_code_blocks(text)
+        # # Make sure the directory exists
+        # audio_dir = os.path.join(users_dir, username, "audio")
+        # Path(audio_dir).mkdir(parents=True, exist_ok=True)
+        # audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
 
-        # Retry mechanism for audio generation
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                audio = generate(
-                    text=text,
-                    voice="ThT5KcBeYPX3keUQqHPh",
-                    model="eleven_multilingual_v1",
-                )
-                with open(audio_path, "wb") as f:
-                    f.write(audio)
-                return audio_path, audio
-            except requests.exceptions.ChunkedEncodingError as e:
-                if attempt < max_retries - 1:
-                    continue
-                else:
-                    raise e
-            except Exception as e:
-                # Log other exceptions and re-raise
-                logger.error(e)
-                raise
+        # # Strip code blocks from text
+        # text = MessageParser.strip_code_blocks(text)
+
+        # # Retry mechanism for audio generation
+        # max_retries = 3
+        # for attempt in range(max_retries):
+        #     try:
+        #         audio = generate(
+        #             text=text,
+        #             voice="ThT5KcBeYPX3keUQqHPh",
+        #             model="eleven_multilingual_v1",
+        #         )
+        #         with open(audio_path, "wb") as f:
+        #             f.write(audio)
+        #         return audio_path, audio
+        #     except requests.exceptions.ChunkedEncodingError as e:
+        #         if attempt < max_retries - 1:
+        #             continue
+        #         else:
+        #             raise e
+        #     except Exception as e:
+        #         # Log other exceptions and re-raise
+        #         logger.error(e)
+        #         raise
 
 
 class BrainProcessor:
@@ -691,19 +694,17 @@ class MessageParser:
         return text
 
     @staticmethod
-    @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
-    async def get_image_description(image_url, prompt, file_name):
-        """Get the description of an image using a LLAVA 1.5 API"""
-        import replicate
-
-        output = replicate.run(
-            "yorickvp/llava-13b:6bc1c7bb0d2a34e413301fee8f7cc728d2d4e75bfab186aa995f63292bda92fc",
-            input={"image": open(image_url, "rb"), "prompt": prompt},
+    async def start_image_description(image_path, prompt, file_name):
+        """Get the description of an image using the OpenAI Vision API, asynchronously."""
+        print(f"Image details: {image_path}, {prompt}, {file_name}")
+        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        resp = await openai_response.get_image_description(
+            image_path=image_path, prompt=prompt, filename=file_name
         )
-        # The yorickvp/llava-13b model can stream output as it's running.
-        # The predict method returns an iterator, and you can iterate over that output.
-        full_response = "".join([item for item in output])
-        return prompts.image_description.format(prompt, file_name, full_response)
+        print(f"Image description: {resp}")
+        result = prompts.image_description.format(prompt, file_name, resp)
+        print(f"Image description + prompt: {result}")
+        return result
 
     @staticmethod
     async def get_recent_messages(username, chat_id):
@@ -871,35 +872,45 @@ class MessageParser:
         }
         await MessageSender.send_message(new_message, "red", username)
         try:
-            # we are here, continue fix the function execution
-            print(f"function dict: {function_dict}")
-            # Initialize function to None
-            function = None
-            # Iterate over each function dictionary in the list
-            for func_dict in function_dict:
-                print(f'f d: {func_dict["function"]["name"]}')
-                if (
-                    "function" in func_dict
-                    and func_dict["function"]["name"] == function_call_name
-                ):
-                    # If the function name matches the one you're looking for, assign it to function
-                    function = func_dict["function"]
-                    break  # Break the loop as we've found the matching function
-            if inspect.iscoroutinefunction(function):
-                function_response = await MessageParser.ahandle_function_response(
-                    function, converted_function_call_arguments
-                )
+            # Print the available functions for debugging
+            print(f"Available functions: {list(function_dict.keys())}")
+
+            # Try to get the module corresponding to the function_call_name
+            module = function_dict.get(function_call_name)
+            if module:
+                try:
+                    # Attempt to retrieve the callable function from the module
+                    actual_function = getattr(module, function_call_name)
+                    if actual_function and callable(actual_function):
+                        # print(f"Executing {function_call_name}...")
+                        if asyncio.iscoroutinefunction(actual_function):
+                            function_response = (
+                                await MessageParser.ahandle_function_response(
+                                    actual_function, converted_function_call_arguments
+                                )
+                            )
+                        else:
+                            function_response = MessageParser.handle_function_response(
+                                actual_function, converted_function_call_arguments
+                            )
+                    else:
+                        print(
+                            f"Function {function_call_name} not found within the module."
+                        )
+                        function_response = f"Function {function_call_name} not found."
+                except AttributeError as e:
+                    print(
+                        f"Error accessing function {function_call_name} in module: {e}"
+                    )
+                    function_response = (
+                        f"Error accessing function {function_call_name}: {e}"
+                    )
             else:
-                function_response = MessageParser.handle_function_response(
-                    function, converted_function_call_arguments
-                )
-        except KeyError as e:
-            await MessageSender.send_message(
-                {"error": f"Function {function_call_name} not found: {e}"},
-                "red",
-                username,
-            )
-            function_response = f"Function {function_call_name} not found: {e}"
+                print(f"Module for {function_call_name} not found.")
+                function_response = f"Module for {function_call_name} not found."
+        except Exception as e:
+            print(f"Error: {e}")
+            function_response = f"Error: {e}"
         return await process_function_reply(
             function_call_name,
             function_response,
@@ -1649,10 +1660,14 @@ async def process_function_reply(
     # )
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
     async for resp in openai_response.get_response(
-        username, messages, stream=True, function_metadata=function_metadata
+        username,
+        messages,
+        stream=True,
+        function_metadata=function_metadata,
+        chat_id=chat_id,
     ):
         second_response = resp
-        print(f"Function response: {second_response}")
+        # print(f"Function response: {second_response}")
     return second_response
 
     # final_response = second_response["choices"][0]["message"]["content"]

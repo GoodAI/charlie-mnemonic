@@ -91,6 +91,11 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
     messagesContainer.appendChild(chatMessage);
 
     if (showLoading) {
+        // remove the last message class from the last user message
+        var lastMessage2 = document.querySelector('.last-message');
+        if (lastMessage2) {
+            lastMessage2.classList.remove('last-message');
+        }
         var botMessage = document.createElement('div');
         botMessage.innerHTML = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"><div class="spinner"></div></div></div>';
         messagesContainer.appendChild(botMessage);
@@ -510,6 +515,7 @@ function send_audio(file) {
                 // clear the message input
                 document.getElementById('message').value = '';
             } else {
+                console.log('Sending audio transcription to server: ' + data.transcription);
                 sendMessageToServer(data.transcription);
             }
         })

@@ -36,7 +36,13 @@ class Authentication:
         self.dao.delete_user_by_username(username)
 
     def force_login(self, username: str, regenerate_token: bool) -> str:
-        session_token = self.dao.get_user(username).session_token
+        # session_token = self.dao.get_user(username).session_token
+        user = self.dao.get_user(username)
+        if user is None:
+            logger.error(f"User not found: {username}")
+            return None
+
+        session_token = user.session_token
         if regenerate_token or not session_token:
             session_token = binascii.hexlify(os.urandom(24)).decode()
             self.dao.update_session_token(username, session_token)

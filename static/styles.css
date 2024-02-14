@@ -163,7 +163,7 @@ a {
 
 #toggle-chat-tabs {
     position: absolute;
-    left: 15vw;
+    left: 8vw;
     top: 50%;
     transform: translateY(-50%);
     background: none;
@@ -222,9 +222,11 @@ a {
     font-size: smaller;    
     overflow: hidden;
     /* Mask for text fade out starting at 90% of the parent's width */
-    -webkit-mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
-    mask-image: linear-gradient(to right, black 12vw, transparent 16vw);
+    -webkit-mask-image: linear-gradient(to right, black 11vw, transparent 13vw);
+    mask-image: linear-gradient(to right, black 11vw, transparent 13vw);
     width: 100%;
+    white-space: nowrap;
+    
 }
 
 .chat-tab:hover {
@@ -250,7 +252,7 @@ a {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-left: 13vw;
+    margin-left: 8vw;
     transition: margin-left 0.3s;
     position: relative;
     z-index: 5;
@@ -809,7 +811,7 @@ pre {
 
 .sidenav {
     height: 80%;
-    width: 15vw;
+    width: 13vw;
     position: fixed;
     top: 18vh;
     left: 0;

@@ -1,7 +1,10 @@
 import asyncio
+import base64
 import datetime
 import json
 import os
+from pathlib import Path
+import uuid
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import aiohttp
@@ -28,8 +31,66 @@ class OpenAIResponser:
                 addon_name = filename.replace(".py", "")
                 addon = __import__(f"addons.{addon_name}", fromlist=[""])
                 addons[addon_name] = addon
-        print(f"Loaded addons: {addons}")
+        # print(f"Loaded addons: {addons}")
         return addons
+
+    async def generate_audio(self, text, username, users_dir, voice="alloy", speed=1.0):
+        """Asynchronously generate audio from text using the OpenAI API."""
+        print(f"Generating audio for text: {text}")
+        # Make sure the directory exists
+        audio_dir = os.path.join(users_dir, username, "audio")
+        Path(audio_dir).mkdir(parents=True, exist_ok=True)
+        audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
+
+        async with self.client.audio.speech.with_streaming_response.create(
+            model="tts-1",
+            voice="alloy",
+            input=text,
+        ) as response:
+            print(f"Response: {response}")
+            await response.stream_to_file(audio_path)
+            return audio_path
+
+    async def get_audio_transcription(self, audio_path, language, filename):
+        from pathlib import Path
+
+        # Create transcription from audio file
+        print(f"Getting transcription for audio: {audio_path}")
+        transcription = await self.client.audio.transcriptions.create(
+            model="whisper-1",
+            file=Path(audio_path),
+            language=language,
+        )
+        return transcription
+
+    async def get_image_description(self, image_path, prompt, filename):
+        """Asynchronously get a description of an image using the OpenAI Vision API."""
+        print(f"Getting description for image: {image_path} and prompt: {prompt}")
+        # Encode the image to base64
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Craft the prompt with the base64-encoded image
+        prompt_message = {
+            "role": "user",
+            "content": [
+                prompt,
+                {"image": base64_image, "resize": 768},
+            ],
+        }
+
+        params = {
+            "model": "gpt-4-vision-preview",
+            "messages": [prompt_message],
+            "max_tokens": 200,
+        }
+
+        response = await self.client.chat.completions.create(**params)
+        if response:
+            description = response.choices[0].message.content
+            return description
+        else:
+            return "Failed to get a description."
 
     async def get_response(
         self,
@@ -107,10 +168,9 @@ class OpenAIResponser:
                 accumulated_name = ""
                 accumulated_arguments = ""
                 async for chunk in response:
-                    print(
-                        f"Current chunk finish_reason: {chunk.choices[0].finish_reason}"
-                    )
-
+                    # print(
+                    #     f"Current chunk finish_reason: {chunk.choices[0].finish_reason}"
+                    # )
                     delta = chunk.choices[0].delta
                     # check if the user pressed stop
                     global stopPressed
@@ -143,40 +203,39 @@ class OpenAIResponser:
                     if (
                         chunk.choices[0].finish_reason == "stop"
                         or chunk.choices[0].finish_reason == "tool_calls"
+                        or tool_calls_complete
                     ):
                         if accumulated_arguments:
                             try:
-                                print(
-                                    f"Final accumulated arguments: {accumulated_arguments}"
-                                )  # Debug print: Show final accumulated arguments
+                                # print(
+                                #     f"Final accumulated arguments: {accumulated_arguments}"
+                                # )
                                 parsed_arguments = (
                                     json.loads(accumulated_arguments)
                                     if accumulated_arguments
                                     else accumulated_arguments
                                 )
-                                print(
-                                    f"Parsed arguments: {parsed_arguments}"
-                                )  # Debug print: Show parsed arguments
-
-                                # Assuming process_function_call can handle the parsed arguments correctly
-                                tool_response = await utils.MessageParser.process_function_call(
-                                    accumulated_name,
-                                    parsed_arguments,
-                                    function_metadata,
-                                    [],  # Likely don't need to pass tool_calls here based on context
-                                    message,
-                                    message,
-                                    username,
-                                    None,
-                                    chat_id=chat_id,
+                                # print(
+                                #     f"Parsed arguments: {parsed_arguments}"
+                                # )
+                                tool_response = (
+                                    await utils.MessageParser.process_function_call(
+                                        accumulated_name,
+                                        parsed_arguments,
+                                        self.addons,
+                                        function_metadata,
+                                        message,
+                                        message,
+                                        username,
+                                        None,
+                                        chat_id=chat_id,
+                                    )
                                 )
                                 yield tool_response
-                                break  # Exit the loop after processing the tool call
+                                break
                             except json.JSONDecodeError as e:
                                 yield f"Error parsing JSON arguments: {e}"
-                                print(
-                                    f"JSON parsing error: {e}"
-                                )  # Debug print: Show JSON parsing error
+                                print(f"JSON parsing error: {e}")
                                 break
                         await utils.MessageSender.send_message(
                             {"stop_message": True, "chat_id": chat_id},
@@ -190,42 +249,30 @@ class OpenAIResponser:
                         if chunk.choices[0].delta.content
                         else ""
                     )
-                    if content:
-                        collected_messages.append(content)
-                        yield await utils.MessageSender.send_message(
-                            {"chunk_message": content, "chat_id": chat_id},
-                            "blue",
-                            username,
-                        )
-                    print("Processing chunk...")
-                    print(f"chunk: {chunk}")
                     if delta.tool_calls:
                         for toolcall_chunk in delta.tool_calls:
-                            print(
-                                f"toolcall_chunk: {toolcall_chunk}"
-                            )  # Debug print: Show each toolcall_chunk
+                            # print(
+                            #     f"toolcall_chunk: {toolcall_chunk}"
+                            # )
 
                             # Only set the name if it's not None and accumulated_name is not already set
                             if toolcall_chunk.function.name and not accumulated_name:
                                 accumulated_name = toolcall_chunk.function.name
-                                print(
-                                    f"Function name set to: {accumulated_name}"
-                                )  # Debug print: Show function name when set
+                                # print(
+                                #     f"Function name set to: {accumulated_name}"
+                                # )
 
                             # Accumulate arguments
                             accumulated_arguments += toolcall_chunk.function.arguments
-                            print(
-                                f"Accumulated arguments: {accumulated_arguments}"
-                            )  # Debug print: Show accumulated arguments
+                            # print(
+                            #     f"Accumulated arguments: {accumulated_arguments}"
+                            # )
 
                         # Use finish_reason to determine if tool calls are complete
                         if chunk.choices[0].finish_reason == "tool_calls":
                             tool_calls_complete = True
-                            print(
-                                "Tool calls complete"
-                            )  # Debug print: Indicate completion of tool calls
-
-                    # Once tool calls are complete, parse and process the accumulated arguments
+                            print("Tool calls complete")
+                            break
 
                     # define the content of the message
                     content = (
@@ -239,8 +286,6 @@ class OpenAIResponser:
                     yield response
             # if no stream, return the full message
             else:
-                print("no stream")
-                print(f"ns response: {response}")
                 yield response.choices[0].message.content
 
     def get_role_content(self, role, current_date_time):
@@ -286,22 +331,22 @@ class OpenAIResponser:
 
 
 # Example usage
-async def main():
-    api_key = os.getenv("OPENAI_API_KEY")
-    default_params = {
-        "model": "gpt-4-1106-preview",
-        "temperature": 0.3,
-        "max_tokens": 150,
-    }
-    responser = OpenAIResponser(api_key, default_params)
+# async def main():
+#     api_key = os.getenv("OPENAI_API_KEY")
+#     default_params = {
+#         "model": "gpt-4-1106-preview",
+#         "temperature": 0.3,
+#         "max_tokens": 150,
+#     }
+#     responser = OpenAIResponser(api_key, default_params)
 
-    messages = [{"role": "user", "content": "What's 1+1, use 10 words!"}]
-    async for response in responser.get_response("test", messages, stream=False):
-        print(response)
+#     messages = [{"role": "user", "content": "What's 1+1, use 10 words!"}]
+#     async for response in responser.get_response("test", messages, stream=False):
+#         print(response)
 
-    async for chunk in responser.get_response("test", messages, stream=True):
-        print(chunk)
+#     async for chunk in responser.get_response("test", messages, stream=True):
+#         print(chunk)
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())

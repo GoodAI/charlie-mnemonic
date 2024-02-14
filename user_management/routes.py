@@ -73,7 +73,7 @@ def set_login_cookies(
 ) -> None:
     expiracy_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
     cookie_params = {
-        "secure": PRODUCTION,
+        "secure": True,
         "httponly": False,
         "samesite": "None",
         "expires": expiracy_date,

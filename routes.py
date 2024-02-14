@@ -391,23 +391,26 @@ async def handle_message_image(
     settings = await SettingsManager.load_settings(users_dir, username)
     if count_tokens(prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    with Database() as db, AdminControlsDAO() as admin_controls_dao, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao:
-        total_tokens_used, total_cost = db.get_token_usage(username)
-        total_daily_tokens_used, total_daily_cost = db.get_token_usage(username, True)
-        display_name = dao.get_display_name(username)[0]
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
         daily_limit = admin_controls_dao.get_daily_limit()
-        has_access = dao.get_user_access(username)
-        user_id = dao.get_user_id(username)[0]
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
         tab_data = chat_tabs_dao.get_tab_data(user_id)
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
-            chat_id = 0
+            chat_id = "0"
             # put the data in the database
             chat_tabs_dao.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
         # if there is an active tab, set chat_id to the active tab's chat_id
         else:
-            chat_id = active_tab_data["chat_id"]
+            chat_tabs_dao.update_created_at(user_id, chat_id)
+            chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {username} does not have access")
         raise HTTPException(
@@ -438,7 +441,7 @@ async def handle_message_image(
     # add the image as markdown to the prompt
     url_encoded_image = urllib.parse.quote(image_file.filename)
     prompt = "![image](data/" + url_encoded_image + ' "image")<p>' + prompt + "</p>"
-    result = await MessageParser.get_image_description(
+    result = await MessageParser.start_image_description(
         image_path, prompt, image_file.filename
     )
     return await process_message(
@@ -543,9 +546,10 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
     settings = await SettingsManager.load_settings(users_dir, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    audio_path, audio = await AudioProcessor.generate_audio(
+    audio_path = await AudioProcessor.generate_audio(
         message.prompt, user.username, users_dir
     )
+
     with Database() as db:
         db.add_voice_usage(user.username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")

@@ -12,6 +12,7 @@ import logs
 from agentmemory import wipe_all_memories, stop_database
 from chat_tabs.dao import ChatTabsDAO
 from classes import (
+    EditTabDescription,
     RecentMessages,
 )
 from routes import users_dir
@@ -130,3 +131,11 @@ async def handle_delete_data(request: Request):
         db.delete_tab_data(user.id)
     shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
     return {"message": "User data deleted successfully"}
+
+
+# update_chat_tab_description route
+@router.post("/update_chat_tab_description/", tags=[LOGIN_REQUIRED])
+async def update_chat_tab_description(request: Request, user: EditTabDescription):
+    with ChatTabsDAO() as chat_tabs_dao:
+        chat_tabs_dao.update_tab_description(user.chat_id, user.description)
+    return {"message": "Tab description updated successfully"}

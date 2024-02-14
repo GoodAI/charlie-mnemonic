@@ -1197,6 +1197,79 @@ function addChatTab(id) {
     setChat(id);
 }
 
+function shareChat(chat_id) {
+    var chatContent = document.getElementById('messages').innerHTML;
+    
+    // Create the modal elements
+    var backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    var modalContent = document.createElement('div');
+    modalContent.className = 'share-modal-content';
+    
+    // Set the inner HTML of the modal content
+    modalContent.innerHTML = `<h3>This function is a WIP, your shared conversation would look like this (only active tab is currently displayed):</h3>${chatContent}`;
+    
+    // Append the modal content to the backdrop and then the backdrop to the modal container
+    backdrop.appendChild(modalContent);
+    document.getElementById('share-modal-container').appendChild(backdrop);
+    
+    // Show the modal
+    backdrop.style.display = 'block';
+    
+    // Close the modal when clicking on the backdrop
+    backdrop.addEventListener('click', function(event) {
+      if (event.target === backdrop) {
+        backdrop.style.display = 'none';
+        backdrop.remove();
+      }
+    });
+  }
+  
+  
+
+function editTabDescription(chat_id) {
+    var tabButton = document.getElementById('chat-tab-' + chat_id);
+    var tabDescription = tabButton.textContent;
+    // rempve the ' ⋮ ' from the text
+    tabDescription = tabDescription.split(' ⋮ ')[0];
+    var newDescription = prompt('Enter a new description for the chat tab:', tabDescription);
+    if (newDescription != null) {
+        // trim to the first 5 words only
+        newDescription = newDescription.split(' ').slice(0, 5).join(' ');
+        if (newDescription.split(' ').length > 5) {
+            newDescription += '...';
+        }
+        tabButton.textContent = newDescription;
+        tabButton.classList.add('typewriter-text');
+        // force the browser to reflow the element
+        tabButton.offsetWidth;
+        tabButton.classList.add('typewriter-text');
+        // send the new description to the server
+        fetch(API_URL + '/update_chat_tab_description/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'username': user_name, 'chat_id': chat_id, 'description': newDescription }),
+            credentials: 'include'
+        })
+            .then(response => response.json())
+            .then(data => {
+                // add the tab dots menu
+                var dots = document.createElement('div');
+                dots.className = 'chat-tab-dots';
+                dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
+                dots.onclick = function(event) {
+                    event.stopPropagation();
+                    showDropdown(this, chat_id);
+                };
+
+                tabButton.appendChild(dots);
+            })
+            .catch(console.error);
+    }
+}
+
 
 function deleteChatTab(chat_id) {
     var chatTabs = document.getElementById('chat-tabs-container');

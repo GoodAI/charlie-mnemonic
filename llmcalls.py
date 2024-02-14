@@ -44,7 +44,7 @@ class OpenAIResponser:
 
         async with self.client.audio.speech.with_streaming_response.create(
             model="tts-1",
-            voice="alloy",
+            voice="shimmer",
             input=text,
         ) as response:
             print(f"Response: {response}")

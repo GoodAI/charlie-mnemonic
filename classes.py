@@ -28,6 +28,12 @@ class RecentMessages(BaseModel):
     chat_id: str
 
 
+class EditTabDescription(BaseModel):
+    username: str
+    chat_id: str
+    description: str
+
+
 class UserCheckToken(BaseModel):
     username: str
     session_token: str

@@ -180,6 +180,14 @@ function handleImageFile(imageFile) {
             document.getElementById('image-preview').style.display = 'block';
             // Hide the upload-image button
             document.getElementById('upload-image').style.display = 'none';
+
+            let imageWrapper = document.querySelector('.image-wrapper');
+            imageWrapper.addEventListener('mouseover', function () {
+                this.querySelector('.hover-text').style.display = 'block';
+            });
+            imageWrapper.addEventListener('mouseout', function () {
+                this.querySelector('.hover-text').style.display = 'none';
+            });
         };
 
         // Set image src to the result of FileReader
@@ -240,7 +248,7 @@ document.getElementById('send').addEventListener('click', async function () {
                 }
 
                 console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
-                document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
+                document.querySelector('.icon-container-right').style.right = 45 + 'px';
 
                 // Image sending operations
                 send_image(pastedImageFile);

@@ -46,6 +46,12 @@ class userMessage(BaseModel):
     chat_id: str
 
 
+class regenerateMessage(BaseModel):
+    uuid: str
+    username: str
+    chat_id: str
+
+
 class userImageMessage(BaseModel):
     prompt: str
     username: str
@@ -100,12 +106,6 @@ class ConfigurationData(BaseModel):
         title="OpenAI API key",
         description="This key is used for general OpenAI API calls and is required for the agent to work.",
     )
-    ELEVENLABS_API_KEY: str = Field(
-        None,
-        title="Elevenlabs API key",
-        description="This is used for text to speech. Use it if you want agent to speak.",
-        required=False,
-    )
 
     @staticmethod
     def for_frontend():
@@ -128,7 +128,7 @@ class ConfigurationData(BaseModel):
             )
         return OrderedDict(result)
 
-    @validator("OPENAI_API_KEY", "ELEVENLABS_API_KEY", pre=True, always=True)
+    @validator("OPENAI_API_KEY", pre=True, always=True)
     def check_not_empty(cls, v, field):
         if field.required and (v is None or v == ""):
             raise ValueError(f"{field.name} is required and cannot be empty")

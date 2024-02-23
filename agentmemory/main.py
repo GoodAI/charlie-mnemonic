@@ -19,7 +19,14 @@ from agentmemory.client import get_client
 
 
 def create_memory(
-    category, text, metadata={}, embedding=None, id=None, username=None, mUsername=None
+    category,
+    text,
+    metadata={},
+    embedding=None,
+    id=None,
+    username=None,
+    mUsername=None,
+    regenerate=False,
 ):
     """
     Create a new memory in a collection.
@@ -118,6 +125,18 @@ def create_unique_memory(
     metadata["novel"] = "False"
     metadata["related_to"] = memories[0]["id"]
     metadata["related_document"] = memories[0]["document"]
+    create_memory(category, content, metadata=metadata, username=username)
+    return id
+
+
+def create_alternative_memory(
+    category, content, metadata={}, username=None, mUsername=None, chat_id=None
+):
+    """
+    Creates a new alternate memory, basically a newer version of the memory
+    """
+    # placeholder for now
+    metadata["novel"] = "True"
     create_memory(category, content, metadata=metadata, username=username)
     return id
 
@@ -497,6 +516,57 @@ def get_memories(
     debug_log(f"Got memories from category {category}", memories)
 
     return memories
+
+
+def get_last_message(category, chat_id, username=None, message_uuid=None):
+    """
+    Retrieve the second to last message from a given category or the message before the message with the given UUID.
+
+    Arguments:
+        category (str): The category of the memories.
+        chat_id (str): The chat_id of the chat.
+        username (str, optional): The username for client authentication. Defaults to None.
+        message_uuid (str, optional): The UUID of the message to find the preceding message of. Defaults to None.
+
+    Returns:
+        dict: The retrieved memory.
+
+    Example:
+        >>> get_last_message("books", "1")
+        >>> get_last_message("books", "1", message_uuid="some-uuid")
+    """
+
+    # Get or create the collection for the given category
+    memories = get_client(username=username).get_or_create_collection(category)
+
+    # Get the types to include based on the function parameters
+    include_types = get_include_types(True, False)
+
+    # Retrieve all memories that meet the given metadata filter
+    memories = memories.get(where={"chat_id": chat_id}, include=include_types)
+
+    if not isinstance(memories, list):
+        # Convert the collection to list format
+        memories = chroma_collection_to_list(memories)
+
+    # Sort memories by ID. Sorting in descending order to make it easier to access the second to last message.
+    memories.sort(key=lambda x: x["metadata"]["created_at"], reverse=False)
+
+    debug_log(f"Got previous last message from category {category}", memories)
+
+    if message_uuid:
+        # Iterate over memories to find the one with the given UUID and return the message before it
+        for i, memory in enumerate(memories):
+            if memory.get("metadata").get("uid") == message_uuid and i > 0:
+                return memories[i - 1]["document"]
+        return (
+            {}
+        )  # Return an empty dict if the UUID is not found or is the first message
+    elif len(memories) > 1:
+        # Access the second to last message if there are enough memories, otherwise return an empty dict
+        return memories[1]["document"]
+    else:
+        return {}  # Return an empty dict if there's only one or no messages
 
 
 def update_memory(

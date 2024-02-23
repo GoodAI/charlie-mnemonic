@@ -43,11 +43,13 @@ from classes import (
     noTokenMessage,
     UserGoogle,
     generateAudioMessage,
+    regenerateMessage,
 )
 from database import Database
 from memory import (
     export_memory_to_file,
     import_file_to_memory,
+    get_last_message,
 )
 from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO, AdminControlsDAO
@@ -146,7 +148,8 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
                 await websocket.send_text(f"Received: {data}")
     except WebSocketDisconnect:
         # Handle client disconnection
-        del connections[username]
+        if username in connections:
+            del connections[username]
         logger.debug(f"User {username} disconnected")
     except ConnectionResetError:
         # Handle client disconnection
@@ -370,6 +373,71 @@ async def handle_message(request: Request, message: userMessage):
         users_dir,
         message.display_name,
         chat_id=message.chat_id,
+    )
+
+
+@router.post("/regenerate_response/", tags=[LOGIN_REQUIRED])
+async def regenerate_response(request: Request, message: regenerateMessage):
+    user = request.state.user
+    settings = await SettingsManager.load_settings(users_dir, user.username)
+
+    (
+        total_tokens_used,
+        total_cost,
+        daily_limit,
+        total_daily_tokens_used,
+        total_daily_cost,
+        display_name,
+    ) = (0, 0, 0, 0, 0, "")
+    print(
+        f"getting user data for {user.username} to regenerate response with uuid {message.uuid} and chat_id {message.chat_id}"
+    )
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
+        last_message = get_last_message(
+            "active_brain", message.chat_id, user.username, message.uuid
+        )
+        print(f"last message: {last_message}")
+        # if no active tab, set chat_id to 0
+        if active_tab_data is None:
+            message.chat_id = "0"
+            # put the data in the database
+            chat_tabs_dao.insert_tab_data(
+                user_id, message.chat_id, "new chat", message.chat_id, True
+            )
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+            message.chat_id = active_tab_data.chat_id
+    if not has_access or has_access == "false" or has_access == "False":
+        logger.info(f"user {user.username} does not have access")
+        raise HTTPException(
+            status_code=400,
+            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
+        )
+    if total_daily_cost >= daily_limit:
+        logger.info(f"user {user.username} reached daily limit")
+        raise HTTPException(
+            status_code=400,
+            detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
+        )
+    return await process_message(
+        last_message,
+        user.username,
+        users_dir,
+        display_name,
+        chat_id=message.chat_id,
+        regenerate=True,
+        uuid=message.uuid,
     )
 
 

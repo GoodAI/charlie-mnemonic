@@ -25,6 +25,8 @@ from agentmemory import (
     export_memory_to_file,
     stop_database,
     search_memory_by_date,
+    create_alternative_memory,
+    get_last_message,
 )
 import utils
 from dateutil.parser import parse
@@ -46,11 +48,22 @@ class MemoryManager:
         pass
 
     async def create_memory(
-        self, category, document, metadata={}, username=None, mUsername=None
+        self,
+        category,
+        document,
+        metadata={},
+        username=None,
+        mUsername=None,
+        regenerate=False,
     ):
         """Create a new memory and return the ID."""
         return create_memory(
-            category, document, metadata, username=username, mUsername=mUsername
+            category,
+            document,
+            metadata,
+            username=username,
+            mUsername=mUsername,
+            regenerate=regenerate,
         )
 
     async def create_unique_memory(
@@ -60,6 +73,12 @@ class MemoryManager:
         return create_unique_memory(
             category, content, metadata, similarity, username=username
         )
+
+    async def create_alternative_memory(
+        self, category, content, metadata={}, username=None
+    ):
+        """Create a new memory if it doesn't exist yet and return the ID."""
+        return create_alternative_memory(category, content, metadata, username=username)
 
     async def get_memories(self, category, username=None):
         """Return all memories in the category."""
@@ -227,9 +246,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -303,13 +322,17 @@ class MemoryManager:
         remaining_tokens=1000,
         verbose=False,
         chat_id=None,
+        regenerate=False,
+        uid=None,
     ):
+        """Process the active brain and return the updated active brain data."""
         category = "active_brain"
         process_dict = {"input": new_messages}
         seen_ids = set()
 
         chunks = await self.split_text_into_chunks(new_messages, 200)
-        uid = secrets.token_hex(10)
+        if uid is None:
+            uid = secrets.token_hex(10)
         for chunk in chunks:
             # Create a memory for each chunk
             await self.create_memory(
@@ -318,6 +341,7 @@ class MemoryManager:
                 username=username,
                 metadata={"uid": uid, "chat_id": chat_id},
                 mUsername="user",
+                regenerate=regenerate,
             )
             logger.debug(
                 f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"
@@ -440,10 +464,6 @@ class MemoryManager:
         process_dict = {"input": content}
         unique_results = set()
         logger.debug(f"Processing incoming memory: {content}")
-        # self.openai_manager.set_username(username)
-        # subject_query = await self.openai_manager.ask_openai(
-        #     content, "categorise_query", self.model_used, 100, 0.1, username=username
-        # )
         subject_query = "none"
         openai_response = llmcalls.OpenAIResponser(
             config.api_keys["openai"], config.default_params
@@ -548,10 +568,6 @@ class MemoryManager:
                     f"({similar_message['id']}){similar_message['metadata']['created_at']} - {similar_message['document']} - score: {similar_message['distance']}"
                 )
         else:
-            # self.openai_manager.set_username(username)
-            # subject_category = await self.openai_manager.ask_openai(
-            #     content, "categorise", self.model_used, 100, 0.1, username=username
-            # )
             subject_category = "none"
             openai_response = llmcalls.OpenAIResponser(
                 config.api_keys["openai"], config.default_params
@@ -629,21 +645,28 @@ class MemoryManager:
         return full_search_result, process_dict
 
     async def process_incoming_memory_assistant(
-        self, category, content, username=None, chat_id=None
+        self, category, content, username=None, chat_id=None, regenerate=False, uid=None
     ):
         """Process the incoming memory and return the updated active brain data."""
         logger.debug(f"Processing incoming memory: {content}")
-
+        # todo: get version from the memory
+        version = 0
+        if regenerate:
+            version = 1
         # create a new memory
-        uid = secrets.token_hex(10)
+        if uid is None:
+            uid = secrets.token_hex(10)
         chunks = await self.split_text_into_chunks(content, 200)
         for chunk in chunks:
             await self.create_memory(
                 category,
                 chunk,
                 username=username,
-                metadata={"uid": uid, "chat_id": chat_id},
+                metadata={"uid": uid, "chat_id": chat_id, "version": version},
                 mUsername="assistant",
+            )
+            print(
+                f"adding memory: {chunk} to category: {category} with uid: {uid}, chat_id: {chat_id} and version: {version}"
             )
             logger.debug(f"adding memory: {chunk} to category: {category}")
         return

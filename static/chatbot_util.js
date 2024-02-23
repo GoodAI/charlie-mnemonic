@@ -11,7 +11,7 @@ function escapeHTML(str) {
 };
 
 // copy the code to the clipboard
-function copyToClipboard(btn) {
+function copyCodeToClipboard(btn) {
     var code = btn.nextElementSibling.innerText;
     var textarea = document.createElement('textarea');
     textarea.textContent = code;
@@ -26,6 +26,52 @@ function copyToClipboard(btn) {
         overlay.classList.remove('active');
     }, 1000);
 };
+
+function copyToClipboard(btn) {
+    // Ensure the button is correctly passed and exists in the DOM
+    if (!btn || !btn.closest) {
+        console.error('copyToClipboard was called with an invalid element or the element is not in the DOM');
+        return;
+    }
+
+    // Navigate up to the parent '.bubble' div
+    var bubbleDiv = btn.closest('.bubble');
+    if (!bubbleDiv) {
+        console.error('Failed to find the .bubble parent element.');
+        return;
+    }
+
+    // Find the '.markdown' div within the '.bubble' div
+    var markdownDiv = bubbleDiv.querySelector('.markdown');
+    if (!markdownDiv) {
+        console.error('Failed to find the .markdown element within the bubble.');
+        return;
+    }
+
+    // Get the text content you want to copy
+    var textToCopy = markdownDiv.innerText;
+
+    var textarea = document.createElement('textarea');
+    textarea.textContent = textToCopy;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+
+    // Display overlay message
+    var overlay = document.getElementById('overlay');
+    if (overlay) {
+        overlay.textContent = 'Message copied to clipboard';
+        overlay.classList.add('active');
+        setTimeout(function () {
+            overlay.classList.remove('active');
+        }, 1000);
+    } else {
+        console.error('Overlay element not found');
+    }
+}
+
+
 
 var renderer = new marked.Renderer();
 
@@ -146,4 +192,8 @@ function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     seconds = seconds % 60;
     return `${pad(minutes)}:${pad(seconds)}`;
+}
+
+function getUuidFromMessage(messageElement) {
+    return messageElement.dataset.uuid;
 }

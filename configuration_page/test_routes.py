@@ -1,8 +1,8 @@
 import os
-
-import openai
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import close_all_sessions
+import openai
 
 from config import CONFIGURATION_URL
 from launcher import create_app
@@ -17,12 +17,29 @@ def client(tmp_path):
     os.environ["OPENAI_API_KEY"] = ""
     openai.api_key = ""
     os.environ["CLANG_SYSTEM_CONFIGURATION_FILE"] = str(tmp_user_env_file)
+
+    db_url = "sqlite:///config.db"
+    os.environ["NEW_DATABASE_URL"] = db_url
+
+    # Attempt to close all sessions and dispose of the engine (if using SQLAlchemy)
+    close_all_sessions()
+    if "engine" in session_factory.__dict__:
+        session_factory.engine.dispose()
+
     if os.path.exists("config.db"):
         os.remove("config.db")
-    os.environ["NEW_DATABASE_URL"] = "sqlite:///config.db"
-    session_factory.get_refreshed()
 
-    yield TestClient(create_app())
+    session_factory.get_refreshed()  # Ensure a fresh start for the DB session
+
+    client = TestClient(create_app())
+
+    yield client
+
+    # Cleanup
+    client.close()  # Close TestClient, which might also close connections
+    close_all_sessions()
+    if "engine" in session_factory.__dict__:
+        session_factory.engine.dispose()
 
     if os.path.exists("config.db"):
         os.remove("config.db")

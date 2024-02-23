@@ -33,6 +33,8 @@ import llmcalls
 from simple_utils import get_root
 from user_management.dao import UsersDAO
 
+from typing import List, Dict, Any
+
 logger = logs.Log("utils", "utils.log").get_logger()
 
 # Parameters for OpenAI
@@ -70,96 +72,110 @@ class MessageSender:
     async def update_token_usage(response, username, brain=False, elapsed=0):
         """Update the token usage in the database"""
         try:
-            with Database() as db:
-                result = db.update_token_usage(
-                    username,
-                    total_tokens_used=response["usage"]["total_tokens"],
-                    prompt_tokens=response["usage"]["prompt_tokens"],
-                    completion_tokens=response["usage"]["completion_tokens"],
-                )
-                if result is not None:
-                    await MessageSender.send_debug(
-                        f"Last message: Prompt tokens: {response['usage']['prompt_tokens']}, Completion tokens: {response['usage']['completion_tokens']}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}",
-                        2,
-                        "red",
-                        username,
-                    )
-                    # cost based on these formulas prompt: $0.01 / 1K tokens completion: $0.03 / 1K tokens
-                    prompt_cost = round(
-                        response["usage"]["prompt_tokens"] * 0.01 / 1000, 5
-                    )
-                    completion_cost = round(
-                        response["usage"]["completion_tokens"] * 0.03 / 1000, 5
-                    )
-                    this_message_total_cost = round(prompt_cost + completion_cost, 5)
+            if not isinstance(response, str) and hasattr(response, "usage"):
+                # Safely access attributes with default values
+                total_tokens_used = getattr(response.usage, "total_tokens", 0)
+                prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
+                completion_tokens = getattr(response.usage, "completion_tokens", 0)
 
-                    total_prompt_cost = round(result[1] * 0.01 / 1000, 5)
-                    total_completion_cost = round(result[2] * 0.03 / 1000, 5)
-                    total_cost = round(total_prompt_cost + total_completion_cost, 5)
+                with Database() as db:
+                    result = db.update_token_usage(
+                        username,
+                        total_tokens_used=total_tokens_used,
+                        prompt_tokens=prompt_tokens,
+                        completion_tokens=completion_tokens,
+                    )
+                    print(f"Response: {response}")
+                    print(f"Result: {result}")
+                    if result is not None:
+                        await MessageSender.send_debug(
+                            f"Last message: Prompt tokens: {response.usage.prompt_tokens}, Completion tokens: {response.usage.completion_tokens}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}",
+                            2,
+                            "red",
+                            username,
+                        )
+                        # cost based on these formulas prompt: $0.01 / 1K tokens completion: $0.03 / 1K tokens
+                        prompt_cost = round(
+                            response.usage.prompt_tokens * 0.01 / 1000, 5
+                        )
+                        completion_cost = round(
+                            response.usage.completion_tokens * 0.03 / 1000, 5
+                        )
+                        this_message_total_cost = round(
+                            prompt_cost + completion_cost, 5
+                        )
+
+                        total_prompt_cost = round(result[1] * 0.01 / 1000, 5)
+                        total_completion_cost = round(result[2] * 0.03 / 1000, 5)
+                        total_cost = round(total_prompt_cost + total_completion_cost, 5)
+                        await MessageSender.send_message(
+                            {
+                                "usage": {
+                                    "total_tokens": result[0],
+                                    "total_cost": total_cost,
+                                }
+                            },
+                            "red",
+                            username,
+                        )
+
+                    daily_stats = db.get_daily_stats(username)
+                    if daily_stats is not None:
+                        current_spending_count = daily_stats["spending_count"] or 0
+                    else:
+                        current_spending_count = 0
+                    spending_count = current_spending_count + this_message_total_cost
+
                     await MessageSender.send_message(
-                        {
-                            "usage": {
-                                "total_tokens": result[0],
-                                "total_cost": total_cost,
-                            }
-                        },
-                        "red",
-                        username,
+                        {"daily_usage": {"daily_cost": spending_count}}, "red", username
                     )
-
-                daily_stats = db.get_daily_stats(username)
-                if daily_stats is not None:
-                    current_spending_count = daily_stats["spending_count"] or 0
-                else:
-                    current_spending_count = 0
-                spending_count = current_spending_count + this_message_total_cost
-
-                await MessageSender.send_message(
-                    {"daily_usage": {"daily_cost": spending_count}}, "red", username
-                )
-                # update the daily_stats table
-                if brain:
-                    db.update_daily_stats_token_usage(
-                        username,
-                        brain_tokens=response["usage"]["total_tokens"],
-                        spending_count=this_message_total_cost,
+                    # update the daily_stats table
+                    if brain:
+                        db.update_daily_stats_token_usage(
+                            username,
+                            brain_tokens=response.usage.prompt_tokens,
+                            spending_count=this_message_total_cost,
+                        )
+                    else:
+                        db.update_daily_stats_token_usage(
+                            username,
+                            prompt_tokens=response.usage.prompt_tokens,
+                            generation_tokens=response.usage.completion_tokens,
+                            spending_count=this_message_total_cost,
+                        )
+                    current_stats_spending_count = (
+                        db.get_statistic(username)["total_spending_count"] or 0
                     )
-                else:
-                    db.update_daily_stats_token_usage(
-                        username,
-                        prompt_tokens=response["usage"]["prompt_tokens"],
-                        generation_tokens=response["usage"]["completion_tokens"],
-                        spending_count=this_message_total_cost,
+                    spending_count = round(
+                        current_stats_spending_count + this_message_total_cost, 5
                     )
-                current_stats_spending_count = (
-                    db.get_statistic(username)["total_spending_count"] or 0
-                )
-                spending_count = round(
-                    current_stats_spending_count + this_message_total_cost, 5
-                )
-                # update the statistics table
-                db.update_statistic(username, total_spending_count=spending_count)
-                # update the elapsed time
-                # get the total response time and response count from the database
-                stats = db.get_daily_stats(username)
-                if stats is not None:
-                    total_response_time = stats["total_response_time"] or 0
-                    response_count = stats["response_count"] or 0
-                else:
-                    total_response_time = 0
-                    response_count = 0
-                # update the total response time and response count
-                total_response_time += elapsed
-                response_count += 1
+                    # update the statistics table
+                    db.update_statistic(username, total_spending_count=spending_count)
+                    # update the elapsed time
+                    # get the total response time and response count from the database
+                    stats = db.get_daily_stats(username)
+                    if stats is not None:
+                        total_response_time = stats["total_response_time"] or 0
+                        response_count = stats["response_count"] or 0
+                    else:
+                        total_response_time = 0
+                        response_count = 0
+                    # update the total response time and response count
+                    total_response_time += elapsed
+                    response_count += 1
 
-                # calculate the new average response time
-                average_response_time = total_response_time / response_count
+                    # calculate the new average response time
+                    average_response_time = total_response_time / response_count
 
-                db.replace_daily_stats_token_usage(
-                    username,
-                    total_response_time=total_response_time,
-                    average_response_time=average_response_time,
-                    response_count=response_count,
+                    db.replace_daily_stats_token_usage(
+                        username,
+                        total_response_time=total_response_time,
+                        average_response_time=average_response_time,
+                        response_count=response_count,
+                    )
+            else:
+                print(
+                    f"Unexpected response type or missing 'usage' attribute: {response}"
                 )
         except Exception as e:
             logger.exception(f"An error occurred: {e}")
@@ -707,11 +723,29 @@ class MessageParser:
         return result
 
     @staticmethod
-    async def get_recent_messages(username, chat_id):
+    async def get_recent_messages(
+        username: str, chat_id: str, regenerator: bool = False, uuid: str = None
+    ) -> List[Dict[str, Any]]:
         memory = _memory.MemoryManager()
         recent_messages = await memory.get_most_recent_messages(
             "active_brain", username, chat_id=chat_id
         )
+
+        if regenerator and uuid:
+            # Initialize a new list to hold the filtered messages
+            filtered_messages = []
+            # Iterate over the messages to find the message with the matching UUID
+            for message in recent_messages:
+                # Add the current message to the filtered list
+                filtered_messages.append(message)
+                print(f"Message UUID: {message['metadata']['uid']} - {uuid}")
+                # If the current message's UUID matches the specified UUID, stop adding messages
+                if message["metadata"]["uid"] == uuid:
+                    # remove the last message too
+                    filtered_messages.pop()
+                    break
+            # Use the filtered list for the rest of the function
+            recent_messages = filtered_messages
 
         return [
             {
@@ -952,6 +986,8 @@ class MessageParser:
         old_kw_brain,
         users_dir,
         chat_id,
+        regenerate=False,
+        uuid=None,
     ):
         if "function_call" in response:
             function_call_name = response["function_call"]["name"]
@@ -981,7 +1017,12 @@ class MessageParser:
                     display_name = db.get_display_name(username)
                 memory = _memory.MemoryManager()
                 await memory.process_incoming_memory_assistant(
-                    "active_brain", response["content"], username, chat_id=chat_id
+                    "active_brain",
+                    response["content"],
+                    username,
+                    chat_id=chat_id,
+                    regenerate=regenerate,
+                    uid=uuid,
                 )
         return response
 
@@ -1097,6 +1138,8 @@ async def process_message(
     display_name=None,
     image_prompt=None,
     chat_id=None,
+    regenerate=False,
+    uuid=None,
 ):
     """Process the message and generate a response"""
     # reset the stopPressed variable
@@ -1135,7 +1178,14 @@ async def process_message(
 
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
-    last_messages = await MessageParser.get_recent_messages(username, chat_id)
+    last_messages = await MessageParser.get_recent_messages(
+        username, chat_id, regenerate, uuid
+    )
+
+    # for message in last_messages:
+    #     print(
+    #         f"{message['metadata'].get('username')}: {message['document']}",
+    #     )
     last_messages_string = "\n".join(
         f"({message['metadata'].get('username')}: {message['document']}"
         for message in last_messages[-100:]
@@ -1145,6 +1195,7 @@ async def process_message(
     last_messages_tokens = MessageParser.num_tokens_from_string(
         last_messages_string, "gpt-4"
     )
+    print(f"last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}")
     if tokens_recent_messages > 100:
         logger.debug(
             f"last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}"
@@ -1206,97 +1257,111 @@ async def process_message(
     remaining_tokens = max_token_usage - token_usage
     logger.debug(f"1. remaining_tokens: {remaining_tokens}")
     verbose = settings.get("verbose").get("verbose")
-    memory = _memory.MemoryManager()
-    (
-        kw_brain_string,
-        token_usage_active_brain,
-        unique_results1,
-    ) = await memory.process_active_brain(
-        og_message,
-        username,
-        all_messages,
-        tokens_active_brain,
-        verbose,
-        chat_id=chat_id,
-    )
 
-    token_usage += token_usage_active_brain
-    remaining_tokens = remaining_tokens - token_usage_active_brain
-    logger.debug(f"2. remaining_tokens: {remaining_tokens}")
-
-    if tokens_episodic_memory > 100:
-        episodic_memory, timezone = await memory.process_episodic_memory(
-            og_message, username, all_messages, tokens_episodic_memory, verbose
-        )
-        if episodic_memory is None or episodic_memory == "":
-            episodic_memory_string = ""
-        else:
-            episodic_memory_string = (
-                f"""Episodic Memory of {timezone}:\n{episodic_memory}\n"""
-            )
-    else:
-        episodic_memory_string = ""
-
-    episodic_memory_tokens = MessageParser.num_tokens_from_string(
-        episodic_memory_string, "gpt-4"
-    )
-    token_usage += episodic_memory_tokens
-    remaining_tokens = remaining_tokens - episodic_memory_tokens
-    logger.debug(f"3. remaining_tokens: {remaining_tokens}")
-
-    if tokens_cat_brain > 100:
+    if regenerate is False:
+        memory = _memory.MemoryManager()
         (
-            results,
-            token_usage_relevant_memory,
-            unique_results2,
-        ) = await memory.process_incoming_memory(
-            None, og_message, username, tokens_cat_brain, verbose
+            kw_brain_string,
+            token_usage_active_brain,
+            unique_results1,
+        ) = await memory.process_active_brain(
+            og_message,
+            username,
+            all_messages,
+            tokens_active_brain,
+            verbose,
+            chat_id=chat_id,
+            regenerate=regenerate,
+            uid=uuid,
         )
-        merged_results_dict = {
-            id: (document, distance, formatted_date)
-            for id, document, distance, formatted_date in unique_results1.union(
-                unique_results2
+
+        token_usage += token_usage_active_brain
+        remaining_tokens = remaining_tokens - token_usage_active_brain
+        logger.debug(f"2. remaining_tokens: {remaining_tokens}")
+
+        if tokens_episodic_memory > 100:
+            episodic_memory, timezone = await memory.process_episodic_memory(
+                og_message, username, all_messages, tokens_episodic_memory, verbose
             )
-        }
-        merged_results_list = [
-            (id, document, distance, formatted_date)
-            for id, (document, distance, formatted_date) in merged_results_dict.items()
-        ]
-        merged_results_list.sort(key=lambda x: int(x[0]))
+            if episodic_memory is None or episodic_memory == "":
+                episodic_memory_string = ""
+            else:
+                episodic_memory_string = (
+                    f"""Episodic Memory of {timezone}:\n{episodic_memory}\n"""
+                )
+        else:
+            episodic_memory_string = ""
 
-        # Create the result string
-        merged_result_string = "\n".join(
-            f"({id}){formatted_date} - {document} (score: {distance})"
-            for id, document, distance, formatted_date in merged_results_list
+        episodic_memory_tokens = MessageParser.num_tokens_from_string(
+            episodic_memory_string, "gpt-4"
         )
-    else:
-        results = ""
-        token_usage_relevant_memory = 0
-        merged_result_string = ""
+        token_usage += episodic_memory_tokens
+        remaining_tokens = remaining_tokens - episodic_memory_tokens
+        logger.debug(f"3. remaining_tokens: {remaining_tokens}")
 
-    token_usage += token_usage_relevant_memory
-    remaining_tokens = remaining_tokens - token_usage_relevant_memory
-    logger.debug(f"4. remaining_tokens: {remaining_tokens}")
+        if tokens_cat_brain > 100:
+            (
+                results,
+                token_usage_relevant_memory,
+                unique_results2,
+            ) = await memory.process_incoming_memory(
+                None, og_message, username, tokens_cat_brain, verbose
+            )
+            merged_results_dict = {
+                id: (document, distance, formatted_date)
+                for id, document, distance, formatted_date in unique_results1.union(
+                    unique_results2
+                )
+            }
+            merged_results_list = [
+                (id, document, distance, formatted_date)
+                for id, (
+                    document,
+                    distance,
+                    formatted_date,
+                ) in merged_results_dict.items()
+            ]
+            merged_results_list.sort(key=lambda x: int(x[0]))
 
-    # process the results
-    history_string = results
+            # Create the result string
+            merged_result_string = "\n".join(
+                f"({id}){formatted_date} - {document} (score: {distance})"
+                for id, document, distance, formatted_date in merged_results_list
+            )
+        else:
+            results = ""
+            token_usage_relevant_memory = 0
+            merged_result_string = ""
 
-    observations = "No observations available."
-    instruction_string = (
-        f"""{episodic_memory_string}\nObservations:\n{observations}\n"""
-    )
+        token_usage += token_usage_relevant_memory
+        remaining_tokens = remaining_tokens - token_usage_relevant_memory
+        logger.debug(f"4. remaining_tokens: {remaining_tokens}")
 
-    if tokens_notes > 100:
-        notes = await memory.note_taking(
-            all_messages, og_message, users_dir, username, False, verbose, tokens_notes
+        # process the results
+        history_string = results
+
+        observations = "No observations available."
+        instruction_string = (
+            f"""{episodic_memory_string}\nObservations:\n{observations}\n"""
         )
 
-        if notes is not None or notes != "":
-            notes_string = prompts.notes_string.format(notes)
-            instruction_string += notes_string
-    else:
-        notes = ""
-        notes_string = ""
+        if tokens_notes > 100:
+            notes = await memory.note_taking(
+                all_messages,
+                og_message,
+                users_dir,
+                username,
+                False,
+                verbose,
+                tokens_notes,
+            )
+
+            if notes is not None or notes != "":
+                notes_string = prompts.notes_string.format(notes)
+                instruction_string += notes_string
+        else:
+            notes = ""
+            notes_string = ""
 
     if image_prompt is not None:
         image_prompt_injection = (
@@ -1333,6 +1398,8 @@ async def process_message(
             tokens_output,
             history_messages,
             chat_id=chat_id,
+            regenerate=regenerate,
+            uid=uuid,
         )
     print(f"gen response: {response}")
     response = MessageParser.extract_content(response)
@@ -1356,6 +1423,8 @@ async def process_message(
         kw_brain_string,
         users_dir,
         chat_id=chat_id,
+        regenerate=regenerate,
+        uuid=uuid,
     )
 
     with Database() as db:
@@ -1427,6 +1496,8 @@ async def generate_response(
     max_allowed_tokens,
     history_messages,
     chat_id=None,
+    regenerate=False,
+    uid=None,
 ):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
@@ -1473,6 +1544,7 @@ async def generate_response(
         stream=True,
         function_metadata=function_metadata,
         chat_id=chat_id,
+        uid=uid,
     ):
         response = resp
         # print(f"Generate response: {response}")

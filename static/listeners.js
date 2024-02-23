@@ -9,6 +9,7 @@ var limit = Math.floor((viewportHeight * 0.7) / lineHeight); // max lines based 
 var min = 1; // minimum number of lines
 
 let pastedImageFile;
+let isGeneratingAudio = false;
 
 // check for session token when page loads
 window.onload = function () {
@@ -31,37 +32,39 @@ textarea.oninput = function () {
 };
 let lastValidMessage = '';
 
-function playButtonHandler() {
-    this.classList.remove('fa-play');
-    this.classList.add('fa-spinner');
-    request_audio(this).then(audioSrc => {
+function playButtonHandler(element) {
+    if (!element) return;
+    console.log('Play button clicked');
+    element.classList.remove('fa-play');
+    element.classList.add('fa-spinner');
+
+    if (isGeneratingAudio) {
+        console.log('Audio generation in progress');
+        return;
+    }
+    isGeneratingAudio = true;
+
+    // remove the event listener to prevent multiple clicks
+    element.removeEventListener('click', playButtonHandler);
+
+    // force the browser to reflow the DOM
+    element.offsetWidth;
+
+    request_audio(element).then(audioSrc => {
         var audioElement = document.createElement('audio');
         audioElement.controls = true;
         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-        var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
-        this.closest('.bubble').appendChild(audioElement);
+        var anchorTag = element.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
+        element.closest('.bubble').appendChild(audioElement);
+        isGeneratingAudio = false;
         if (anchorTag) {
             anchorTag.remove();
         }
+    }).catch(error => {
+        console.error("Error processing audio: ", error);
+        isGeneratingAudio = false;
     });
 }
-
-
-$('#avatar-checkbox').change(function () {
-    var settings = {
-        avatar: $('#avatar-checkbox').prop('checked')
-    };
-
-    // Show or hide D-ID content based on the setting
-    if (settings.avatar) {
-        $('#d-id-content').show();
-        document.getElementById("chat-container").style.minWidth = "50vw";
-        document.getElementById("chat-container").style.maxWidth = "50vw";
-    } else {
-        $('#d-id-content').hide();
-        document.getElementById("chat-container").style.minWidth = "80vw";
-    }
-});
 
 // Event listeners
 // Add an input event listener to the textarea
@@ -471,7 +474,53 @@ document.getElementById('messages').addEventListener('scroll', function() {
     }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
+function applyTooltips(selector) {
+    const tooltipElements = document.querySelectorAll(selector);
+
+    tooltipElements.forEach(el => {
+        el.addEventListener('mouseenter', showTooltip);
+        el.addEventListener('mouseleave', hideTooltip);
+    });
+
+    function showTooltip(e) {
+        const tooltipText = this.getAttribute('data-tooltip');
+        const tooltipDiv = document.createElement('div');
+        tooltipDiv.className = 'dynamic-tooltip';
+        tooltipDiv.textContent = tooltipText;
+        document.body.appendChild(tooltipDiv);
+
+        let rect = this.getBoundingClientRect();
+        let left = rect.left + window.scrollX + (this.offsetWidth / 2) - (tooltipDiv.offsetWidth / 2);
+        let top = rect.top + window.scrollY - tooltipDiv.offsetHeight - 5; // 5px above the element
+
+        // Adjust if tooltip goes beyond the right edge of the viewport
+        const rightEdge = left + tooltipDiv.offsetWidth;
+        if (rightEdge > window.innerWidth) {
+            left -= rightEdge - window.innerWidth;
+        }
+
+        // Adjust if tooltip goes beyond the left edge of the viewport
+        if (left < 0) {
+            left = 0;
+        }
+
+        // Apply the calculated position
+        tooltipDiv.style.left = `${left}px`;
+        tooltipDiv.style.top = `${top}px`;
+        tooltipDiv.style.visibility = 'visible';
+        tooltipDiv.style.position = 'absolute'; // Ensure tooltip is positioned absolutely
+        tooltipDiv.style.opacity = '1';
+    }
+
+    function hideTooltip() {
+        document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => {
+            tooltip.remove();
+        });
+    }
+}
+
+
+document.addEventListener('DOMContentLoaded', function() {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");
@@ -490,46 +539,21 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (tabsState === "closed") {
         closeTabs();
     }
-});
 
-
-document.addEventListener('DOMContentLoaded', function () {
-    const tooltipElements = document.querySelectorAll('[data-tooltip]');
-
-    tooltipElements.forEach(el => {
-        el.addEventListener('mouseenter', function (e) {
-            const tooltipText = this.getAttribute('data-tooltip');
-            const tooltipDiv = document.createElement('div');
-            tooltipDiv.className = 'dynamic-tooltip';
-            tooltipDiv.textContent = tooltipText;
-            document.body.appendChild(tooltipDiv);
-
-            let rect = this.getBoundingClientRect();
-            let left = rect.left + window.scrollX + (this.offsetWidth / 2) - (tooltipDiv.offsetWidth / 2);
-            let top = rect.top + window.scrollY - tooltipDiv.offsetHeight - 5; // 5px above the element
-
-            // Adjust if tooltip goes beyond the right edge of the viewport
-            const rightEdge = left + tooltipDiv.offsetWidth;
-            if (rightEdge > window.innerWidth) {
-                left -= rightEdge - window.innerWidth;
-            }
-
-            // Adjust if tooltip goes beyond the left edge of the viewport
-            if (left < 0) {
-                left = 0;
-            }
-
-            // Apply the calculated position
-            tooltipDiv.style.left = `${left}px`;
-            tooltipDiv.style.top = `${top}px`;
-            tooltipDiv.style.visibility = 'visible';
-            tooltipDiv.style.opacity = '1';
-        });
-
-        el.addEventListener('mouseleave', function () {
-            document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => {
-                tooltip.remove();
-            });
-        });
+    // Event delegation for copy button
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.className.includes('copy-button')) {
+            var div = e.target.closest('.bubble');
+            copyToClipboard(div);
+        }
     });
+
+    // Event delegation for regenerate button
+    document.body.addEventListener('click', function(e) {
+        if (e.target && e.target.className.includes('regenerate-button')) {
+            var div = e.target.closest('.bubble');
+            regenerateResponse(div);
+        }
+    });
+    applyTooltips('[data-tooltip]');
 });

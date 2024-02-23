@@ -14,6 +14,8 @@ from .main import (
     stop_database,
     search_memory_by_date,
     get_memory_by_date,
+    create_alternative_memory,
+    get_last_message,
 )
 
 from .events import (

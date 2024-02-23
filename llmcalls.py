@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import time
 import uuid
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -101,6 +102,7 @@ class OpenAIResponser:
         function_call="auto",
         chat_id=None,
         role=None,
+        uid=None,
     ):
         """Get a response from the OpenAI API."""
         # debug print
@@ -150,6 +152,7 @@ class OpenAIResponser:
         )
 
         timeout = 180.0
+        now = time.time()
 
         async with aiohttp.ClientSession() as session:
             self.client.session = session
@@ -287,6 +290,10 @@ class OpenAIResponser:
             # if no stream, return the full message
             else:
                 yield response.choices[0].message.content
+            elapsed = time.time() - now
+            await utils.MessageSender.update_token_usage(
+                response, username, False, elapsed=elapsed
+            )
 
     def get_role_content(self, role, current_date_time):
         """Return the content for the role."""

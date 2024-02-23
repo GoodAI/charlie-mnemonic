@@ -93,7 +93,7 @@
         marked.setOptions({
             highlight: function (code, lang) {
                 return '<div class="language">' + (lang || 'code') + '</div>' +
-                    '<button class="copy-btn" onclick="copyToClipboard(this)">Copy</button>' +
+                    '<button class="copy-btn" onclick="copyCodeToClipboard(this)">Copy</button>' +
                     '<pre><code>' + hljs.highlightAuto(code, [lang]).value + '</code></pre>';
             },
             renderer: renderer,

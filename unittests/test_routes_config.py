@@ -1,11 +1,10 @@
 import os
-import tempfile
-
-import dotenv
-import openai
 import pytest
+from sqlalchemy.orm import close_all_sessions
 from starlette.testclient import TestClient
-
+import openai
+import tempfile
+import dotenv
 from config import CONFIGURATION_URL
 from launcher import create_app
 from user_management.session import session_factory
@@ -13,19 +12,42 @@ from user_management.session import session_factory
 
 @pytest.fixture
 def client():
+    db_file = "user.db"
+    db_url = f"sqlite:///{db_file}?cache=shared"
     os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
+    os.environ["NEW_DATABASE_URL"] = db_url
 
-    if os.path.exists("user.db"):
-        os.remove("user.db")
-    os.environ["NEW_DATABASE_URL"] = "sqlite:///user.db?cache=shared"
+    # Dispose of engine and close all sessions to ensure clean teardown
+    if hasattr(session_factory, "engine"):
+        session_factory.engine.dispose()
+        close_all_sessions()
+
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except PermissionError as e:
+            print(
+                f"Failed to delete {db_file} before tests due to PermissionError: {e}"
+            )
 
     session_factory.get_refreshed()
 
     app = create_app()
-    yield TestClient(app)
+    client = TestClient(app)
+    yield client
 
-    if os.path.exists("user.db"):
-        os.remove("user.db")
+    # Close client and dispose engine after test run
+    client.close()
+
+    if hasattr(session_factory, "engine"):
+        session_factory.engine.dispose()
+        close_all_sessions()
+
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except PermissionError as e:
+            print(f"Failed to delete {db_file} after tests due to PermissionError: {e}")
 
 
 @pytest.fixture(autouse=True)
@@ -95,25 +117,6 @@ OPENAI_API_KEY=value
 """.strip()
         )
     assert openai.api_key == "value"
-
-
-def test_blank_elevenlabs_resets(client, config_file_path, fake_openai_key):
-    response = client.post(
-        CONFIGURATION_URL, json={"OPENAI_API_KEY": "value", "ELEVENLABS_API_KEY": ""}
-    )
-    content = response.json()
-    assert (
-        response.status_code == 200
-    ), f"""
-Expected 200, but was {response.status_code}
-Content:
-{content}
-"""
-    assert "message" in content
-    assert content["message"] == "Configuration updated successfully"
-    loaded_values = dotenv.dotenv_values(config_file_path)
-    assert loaded_values["OPENAI_API_KEY"] == "value"
-    assert loaded_values["ELEVENLABS_API_KEY"] == ""
 
 
 def test_missing_json_body(client, fake_openai_key):

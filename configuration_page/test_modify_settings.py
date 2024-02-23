@@ -31,7 +31,14 @@ def test_updating_set_openai_key(config_file_path):
 
 
 def test_creates_file(config_file_path):
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        os.remove(tmp.name)
-        modify_settings({"OPENAI_API_KEY": "value"}, path=tmp.name)
-        assert os.path.exists(tmp.name)
+    modify_settings({"OPENAI_API_KEY": "value"}, path=config_file_path)
+    assert os.path.exists(config_file_path), "Configuration file was not created."
+    with open(config_file_path) as f:
+        content = f.read()
+        assert (
+            "OPENAI_API_KEY=value" in content
+        ), "OPENAI_API_KEY was not correctly set in the configuration file."
+    config = dotenv.dotenv_values(config_file_path)
+    assert (
+        config.get("OPENAI_API_KEY") == "value"
+    ), "OPENAI_API_KEY was not correctly set according to dotenv."

@@ -1,7 +1,7 @@
 import os
-
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import close_all_sessions
 from starlette.websockets import WebSocketDisconnect
 
 from launcher import create_app
@@ -11,12 +11,24 @@ from user_management.test_dao_user import dao_session
 
 @pytest.fixture
 def client():
+    db_file = "user.db"
+    db_url = f"sqlite:///{db_file}?cache=shared"
     os.environ["ORIGINS"] = "*"
     os.environ["DATABASE_URL"] = "postgres://postgres:postgres@localhost:5432/postgres"
+    os.environ["NEW_DATABASE_URL"] = db_url
 
-    if os.path.exists("user.db"):
-        os.remove("user.db")
-    os.environ["NEW_DATABASE_URL"] = "sqlite:///user.db?cache=shared"
+    # Dispose of engine and close all sessions before starting tests
+    if hasattr(session_factory, "engine"):
+        session_factory.engine.dispose()
+        close_all_sessions()
+
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except PermissionError as e:
+            print(
+                f"Failed to delete {db_file} before tests due to PermissionError: {e}"
+            )
 
     session_factory.get_refreshed()
     from configuration_page.redirect_middleware import RedirectToConfigurationMiddleware
@@ -27,10 +39,21 @@ def client():
         middlewares=[RedirectToConfigurationMiddleware, LoginRequiredCheckMiddleware],
         routers=[user_management_router],
     )
-    yield TestClient(app)
+    client = TestClient(app)
+    yield client
 
-    if os.path.exists("user.db"):
-        os.remove("user.db")
+    client.close()
+
+    # Dispose of engine and close all sessions after tests
+    if hasattr(session_factory, "engine"):
+        session_factory.engine.dispose()
+        close_all_sessions()
+
+    if os.path.exists(db_file):
+        try:
+            os.remove(db_file)
+        except PermissionError as e:
+            print(f"Failed to delete {db_file} after tests due to PermissionError: {e}")
 
 
 @pytest.fixture

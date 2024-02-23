@@ -1683,3 +1683,7 @@ pre {
     z-index: 1001;
   }
   
+  .bottom-buttons-container > div {
+    display: inline-block;
+    margin-right: 10px;
+}

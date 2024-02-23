@@ -67,7 +67,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     return `<div class="markdown">${marked(message)}</div>`;
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {
     var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
 
     if (messageReplaced.endsWith('<br>')) {
@@ -84,9 +84,19 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
     if (lastMessage) {
         lastMessage.classList.remove('last-message');
     }
-
+    var uuidAttribute = uuid ? ' data-uuid="' + uuid + '"' : '';
+    
     var chatMessage = document.createElement('div');
-    chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + messageReplaced + '</div></div>';
+    chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"' + uuidAttribute + '>' + messageReplaced + '</div></div>';
+    
+    if (addButtons && user === 'bot') {
+        // add bottom buttons to the bubble
+        var buttons = document.createElement('div');
+        buttons.className = 'bottom-buttons-container';
+        addBottomButtons(buttons);
+        chatMessage.firstChild.querySelector('.bubble').appendChild(buttons);
+    }
+
     var messagesContainer = document.getElementById('messages');
     messagesContainer.appendChild(chatMessage);
 
@@ -191,7 +201,7 @@ async function sendMessageToServer(message) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 'prompt': message, 'username': user_name, 'display_name': display_name[0], chat_id: chat_id }),
+            body: JSON.stringify({ 'prompt': message, 'username': user_name, 'display_name': display_name[0], 'chat_id': chat_id }),
             credentials: 'include'
         });
 
@@ -201,6 +211,33 @@ async function sendMessageToServer(message) {
     } catch (error) {
         console.error('Failed to send message: ', error);
         showErrorMessage('Failed to send message: ' + error);
+    }
+}
+
+async function regenerateResponse(div) {
+    // extract the uuid from the div
+    var uuid = div.parentNode.getAttribute('data-uuid');
+    canRecord = false;
+    canSend = false;
+    isWaiting = true;
+    isRecording = false;
+    canSendMessage();
+    try {
+        const response = await fetch(API_URL + '/regenerate_response/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'uuid': uuid, 'username': user_name, 'chat_id': chat_id}),
+            credentials: 'include'
+        });
+
+        const data = await response.json();
+        addCustomMessage(data.content, 'bot');
+
+    } catch (error) {
+        console.error('Failed to regenerate response: ', error);
+        showErrorMessage('Failed to regenerate response: ' + error);
     }
 }
 

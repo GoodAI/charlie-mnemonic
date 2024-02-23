@@ -469,87 +469,8 @@ function setSettings(newSettings) {
         document.getElementById('username').innerHTML = 'Display Name: <a href="/profile" target="_blank">' + display_name + '</a>';
         settings = newSettings;
         populateSettingsMenu(settings);
-        if (newSettings.audio.voice_input) {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(function (stream) {
-                    $('#record').show();
-                })
-                .catch(function (err) {
-                    edit_status('audio', 'voice_input', false);
-                    $('#record').hide();
-                    if (err.name === 'NotAllowedError') {
-                        showErrorModal('Permission to access microphone was denied. Please allow access to the microphone and try again.');
-                    } else if (err.name === 'NotFoundError') {
-                        showErrorModal('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
-                    } else {
-                        showErrorModal('Error occurred : ' + err.name);
-                    }
-                });
+        handleAudioSettings(newSettings);
 
-        } else {
-            $('#record').hide();
-        }
-
-        var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
-
-        if (newSettings.audio.voice_output) {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(function (stream) {
-                    $('#record').show();
-        
-                    // Add play button to all existing chat bubbles of bot messages
-                    var allMessages = document.querySelectorAll('.message.bot .bubble');
-                    allMessages.forEach(function(message) {
-                        // Check if a play button or an audio player already exists
-                        var playButtonExists = message.querySelector('.play-button');
-                        var audioPlayerExists = message.querySelector('audio');
-                        // check if the message is still loading
-                        var spinner = message.querySelector('.spinner');
-        
-                        if (!playButtonExists && !audioPlayerExists && !spinner) {
-                            message.innerHTML += playButtonCode;
-                            var playButton = message.querySelector('.play-button');
-                            playButton.addEventListener('click', playButtonHandler);
-                        }
-                    });
-                    // check if we need to scroll to the bottom of the chat
-                    var messagesContainer = document.getElementById('messages');
-                    if (isUserAtBottom(messagesContainer)) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                        hideNewMessageIndicator();
-                    } else {
-                        showNewMessageIndicator();
-                    }
-                })
-                .catch(function (err) {
-                    edit_status('audio', 'voice_output', false);
-                    $('#record').hide();
-                });
-        
-        } else {
-            $('#record').hide();
-        
-            // Remove play button from all existing chat bubbles of bot messages
-            var allPlayButtonWrappers = document.querySelectorAll('.message.bot .bubble .play-button-wrapper');
-            allPlayButtonWrappers.forEach(function(wrapper) {
-                wrapper.remove();
-            });
-            // Remove audio elements from all existing chat bubbles of bot messages
-            var allAudioElements = document.querySelectorAll('.message.bot .bubble audio');
-            allAudioElements.forEach(function(audio) {
-                audio.remove();
-            });
-        }
-
-        if (newSettings.avatar.avatar) {
-            $('#d-id-content').show();
-            document.getElementById("chat-container").style.minWidth = "50vw";
-            document.getElementById("chat-container").style.maxWidth = "50vw";
-        }
-        else {
-            $('#d-id-content').hide();
-            document.getElementById("chat-container").style.minWidth = "80vw";
-        }
         if (newSettings.usage != "" && newSettings.usage != null) {
             handleUsage(newSettings);
         }
@@ -557,7 +478,80 @@ function setSettings(newSettings) {
             handleDailyUsage(newSettings);
         }
     }
+    applyTooltips('[data-tooltip]');
 };
+
+function handleAudioSettings(newSettings) {
+    // Handle voice input settings
+    if (newSettings.audio.voice_input) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function (stream) {
+                $('#record').show();
+            })
+            .catch(function (err) {
+                edit_status('audio', 'voice_input', false);
+                $('#record').hide();
+                handleMicrophoneErrors(err);
+            });
+    } else {
+        $('#record').hide();
+    }
+
+    // Handle voice output settings
+    if (newSettings.audio.voice_output) {
+        addPlayButtonsToMessages();
+    } else {
+        removePlayButtonsAndAudioFromMessages();
+    }
+}
+
+function handleMicrophoneErrors(err) {
+    if (err.name === 'NotAllowedError') {
+        showErrorModal('Permission to access microphone was denied. Please allow access to the microphone and try again.');
+    } else if (err.name === 'NotFoundError') {
+        showErrorModal('No microphone was found. Ensure that a microphone is installed and that microphone settings are configured correctly.');
+    } else {
+        showErrorModal('Error occurred : ' + err.name);
+    }
+}
+
+function addPlayButtonsToMessages() {
+    var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
+    // Add play buttons to all messages' bottom buttons
+    var messages = document.querySelectorAll('.message');
+    for (var i = 0; i < messages.length; i++) {
+        var message = messages[i];
+        var bottomButtons = message.querySelector('.bottom-buttons-container');
+        // check if the message already has a play button
+        if (bottomButtons && !bottomButtons.querySelector('.play-button-wrapper')) {
+            bottomButtons.insertAdjacentHTML('afterbegin', playButtonCode);
+        }
+    }
+
+    // Add event listeners to the play buttons
+    var playButtons = document.querySelectorAll('.play-button');
+    playButtons.forEach(playButton => {
+        playButton.addEventListener('click', event => {
+            playButtonHandler(event.target); // `event.target` is the clicked playButton
+        });
+    });
+}
+
+function removePlayButtonsAndAudioFromMessages() {
+    // Remove play buttons from all messages' bottom buttons
+    var playButtons = document.querySelectorAll('.play-button-wrapper');
+    for (var i = 0; i < playButtons.length; i++) {
+        playButtons[i].remove();
+    }
+
+    // Remove audio elements from all messages
+    var audioElements = document.querySelectorAll('audio');
+    for (var i = 0; i < audioElements.length; i++) {
+        audioElements[i].remove();
+    }
+}
+
+
 function showErrorMessage(message, instant) {
     var timestamp = new Date().toLocaleTimeString();
     var content = message;
@@ -825,6 +819,69 @@ async function handleCancelMessage(msg) {
     resetState();
 }
 
+function addBottomButtons(div) {
+    var buttonsContainer = document.createElement('div');
+    buttonsContainer.className = 'bottom-buttons-container';
+
+    // Check the settings to see if we need to add the audio play button
+    if (settings.audio.voice_output) {
+        var playButtonWrapper = document.createElement('div');
+        playButtonWrapper.className = 'play-button-wrapper';
+        var playButtonLink = document.createElement('a');
+        playButtonLink.href = '#';
+        playButtonLink.setAttribute('data-tooltip', 'Play Audio');
+        var playButton = document.createElement('i');
+        playButton.className = 'fas fa-play play-button';
+        playButton.title = 'Play';
+        playButton.onclick = function() {
+            playButtonHandler(playButton);
+        };
+
+        playButtonLink.appendChild(playButton);
+        playButtonWrapper.appendChild(playButtonLink);
+        buttonsContainer.appendChild(playButtonWrapper);
+    }
+
+    // Create a copy button with the same structure and styling as the play button
+    var copyButtonWrapper = document.createElement('div');
+    copyButtonWrapper.className = 'copy-button-wrapper';
+    var copyButtonLink = document.createElement('a');
+    copyButtonLink.href = '#';
+    copyButtonLink.setAttribute('data-tooltip', 'Copy to clipboard');
+    var copyButton = document.createElement('i');
+    copyButton.className = 'fas fa-copy copy-button';
+    copyButton.title = 'Copy';
+    copyButton.onclick = function() {
+        copyToClipboard(div);
+    };
+
+    copyButtonLink.appendChild(copyButton);
+    copyButtonWrapper.appendChild(copyButtonLink);
+
+    // // Create a regenerate button with the same structure and styling as the play button
+    // var regenerateButtonWrapper = document.createElement('div');
+    // regenerateButtonWrapper.className = 'regen-button-wrapper';
+    // var regenerateButtonLink = document.createElement('a');
+    // regenerateButtonLink.href = '#';
+    // regenerateButtonLink.setAttribute('data-tooltip', 'Regenerate');
+    // var regenerateButton = document.createElement('i');
+    // regenerateButton.className = 'fas fa-redo-alt regen-button';
+    // regenerateButton.title = 'Regenerate';
+    // regenerateButton.onclick = function() {
+    //     regenerateResponse(div);
+    // };
+
+    // regenerateButtonLink.appendChild(regenerateButton);
+    // regenerateButtonWrapper.appendChild(regenerateButtonLink);
+
+    // Append the button wrappers to the container
+    buttonsContainer.appendChild(copyButtonWrapper);
+    // buttonsContainer.appendChild(regenerateButtonWrapper);
+
+    // Append the buttons container to the div
+    div.appendChild(buttonsContainer);
+}
+
 async function handleStopMessage(msg) {
     var target_chat_id = msg.chat_id;
     // check if the current active tab is the same as the target chat id
@@ -852,32 +909,39 @@ async function handleStopMessage(msg) {
             typingIndicator.remove();
         }
     }
-    
-    if (settings.audio.voice_output) {
-        var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
-        var lastMessage = document.querySelector('.last-message .bubble');
-        if (lastMessage) {
-            lastMessage.innerHTML += playButtonCode;
-        }
-        var playButtons = document.querySelectorAll('.play-button');
-        var playButton = playButtons[playButtons.length - 1];
-        playButton.addEventListener('click', async function () {
-            this.classList.remove('fa-play');
-            this.classList.add('fa-spinner');
-            var audioSrc = await request_audio(this);
-            var audioElement = document.createElement('audio');
-            audioElement.controls = true;
-            audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            
-            var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
-            this.closest('.bubble').appendChild(audioElement);
-            if (anchorTag) {
-                anchorTag.remove();
-            }
-        });
+
+    // add bottom buttons to the last message
+    var lastMessage = document.querySelector('.last-message .bubble');
+    if (lastMessage) {
+        addBottomButtons(lastMessage);
     }
+    // if (settings.audio.voice_output) {
+    //     var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
+    //     var lastMessage = document.querySelector('.last-message .bubble');
+    //     if (lastMessage) {
+    //         lastMessage.innerHTML += playButtonCode;
+    //     }
+    //     var playButtons = document.querySelectorAll('.play-button');
+    //     var playButton = playButtons[playButtons.length - 1];
+    //     playButton.addEventListener('click', async function () {
+    //         this.classList.remove('fa-play');
+    //         this.classList.add('fa-spinner');
+    //         var audioSrc = await request_audio(this);
+    //         var audioElement = document.createElement('audio');
+    //         audioElement.controls = true;
+    //         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
+            
+    //         var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
+    //         this.closest('.bubble').appendChild(audioElement);
+    //         if (anchorTag) {
+    //             anchorTag.remove();
+    //         }
+    //     });
+    //     applyTooltips('[data-tooltip]');
+    // }
     
     tempFullChunk = '';
+    applyTooltips('[data-tooltip]');
     resetState();
 }
 
@@ -1339,7 +1403,7 @@ async function get_recent_messages(username, chat_id) {
                 currentMessage += '\n' + text;
             } else {
                 if (currentUUID !== null) {
-                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp });
+                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
                 }
                 currentUUID = uuid;
                 currentMessage = text;
@@ -1350,12 +1414,12 @@ async function get_recent_messages(username, chat_id) {
 
         // Add the last message if it exists
         if (currentUUID !== null) {
-            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp });
+            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
         }
 
         // Process and display the messages
         messages.forEach(message => {
-            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true);
+            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true, true, message.uuid);
         });
 
     } catch (error) {
@@ -1599,35 +1663,6 @@ async function handleAvatar(settings, tempReceived) {
     }
 }
 
-async function handleAudio(settings, timestamp, tempFormatted, msg) {
-    if (settings.audio.voice_output) {
-        var chatMessage = '<br><div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '<i class="fa fa-play play-button" aria-hidden="true"></i></div>';
-        document.getElementById('messages').innerHTML += chatMessage;
-
-        var playButtons = document.querySelectorAll('.play-button');
-        var playButton = playButtons[playButtons.length - 1];
-        var playButtons = document.querySelectorAll('.play-button');
-        var playButton = playButtons[playButtons.length - 1];
-        playButton.addEventListener('click', async function () {
-            this.classList.remove('fa-play');
-            this.classList.add('fa-spinner');
-            var audioSrc = await request_audio(this);
-            var audioElement = document.createElement('audio');
-            audioElement.controls = true;
-            audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            
-            var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
-            this.closest('.bubble').appendChild(audioElement);
-            if (anchorTag) {
-                anchorTag.remove();
-            }
-        });
-    } else {
-        var chatMessage = '<div class="message bot last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble">' + tempFormatted + '</div>';
-        document.getElementById('messages').innerHTML += chatMessage;
-    }
-}
-
 function resetState() {
     tempReceived = '';
     tempFormatted = '';
@@ -1650,17 +1685,17 @@ function resetState() {
     document.getElementById('message').placeholder = 'Type a message...';
 }
 
-async function onResponse(msg) {
-    var timestamp = new Date().toLocaleTimeString();
-    msg = await parseMessage(msg);
-    removeSpinner();
-    tempReceived += msg.content;
-    tempFormatted = formatTempReceived(tempReceived);
-    await handleAvatar(settings, tempReceived);
-    await handleAudio(settings, timestamp, tempFormatted, msg);
-    resetState();
+// async function onResponse(msg) {
+//     var timestamp = new Date().toLocaleTimeString();
+//     msg = await parseMessage(msg);
+//     removeSpinner();
+//     tempReceived += msg.content;
+//     tempFormatted = formatTempReceived(tempReceived);
+//     await handleAvatar(settings, tempReceived);
+//     await handleAudio(settings, timestamp, tempFormatted, msg);
+//     resetState();
 
-    if (msg && msg.end && msg.end === 'true') {
-        resetState();
-    }
-};
+//     if (msg && msg.end && msg.end === 'true') {
+//         resetState();
+//     }
+// };

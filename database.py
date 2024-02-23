@@ -433,7 +433,6 @@ class Database:
         if daily:
             # get the current date
             current_date = datetime.datetime.now().date()
-
             # execute the SQL query with the user_id and the current date
             self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             self.cursor.execute(

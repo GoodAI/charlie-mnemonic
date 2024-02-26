@@ -1,4 +1,8 @@
 import os
+from dataclasses import dataclass
+from typing import Any
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import close_all_sessions
@@ -18,7 +22,7 @@ def client():
     os.environ["NEW_DATABASE_URL"] = db_url
 
     # Dispose of engine and close all sessions before starting tests
-    if hasattr(session_factory, "engine"):
+    if hasattr(session_factory, "engine") and session_factory.engine:
         session_factory.engine.dispose()
         close_all_sessions()
 
@@ -63,29 +67,32 @@ def authentication(client):
     return Authentication()
 
 
+@dataclass
+class LoggedInClient:
+    client: TestClient
+    cookie_header: str
+    response: Any = None
+
+
 @pytest.fixture
 def logged_in_client(client, authentication):
-    authentication.register("testuser", "testpassword", "Test User")
-
-    client.post("/login/", json={"username": "testuser", "password": "testpassword"})
-    return client
-
-
-def test_logout(dao_session, client: TestClient, authentication):
     authentication.dao.create_tables()
-    authentication.register("testuser", "testpassword", "Test User")
+    random_user_id = f"newuser_{uuid.uuid4().hex}"
+    authentication.register(random_user_id, "testpassword", "Test User")
 
-    login_response = client.post(
-        "/login/", json={"username": "testuser", "password": "testpassword"}
+    response = client.post(
+        "/login/", json={"username": random_user_id, "password": "testpassword"}
     )
-    assert (
-        login_response.status_code == 200
-    ), f"""
-Expected status code to be 200, but got {login_response.status_code}
-Json: {login_response.json()}
-"""
+    cookies = response.cookies
+    cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
 
-    logout_response = client.post("/logout/", cookies=login_response.cookies, json={})
+    return LoggedInClient(client, cookie_header=cookie_header, response=response)
+
+
+def test_logout(logged_in_client: LoggedInClient):
+    logout_response = logged_in_client.client.post(
+        "/logout/", headers={"Cookie": logged_in_client.cookie_header}, json={}
+    )
     assert (
         logout_response.status_code == 200
     ), f"""
@@ -97,10 +104,11 @@ Json: {logout_response.json()}
 
 def test_login_bad_password(dao_session, client: TestClient, authentication):
     authentication.dao.create_tables()
-    authentication.register("testuser", "testpassword", "Test User")
+    random_user_id = f"newuser_{uuid.uuid4().hex}"
+    authentication.register(random_user_id, "testpassword", "Test User")
 
     login_response = client.post(
-        "/login/", json={"username": "testuser", "password": "incorrect_password"}
+        "/login/", json={"username": random_user_id, "password": "incorrect_password"}
     )
     assert (
         login_response.status_code == 401
@@ -134,7 +142,9 @@ Json: {login_response.json()}
 
 
 def test_websocket_endpoint(logged_in_client, authentication):
-    with logged_in_client.websocket_connect("/ws/authtest") as websocket:
+    with logged_in_client.client.websocket_connect(
+        "/ws/authtest", headers={"Cookie": logged_in_client.cookie_header}
+    ) as websocket:
         data = websocket.receive_text()
         assert data == "Connection successful"
 

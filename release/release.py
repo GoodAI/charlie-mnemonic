@@ -30,6 +30,7 @@ def run_command(
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
+        encoding="utf-8",
     ) as proc:
         result = ""
         for line in proc.stdout:

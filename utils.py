@@ -16,7 +16,6 @@ from termcolor import colored
 import memory as _memory
 import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
-from elevenlabs import generate, play, set_api_key
 from werkzeug.utils import secure_filename
 from pathlib import Path
 

@@ -5,7 +5,6 @@ from typing import Optional, Dict, Callable
 
 import openai
 from dotenv import load_dotenv
-from elevenlabs import set_api_key as set_elevenlabs_api_key
 
 from config import update_api_keys, DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
@@ -43,10 +42,6 @@ configuration_meta_list = [
         key="OPENAI_API_KEY",
         update_callback=update_openai_api_key,
         is_valid=lambda: openai.api_key and os.environ.get("OPENAI_API_KEY", None),
-    ),
-    ConfigurationMeta(
-        key="ELEVENLABS_API_KEY",
-        update_callback=set_elevenlabs_api_key,
     ),
 ]
 

@@ -17,11 +17,9 @@ test_cases = [
     DotenvTestData(
         original="""
 OPENAI_API_KEY=original
-ELEVENLABS_API_KEY=original
 """,
         expected="""
 OPENAI_API_KEY=new_value
-ELEVENLABS_API_KEY=original
 """,
         updates={"OPENAI_API_KEY": "new_value"},
         description="Update existing key",

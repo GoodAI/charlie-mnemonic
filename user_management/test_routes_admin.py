@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -10,20 +11,23 @@ from .test_routes import client
 def setup_users():
     with UsersDAO() as users_dao:
         # Create an admin user
+        random_adminname = f"newuser_{uuid.uuid4().hex}"
         admin_user_id = users_dao.add_user(
-            "adminuser", "password", "admintoken", "Admin User"
+            random_adminname, "password", "admintoken", "Admin User"
         )
         users_dao.update_user(admin_user_id, True, "admin")
 
         # Create a regular user
+        random_username = f"newuser_{uuid.uuid4().hex}"
         regular_user_id = users_dao.add_user(
-            "regularuser", "password", "regulartoken", "Regular User"
+            random_username, "password", "regulartoken", "Regular User"
         )
         users_dao.update_user(regular_user_id, True, "user")
 
         # Create a target user whose details will be updated
+        random_username = f"newuser_{uuid.uuid4().hex}"
         target_user_id = users_dao.add_user(
-            "targetuser", "password", "targettoken", "Target User"
+            random_username, "password", "targettoken", "Target User"
         )
 
         return admin_user_id, regular_user_id, target_user_id
@@ -31,9 +35,12 @@ def setup_users():
 
 def test_update_user_by_admin_success(client: TestClient, setup_users):
     admin_user_id, _, target_user_id = setup_users
+    admin_name = None
+    with UsersDAO() as users_dao:
+        admin_name = users_dao.get_username(admin_user_id)
 
     client.cookies.set("session_token", "admintoken")
-    client.cookies.set("username", "adminuser")
+    client.cookies.set("username", admin_name)
 
     response = client.post(
         f"/admin/update_user/{target_user_id}",
@@ -52,8 +59,12 @@ def test_update_user_by_admin_success(client: TestClient, setup_users):
 def test_update_user_by_non_admin_failure(client: TestClient, setup_users):
     _, regular_user_id, target_user_id = setup_users
 
+    regular_name = None
+    with UsersDAO() as users_dao:
+        regular_name = users_dao.get_username(regular_user_id)
+
     client.cookies.set("session_token", "regulartoken")
-    client.cookies.set("username", "regularuser")
+    client.cookies.set("username", regular_name)
 
     response = client.post(
         f"/admin/update_user/{target_user_id}",

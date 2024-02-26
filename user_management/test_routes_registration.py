@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from starlette.testclient import TestClient
 
@@ -6,8 +7,9 @@ from .test_routes import client
 
 
 def test_register_success(client: TestClient):
+    unique_username = f"newuser_{uuid.uuid4().hex}"
     new_user = {
-        "username": "newuser",
+        "username": unique_username,
         "password": "newpassword",
         "display_name": "New User",
     }

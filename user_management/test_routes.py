@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from typing import Any
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -76,10 +77,11 @@ class LoggedInClient:
 @pytest.fixture
 def logged_in_client(client, authentication):
     authentication.dao.create_tables()
-    authentication.register("testuser", "testpassword", "Test User")
+    random_user_id = f"newuser_{uuid.uuid4().hex}"
+    authentication.register(random_user_id, "testpassword", "Test User")
 
     response = client.post(
-        "/login/", json={"username": "testuser", "password": "testpassword"}
+        "/login/", json={"username": random_user_id, "password": "testpassword"}
     )
     cookies = response.cookies
     cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
@@ -102,10 +104,11 @@ Json: {logout_response.json()}
 
 def test_login_bad_password(dao_session, client: TestClient, authentication):
     authentication.dao.create_tables()
-    authentication.register("testuser", "testpassword", "Test User")
+    random_user_id = f"newuser_{uuid.uuid4().hex}"
+    authentication.register(random_user_id, "testpassword", "Test User")
 
     login_response = client.post(
-        "/login/", json={"username": "testuser", "password": "incorrect_password"}
+        "/login/", json={"username": random_user_id, "password": "incorrect_password"}
     )
     assert (
         login_response.status_code == 401

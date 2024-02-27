@@ -95,7 +95,7 @@ def release(
         f.write(version)
 
     run_command(f"git add version.txt")
-    run_command(f"git commit -m 'Release {version}'")
+    run_command(f'git commit -m "Release {version}"')
     run_command(f"git push {force_str} {origin_name} {release_branch}")
 
     print(f"Successfully created and released version {version}")

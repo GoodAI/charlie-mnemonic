@@ -13,12 +13,14 @@ services:
       - HOST=0.0.0.0
       - PORT=8002
     ports:
-      - 8002:8002
+      - "8002:8002"
     restart: unless-stopped
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./data/user:/app/users
     env_file:
       - .env
+    privileged: true
 
   psdb:
     image: postgres:14
@@ -28,7 +30,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     ports:
-      - 5432:5432
+      - "5432:5432"
     environment:
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres

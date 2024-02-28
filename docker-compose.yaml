@@ -4,7 +4,7 @@ services:
     image: goodaidev/charlie-mnemonic:latest
     container_name: charlie-mnemonic
     hostname: charlie-mnemonic
-    entrypoint: ["python", "launcher.py"]
+    entrypoint: [ "python", "launcher.py" ]
     build:
       context: .
       dockerfile: Dockerfile
@@ -36,6 +36,13 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_HOSTNAME=psdb
+
+  python-env:
+    build:
+      context: ./pythondocker
+      dockerfile: Dockerfile
+    container_name: python-env
+    hostname: python-env
 
 volumes:
   postgres-data:

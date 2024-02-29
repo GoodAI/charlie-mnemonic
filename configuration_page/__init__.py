@@ -1,10 +1,12 @@
 import os
+import sys
 from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Optional, Dict, Callable
 
 import openai
 from dotenv import load_dotenv
+from openai import AuthenticationError
 
 from config import update_api_keys, DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
@@ -12,6 +14,20 @@ from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv
 
 def update_openai_api_key(value: str):
     openai.api_key = value
+
+
+TEST_KEY_PREFIX = "test-token-"
+
+
+def validate_openai_key(value: str):
+    if value.startswith(TEST_KEY_PREFIX):
+        # when we see this prefix, we ignore the validator (used in tests)
+        return
+    openai.api_key = value
+    try:
+        openai.models.list()
+    except AuthenticationError as e:
+        raise ValueError("Invalid OpenAI API key.") from e
 
 
 def reload_configuration():
@@ -41,6 +57,7 @@ configuration_meta_list = [
     ConfigurationMeta(
         key="OPENAI_API_KEY",
         update_callback=update_openai_api_key,
+        validate_callback=validate_openai_key,
         is_valid=lambda: openai.api_key and os.environ.get("OPENAI_API_KEY", None),
     ),
 ]

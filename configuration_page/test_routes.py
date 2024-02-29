@@ -1,10 +1,12 @@
 import os
+
+import openai
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import close_all_sessions
-import openai
 
 from config import CONFIGURATION_URL
+from configuration_page import TEST_KEY_PREFIX
 from launcher import create_app
 from user_management.session import session_factory
 
@@ -61,12 +63,12 @@ def test_middleware_redirects_random_url(client):
 
 
 def test_update_configuration(client):
-    test_data = {"OPENAI_API_KEY": "new_key_value"}
+    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
 
     response = client.post(CONFIGURATION_URL, json=test_data)
     assert response.status_code == 200
     assert response.json() == {"message": "Configuration updated successfully"}
-    assert openai.api_key == "new_key_value"
+    assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
 
 
 def test_update_configuration_missing_required(client):

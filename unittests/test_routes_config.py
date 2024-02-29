@@ -6,6 +6,7 @@ import openai
 import tempfile
 import dotenv
 from config import CONFIGURATION_URL
+from configuration_page import TEST_KEY_PREFIX
 from launcher import create_app
 from user_management.session import session_factory
 
@@ -104,7 +105,9 @@ def test_updating_invalid_key(client, fake_openai_key):
 
 
 def test_updating_set_openai_key(client, config_file_path, fake_openai_key):
-    response = client.post(CONFIGURATION_URL, json={"OPENAI_API_KEY": "value"})
+    response = client.post(
+        CONFIGURATION_URL, json={"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}value"}
+    )
     content = response.json()
     assert response.status_code == 200
     assert "message" in content
@@ -112,11 +115,11 @@ def test_updating_set_openai_key(client, config_file_path, fake_openai_key):
     with open(config_file_path) as f:
         assert (
             f.read()
-            == """
-OPENAI_API_KEY=value
+            == f"""
+OPENAI_API_KEY={TEST_KEY_PREFIX}value
 """.strip()
         )
-    assert openai.api_key == "value"
+    assert openai.api_key == f"{TEST_KEY_PREFIX}value"
 
 
 def test_missing_json_body(client, fake_openai_key):

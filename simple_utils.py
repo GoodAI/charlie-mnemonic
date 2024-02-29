@@ -2,8 +2,10 @@
 Simple utils with no big dependencies. Cannot be in utils due to circular imports.
 Ideally move here only things that don't require any local dependencies.
 """
+
 import os
 from pathlib import Path
+import re
 
 from unidecode import unidecode
 
@@ -23,3 +25,16 @@ def convert_name(name):
     name = name.replace(".", "_")
     # lowercase the name
     return name.lower()
+
+
+def parse_memory_cat_string(s):
+    # Remove characters not allowed (rule 3)
+    s = re.sub(r"[^a-zA-Z0-9_\-]", "", s)
+
+    # Ensure it starts and ends with an alphanumeric character (rule 2)
+    s = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", s)
+
+    # Limit the length to 63 characters (rule 1)
+    s = s[:63]
+
+    return s

@@ -7,6 +7,7 @@ import urllib.parse
 import zipfile
 from datetime import datetime
 from typing import Optional
+import llmcalls
 
 import logs
 from fastapi import (
@@ -56,7 +57,6 @@ from user_management.dao import UsersDAO, AdminControlsDAO
 from user_management.routes import set_login_cookies
 from utils import (
     process_message,
-    OpenAIResponser,
     AudioProcessor,
     AddonManager,
     SettingsManager,
@@ -443,7 +443,7 @@ async def regenerate_response(request: Request, message: regenerateMessage):
 
 @router.post("/stop_streaming/", tags=[LOGIN_REQUIRED])
 async def stop_streaming(request: Request, user: UserName):
-    OpenAIResponser.user_pressed_stop(user.username)
+    llmcalls.OpenAIResponser.user_pressed_stop(user.username)
     return {"message": "Streaming stopped successfully"}
 
 

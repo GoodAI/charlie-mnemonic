@@ -204,22 +204,7 @@ function createDataTabContent(audio, tabId) {
 function createGeneralSettingsTabContent(settings, tabId) {
     var tabContent = document.createElement('div');
     tabContent.id = tabId;
-    tabContent.className = 'tab-content';
-
-    // Populate avatar settings
-    var h3 = document.createElement('h3');
-    h3.textContent = 'Avatar';
-    tabContent.appendChild(h3);
-
-    var avatarItem = document.createElement('a');
-    avatarItem.href = "#";
-    var status = settings.avatar.avatar ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-    avatarItem.innerHTML = 'Enable avatar: ' + status;
-    avatarItem.onclick = function (e) {
-        e.preventDefault();
-        edit_status('avatar', 'avatar', !settings.avatar.avatar);
-    };
-    tabContent.appendChild(avatarItem);
+    tabContent.className = 'tab-content'
 
     // Populate language settings
     h3 = document.createElement('h3');
@@ -232,11 +217,7 @@ function createGeneralSettingsTabContent(settings, tabId) {
     var option1 = document.createElement('option');
     option1.value = 'en';
     option1.text = 'English';
-    var option2 = document.createElement('option');
-    option2.value = 'af';
-    option2.text = 'Afrikaans';
     languageItem.appendChild(option1);
-    languageItem.appendChild(option2);
     languageItem.value = settings.language.language;
     languageItem.onchange = function (e) {
         edit_status('language', 'language', e.target.value);
@@ -705,7 +686,7 @@ function handlePlanMessage(msg) {
 function handleFunctionCall(msg) {
     var timestamp = new Date().toLocaleTimeString();
     var addon = msg.message.function;
-    var args = parseComplexJson(msg.message.arguments); // Assuming parseComplexJson is a function you have defined
+    var args = parseComplexJson(msg.message.arguments);
 
     var callDetails = {
         "Function": addon,
@@ -718,7 +699,7 @@ function handleFunctionCall(msg) {
 
 function handleFunctionResponse(msg) {
     var timestamp = new Date().toLocaleTimeString();
-    var content = { "Response": msg.message }; // Wrap the response in an object
+    var content = { "Response": msg.message };
 
     // Call updateOrCreateDebugBubble to handle the display
     updateOrCreateDebugBubble("Function Response", timestamp, content);

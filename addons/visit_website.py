@@ -1,4 +1,3 @@
-import os
 import requests
 from bs4 import BeautifulSoup
 
@@ -26,28 +25,13 @@ parameters = {
 }
 
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup
-
-
 def visit_website(
-    url, include_links=True, include_images=True, username=None, max_length=4000
+    url, include_links=True, include_images=True, max_length=4000, username=None
 ):
     try:
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-        driver.get(url)
-
-        soup = BeautifulSoup(driver.page_source, "html.parser")
+        response = requests.get(url)
+        response.raise_for_status()  # Raises an HTTPError if the response status code is 4XX/5XX
+        soup = BeautifulSoup(response.text, "html.parser")
 
         for script in soup(["script", "style"]):
             script.decompose()
@@ -67,9 +51,8 @@ def visit_website(
             images = [img.get("src") for img in soup.find_all("img") if img.get("src")]
             data += "Images: " + "\n".join(images) + "\n"
 
-        driver.quit()
-
         return data[:max_length]
 
     except Exception as e:
+        print(f"Visit website error: {e}")
         return str(e)

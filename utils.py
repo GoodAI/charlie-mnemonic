@@ -84,8 +84,6 @@ class MessageSender:
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
                     )
-                    print(f"Response: {response}")
-                    print(f"Result: {result}")
                     if result is not None:
                         await MessageSender.send_debug(
                             f"Last message: Prompt tokens: {response.usage.prompt_tokens}, Completion tokens: {response.usage.completion_tokens}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}",
@@ -172,10 +170,6 @@ class MessageSender:
                         average_response_time=average_response_time,
                         response_count=response_count,
                     )
-            else:
-                print(
-                    f"Unexpected response type or missing 'usage' attribute: {response}"
-                )
         except Exception as e:
             logger.exception(f"An error occurred: {e}")
             await MessageSender.send_message(
@@ -329,246 +323,6 @@ class AddonManager:
         return function_dict, function_metadata
 
 
-class OpenAIResponser:
-    """This class contains functions to get responses from OpenAI"""
-
-    error503 = "OpenAI server is busy, try again later"
-
-    def __init__(self, openai_model, temperature, max_tokens, max_responses, username):
-        self.openai_model = openai_model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.max_responses = max_responses
-        self.username = username
-
-        async def log_response_headers(
-            session, trace_config_ctx, params: aiohttp.TraceRequestEndParams
-        ):
-            # Extract the headers
-            tokens_used = params.response.headers.get(
-                "x-ratelimit-remaining-tokens", 40000
-            )
-            requests_remaining = params.response.headers.get(
-                "x-ratelimit-remaining-requests", 200
-            )
-            tokens_limit = params.response.headers.get(
-                "x-ratelimit-limit-tokens", 40000
-            )
-            requests_limit = params.response.headers.get(
-                "x-ratelimit-limit-requests", 200
-            )
-
-            # Calculate the usage
-            tokens_usage = (1 - int(tokens_used) / int(tokens_limit)) * 100
-            requests_usage = (1 - int(requests_remaining) / int(requests_limit)) * 100
-
-            # Print the normal usage
-            # logger.debug(f'OpenAI tokens used: {tokens_used} ({tokens_usage:.2f}% of limit)')
-            # logger.debug(f'OpenAI requests remaining: {requests_remaining} ({requests_usage:.2f}% of limit)')
-            # await MessageSender.send_message({"type": "rate_limit", "content": {"message": f"tokens_usage: " + str(round(tokens_usage, 2)) + "%, requests_usage: " + str(round(requests_usage, 2)) + "%"}}, "blue", self.username)
-
-            # Print the warning if above 50% of the rate limit
-            if tokens_usage > 20 or requests_usage > 20:
-                logger.warning(
-                    "WARNING: You have used more than 20% of your rate limit: tokens_usage: "
-                    + str(tokens_usage)
-                    + "%, requests_usage: "
-                    + str(requests_usage)
-                    + "%"
-                )
-                await MessageSender.send_message(
-                    {
-                        "type": "rate_limit",
-                        "content": {
-                            "warning": "WARNING: You have used more than 20% of your rate limit: tokens_usage: "
-                            + str(tokens_usage)
-                            + "%, requests_usage: "
-                            + str(requests_usage)
-                            + "%"
-                        },
-                    },
-                    "blue",
-                    self.username,
-                )
-
-            # Print the error if above rate limit
-            if tokens_usage >= 100 or requests_usage >= 100:
-                logger.error(
-                    "ERROR: You have exceeded your rate limit: tokens_usage: "
-                    + str(tokens_usage)
-                    + "%, requests_usage: "
-                    + str(requests_usage)
-                    + "%"
-                )
-                await MessageSender.send_message(
-                    {
-                        "type": "rate_limit",
-                        "content": {
-                            "error": "ERROR: You have exceeded your rate limit: tokens_usage: "
-                            + str(tokens_usage)
-                            + "%, requests_usage: "
-                            + str(requests_usage)
-                            + "%"
-                        },
-                    },
-                    "blue",
-                    self.username,
-                )
-
-        self.trace_config = aiohttp.TraceConfig()
-        self.trace_config.on_request_end.append(log_response_headers)
-
-    @staticmethod
-    def user_pressed_stop(username):
-        global stopPressed
-        stopPressed[username] = True
-
-    @staticmethod
-    def reset_stop_stream(username):
-        global stopPressed
-        stopPressed[username] = False
-
-    @retry(stop=stop_after_attempt(5), wait=wait_fixed(1))
-    async def get_response(
-        self,
-        username,
-        messages,
-        stream=False,
-        function_metadata=None,
-        function_call="auto",
-        chat_id=None,
-    ):
-        if function_metadata is None:
-            function_metadata = [
-                {
-                    "name": "none",
-                    "description": "you have no available functions",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                    },
-                }
-            ]
-
-        max_retries = 5
-        timeout = 180.0  # timeout in seconds
-        now = time.time()
-
-        session = aiohttp.ClientSession(trace_configs=[self.trace_config])
-        openai.aiosession.set(session)
-
-        for i in range(max_retries):
-            try:
-                response = await asyncio.wait_for(
-                    openai.ChatCompletion.acreate(
-                        model=self.openai_model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        n=self.max_responses,
-                        top_p=1,
-                        frequency_penalty=0,
-                        presence_penalty=0,
-                        messages=messages,
-                        stream=stream,
-                        functions=function_metadata,
-                        function_call=function_call,
-                    ),
-                    timeout=timeout,
-                )
-
-            except asyncio.TimeoutError:
-                logger.error(
-                    f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
-                )
-                await MessageSender.send_message(
-                    {
-                        "error": f"Request timed out to OpenAI servers, retrying {i+1}/{max_retries}"
-                    },
-                    "red",
-                    username,
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
-                )
-                await MessageSender.send_message(
-                    {
-                        "error": f"Error from openAI: {str(e)}, retrying {i+1}/{max_retries}"
-                    },
-                    "red",
-                    username,
-                )
-
-        elapsed = time.time() - now
-        if stream:
-            func_call = {
-                "name": None,
-                "arguments": "",
-            }
-            collected_messages = []
-            # check if the user pressed stop to stop the stream
-            async for chunk in response:
-                # check if the user pressed stop to stop the stream
-                global stopPressed
-                stopStream = False
-                if username in stopPressed:
-                    stopStream = stopPressed[username]
-                if stopStream:
-                    await session.close()
-                    stopStream = False
-                    stopPressed[username] = False
-                    await MessageSender.send_message(
-                        {"cancel_message": True, "chat_id": chat_id}, "blue", username
-                    )
-                    await session.close()
-                    break
-                delta = chunk["choices"][0]["delta"]
-                if "content" in chunk["choices"][0]["delta"]:
-                    chunk_message = chunk["choices"][0]["delta"]["content"]
-                    collected_messages.append(chunk_message)
-                    await MessageSender.send_message(
-                        {"chunk_message": chunk_message, "chat_id": chat_id},
-                        "blue",
-                        username,
-                    )
-                if chunk["choices"][0]["finish_reason"] == "stop":
-                    await MessageSender.send_message(
-                        {"stop_message": True, "chat_id": chat_id}, "blue", username
-                    )
-                    await session.close()
-                    break
-                if "function_call" in delta:
-                    if "name" in delta.function_call:
-                        func_call["name"] = delta.function_call["name"]
-                    if "arguments" in delta.function_call:
-                        func_call["arguments"] += delta.function_call["arguments"]
-                if chunk.choices[0].finish_reason == "function_call":
-                    # convert the function call to an openai function call structure
-                    full_response = {
-                        "choices": [
-                            {
-                                "message": {
-                                    "function_call": {
-                                        "name": func_call["name"],
-                                        "arguments": func_call["arguments"],
-                                    }
-                                }
-                            }
-                        ],
-                    }
-                    await session.close()
-                    return full_response
-                if not delta.get("content", None):
-                    continue
-                response = "".join(collected_messages)
-        else:
-            await MessageSender.update_token_usage(
-                response, username, False, elapsed=elapsed
-            )
-        await session.close()
-        return response
-
-
 class AudioProcessor:
     """This class contains functions to process audio"""
 
@@ -624,38 +378,11 @@ class AudioProcessor:
     @staticmethod
     async def generate_audio(text, username, users_dir):
         openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        # return an error if the text has more than 4096 characters (openai limit for now)
+        if len(text) > 4096:
+            return {"error": "The text is too long."}
         audio_path = await openai_response.generate_audio(text, username, users_dir)
         return audio_path
-
-        # # Make sure the directory exists
-        # audio_dir = os.path.join(users_dir, username, "audio")
-        # Path(audio_dir).mkdir(parents=True, exist_ok=True)
-        # audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
-
-        # # Strip code blocks from text
-        # text = MessageParser.strip_code_blocks(text)
-
-        # # Retry mechanism for audio generation
-        # max_retries = 3
-        # for attempt in range(max_retries):
-        #     try:
-        #         audio = generate(
-        #             text=text,
-        #             voice="ThT5KcBeYPX3keUQqHPh",
-        #             model="eleven_multilingual_v1",
-        #         )
-        #         with open(audio_path, "wb") as f:
-        #             f.write(audio)
-        #         return audio_path, audio
-        #     except requests.exceptions.ChunkedEncodingError as e:
-        #         if attempt < max_retries - 1:
-        #             continue
-        #         else:
-        #             raise e
-        #     except Exception as e:
-        #         # Log other exceptions and re-raise
-        #         logger.error(e)
-        #         raise
 
 
 class BrainProcessor:
@@ -1186,7 +913,7 @@ async def process_message(
     #         f"{message['metadata'].get('username')}: {message['document']}",
     #     )
     last_messages_string = "\n".join(
-        f"({message['metadata'].get('username')}: {message['document']}"
+        f"{message['metadata'].get('username')}: {message['document']}"
         for message in last_messages[-100:]
     )
 
@@ -1346,13 +1073,13 @@ async def process_message(
 
         if tokens_notes > 100:
             notes = await memory.note_taking(
-                all_messages,
-                og_message,
-                users_dir,
-                username,
-                False,
-                verbose,
-                tokens_notes,
+                content=all_messages,
+                message=og_message,
+                user_dir=users_dir,
+                username=username,
+                show=False,
+                verbose=verbose,
+                tokens_notes=tokens_notes,
             )
 
             if notes is not None or notes != "":
@@ -1384,23 +1111,18 @@ async def process_message(
     cot_settings = settings.get("cot_enabled")
     is_cot_enabled = cot_settings.get("cot_enabled")
     logger.debug(f"is_cot_enabled: {is_cot_enabled}")
-    if is_cot_enabled:
-        response = await start_chain_thoughts(
-            full_message, og_message, username, users_dir, tokens_output
-        )
-    else:
-        response = await generate_response(
-            full_message,
-            og_message,
-            username,
-            users_dir,
-            tokens_output,
-            history_messages,
-            chat_id=chat_id,
-            regenerate=regenerate,
-            uid=uuid,
-        )
-    print(f"gen response: {response}")
+
+    response = await generate_response(
+        full_message,
+        og_message,
+        username,
+        users_dir,
+        tokens_output,
+        history_messages,
+        chat_id=chat_id,
+        regenerate=regenerate,
+        uid=uuid,
+    )
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
     response = json.loads(response)
@@ -1429,58 +1151,6 @@ async def process_message(
     with Database() as db:
         db.update_message_count(username)
     return response
-
-
-async def start_chain_thoughts(
-    message, og_message, username, users_dir, max_tokens_allowed
-):
-    function_dict, function_metadata = await AddonManager.load_addons(
-        username, users_dir
-    )
-    system_prompt = prompts.chain_thoughts_system_prompt
-    message_prompt = prompts.chain_thoughts_message_prompt.format(message)
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message_prompt},
-    ]
-
-    openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens_allowed, max_responses, username
-    )
-    response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata, chat_id=chat_id
-    )
-
-    final_response = response
-
-    await MessageSender.send_debug(
-        f"cot final_response: {final_response}", 1, "green", username
-    )
-    cot_response = await process_chain_thoughts(
-        response,
-        message,
-        og_message,
-        function_dict,
-        function_metadata,
-        username,
-        users_dir,
-        max_tokens_allowed,
-        chat_id=chat_id,
-    )
-    await MessageSender.send_debug(
-        f"cot_response: {cot_response}", 1, "green", username
-    )
-
-    # try:
-    #     return_string = json.dumps({'content': cot_response})
-    # except:
-    #     await MessageSender.send_debug(f"can't parse cot_response: {cot_response}", 2, 'red', username)
-    #     try:
-    #         return_string = cot_response['content']
-    #     except:
-    #         await MessageSender.send_debug(f"can't parse cot_response 2nd time: {cot_response}", 2, 'red', username)
-
-    return cot_response
 
 
 def prettyprint(msg, color):
@@ -1517,13 +1187,13 @@ async def generate_response(
     messages.append({"role": "user", "content": f"{og_message}"})
 
     # print the message in a different color in the terminal
-    # for message in messages:
-    #     if message["role"] == "user":
-    #         prettyprint(f"User: {message['content']}", "blue")
-    #     elif message["role"] == "assistant":
-    #         prettyprint(f"Assistant: {message['content']}", "yellow")
-    #     else:
-    #         prettyprint(f"System: {message['content']}", "green")
+    for message in messages:
+        if message["role"] == "user":
+            prettyprint(f"User: {message['content']}", "blue")
+        elif message["role"] == "assistant":
+            prettyprint(f"Assistant: {message['content']}", "yellow")
+        else:
+            prettyprint(f"System: {message['content']}", "green")
 
     # openai_response = OpenAIResponser(
     #     openai_model, temperature, max_allowed_tokens, max_responses, username
@@ -1546,141 +1216,9 @@ async def generate_response(
         uid=uid,
     ):
         response = resp
-        # print(f"Generate response: {response}")
         await MessageSender.send_debug(f"response: {response}", 1, "green", username)
 
     return response
-
-
-async def process_cot_messages(
-    message,
-    function_dict,
-    function_metadata,
-    username,
-    users_dir,
-    steps_string,
-    full_message="",
-    og_message="",
-):
-    global last_messages
-    memory = _memory.MemoryManager()
-    function_dict, function_metadata = await AddonManager.load_addons(
-        username, users_dir
-    )
-    system_prompt = prompts.process_cot_system_prompt
-    message_prompt = prompts.process_cot_message_prompt.format(
-        full_message, steps_string, message
-    )
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": message_prompt},
-    ]
-    await MessageSender.send_debug(
-        f"process_cot_messages messages: {messages}", 1, "red", username
-    )
-
-    openai_response = OpenAIResponser(
-        openai_model, temperature, max_tokens, max_responses, username
-    )
-    response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata
-    )
-    await MessageSender.send_debug(
-        f"process_cot_messages response: {response}", 2, "red", username
-    )
-    response = response["choices"][0]["message"]
-
-    if "function_call" in response:
-        function_call_name = response["function_call"]["name"]
-        function_call_arguments = response["function_call"]["arguments"]
-        response = await MessageParser.process_function_call(
-            function_call_name,
-            function_call_arguments,
-            function_dict,
-            function_metadata,
-            message,
-            og_message,
-            username,
-            process_cot_messages,
-            False,
-            users_dir,
-            steps_string,
-        )
-        await memory.process_incoming_memory_assistant(
-            "active_brain", f"Result: {response}", username
-        )
-        return response
-    else:
-        await memory.process_incoming_memory_assistant(
-            "active_brain", f"Result: {response}", username
-        )
-        await MessageSender.send_debug(f"{response}", 1, "green", username)
-        return response["content"]
-
-
-async def summarize_cot_responses(
-    steps_string,
-    message,
-    og_message,
-    username,
-    users_dir,
-    max_allowed_tokens,
-    chat_id=None,
-):
-    global COT_RETRIES
-    global last_messages
-    # kw_brain_string = await  BrainProcessor.load_brain(username, users_dir)
-    # add user to COT_RETRIES if they don't exist
-    if username not in COT_RETRIES:
-        COT_RETRIES[username] = 0
-    function_dict, function_metadata = await AddonManager.load_addons(
-        username, users_dir
-    )
-    if COT_RETRIES[username] >= 2:
-        await MessageSender.send_debug(
-            f"Too many CoT retries, skipping...", 1, "red", username
-        )
-        system_prompt = prompts.cot_too_many_retries_system_prompt
-        message_prompt = prompts.cot_too_many_retries_message_prompt.format(
-            steps_string
-        )
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message_prompt},
-        ]
-    else:
-        system_prompt = prompts.cot_system_prompt
-        message_prompt = prompts.cot_message_prompt.format(steps_string)
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message_prompt},
-        ]
-
-    openai_response = OpenAIResponser(
-        openai_model, temperature, max_allowed_tokens, max_responses, username
-    )
-    response = await openai_response.get_response(
-        username, messages, function_metadata=function_metadata
-    )
-
-    response = response["choices"][0]["message"]["content"]
-    # return response
-    if response.startswith("YES: "):
-        COT_RETRIES[username] = 0
-        # remove the YES: part
-        response = response[5:]
-        return response
-    else:
-        COT_RETRIES[username] += 1
-        return await process_final_message(
-            message,
-            og_message,
-            response,
-            username,
-            users_dir,
-            max_allowed_tokens,
-            chat_id,
-        )
 
 
 async def process_function_reply(
@@ -1723,12 +1261,7 @@ async def process_function_reply(
             "content": str(function_response),
         },
     ]
-    # openai_response = OpenAIResponser(
-    #     openai_model, temperature, max_tokens, max_responses, username
-    # )
-    # second_response = await openai_response.get_response(
-    #     username, messages, stream=True, chat_id=chat_id
-    # )
+
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
     async for resp in openai_response.get_response(
         username,
@@ -1738,93 +1271,4 @@ async def process_function_reply(
         chat_id=chat_id,
     ):
         second_response = resp
-        # print(f"Function response: {second_response}")
     return second_response
-
-    # final_response = second_response["choices"][0]["message"]["content"]
-
-    # final_message_string = f"Function {function_call_name} response: {str(function_response)}\n\n{final_response}"
-    # if merge:
-    #     return final_message_string
-    # else:
-    #     return final_response
-
-
-async def process_final_message(
-    message, og_message, response, username, users_dir, max_allowed_tokens, chat_id=None
-):
-    if response.startswith("YES: "):
-        # remove the YES: part
-        response = await response[5:]
-        return response
-
-    function_dict, function_metadata = await AddonManager.load_addons(
-        username, users_dir
-    )
-
-    if not function_metadata:
-        # add a default function
-        function_metadata.append(
-            {
-                "name": "none",
-                "description": "you have no available functions",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                },
-            }
-        )
-
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
-
-    last_messages_string = "\n".join(last_messages[username][-10:])
-    full_message = prompts.full_message.format(message, og_message, response)
-
-    await MessageSender.send_debug(f"{full_message}", 1, "cyan", username)
-
-    # response = generate_response(messages, function_dict, function_metadata)
-    response = await start_chain_thoughts(
-        full_message, og_message, username, users_dir, max_allowed_tokens, chat_id
-    )
-
-    fc_check = None
-    try:
-        fc_check = json.loads(response)
-    except:
-        fc_check = response
-
-    response = MessageParser.extract_content(response)
-
-    await MessageSender.send_debug(
-        f"Retry CoT Response: {response}", 1, "green", username
-    )
-
-    if "function_call" in fc_check:
-        function_call_name = fc_check["function_call"]["name"]
-        function_call_arguments = fc_check["function_call"]["arguments"]
-        new_fc_check = await MessageParser.process_function_call(
-            function_call_name,
-            function_call_arguments,
-            function_dict,
-            function_metadata,
-            message,
-            og_message,
-            username,
-            process_final_message,
-            False,
-            users_dir,
-            "",
-            None,
-            chat_id,
-        )
-        return new_fc_check
-    else:
-        await MessageSender.send_debug(f"{message}", 1, "green", username)
-        await MessageSender.send_debug(f"Assistant: {response}", 1, "pink", username)
-
-        # if settings.get('voice_output', True):
-        #     audio_path, audio = generate_audio(response['content'])
-        #     play(audio)
-        #     return response
-        # else:
-        return response

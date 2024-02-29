@@ -112,3 +112,4 @@ moviepy==1.0.3
 decorator==4.4.2
 djlint==1.34.1
 sqlalchemy==2.0.25
+ffprobe==0.5

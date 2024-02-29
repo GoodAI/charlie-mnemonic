@@ -226,6 +226,14 @@ window.addEventListener('drop', function (event) {
     if (event.dataTransfer.files.length > 0 && event.dataTransfer.files[0].type.indexOf('image') > -1) {
         // get the image file
         let imageFile = event.dataTransfer.files[0];
+        // check if the image is too large
+        if (imageFile.size > 20000000) {
+            showErrorModal('The image is too large, max 20MB!');
+            // clear the file input
+            this.value = '';
+            return;
+
+        }
         handleImageFile(imageFile);
     }
 });

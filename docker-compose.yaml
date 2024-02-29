@@ -4,7 +4,7 @@ services:
     image: goodaidev/charlie-mnemonic:latest
     container_name: charlie-mnemonic
     hostname: charlie-mnemonic
-    entrypoint: ["python", "launcher.py"]
+    entrypoint: [ "python", "launcher.py" ]
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,12 +13,14 @@ services:
       - HOST=0.0.0.0
       - PORT=8002
     ports:
-      - 8002:8002
+      - "8002:8002"
     restart: unless-stopped
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./data/user:/app/users
     env_file:
       - .env
+    privileged: true
 
   psdb:
     image: postgres:14
@@ -28,12 +30,19 @@ services:
       - postgres-data:/var/lib/postgresql/data
     restart: unless-stopped
     ports:
-      - 5432:5432
+      - "5432:5432"
     environment:
       - POSTGRES_NAME=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_HOSTNAME=psdb
+
+  python-env:
+    build:
+      context: ./pythondocker
+      dockerfile: Dockerfile
+    container_name: python-env
+    hostname: python-env
 
 volumes:
   postgres-data:

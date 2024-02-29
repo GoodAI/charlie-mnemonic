@@ -76,16 +76,22 @@
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(formObject),
-        }).then(response => response.json())
-            .then(data => {
-                success(data["message"]);
+        }).then(response => response.json().then(data => ({
+            ok: response.ok,
+            status: response.status,
+            body: data
+        }))).then(response => {
+            if (response.ok) { // Check if response status code is not ok (200-299)
+                success(response.body["message"]);
                 setTimeout(() => {
                     window.location.href = "/";
                 }, 1000);
-            })
-            .catch((err) => {
-                error(err);
-            });
+            } else {
+                error(response.body["detail"]);
+            }
+        }).catch((err) => {
+            error(err);
+        });
 
         return false;
     }

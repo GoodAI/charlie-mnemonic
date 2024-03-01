@@ -71,7 +71,11 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
 
         # Start a new container with the volume
         container = client.containers.run(
-            "python-env", name=username, detach=True, tty=True, volumes=volumes
+            "charlie-mnemonic-python-env",
+            name=username,
+            detach=True,
+            tty=True,
+            volumes=volumes,
         )
 
         pip_string = ""

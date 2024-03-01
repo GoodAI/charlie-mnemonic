@@ -20,7 +20,7 @@ Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 ## Installation
 
 - How to install and run Charlie Mnemonic on [Windows](docs/WININSTALL.md)
-- How to install, develop and run Charlie Mnemonic using [Docker](docs/DOCKER-SETUP.md)
+- How to install, develop and run Charlie Mnemonic using [Docker](docs/DEV-DOCKER.md)
 - How to install, develop and run Charlie Mnemonic [manually](docs/DEV-SETUP.md)
 
 

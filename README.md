@@ -1,8 +1,12 @@
 # Charlie Mnemonic
 
-Charlie-mnemonic is a Python application that uses OpenAI’s GPT-4 model to provide an interactive conversational agent. It is
-designed to continually learn and grow through user interactions, extending the capabilities of GPT-4 with additional
-functionalities.
+As part of our research efforts in continual learning, we are open-sourcing Charlie Mnemonic, the first personal assistant (LLM agent) equipped with Long-Term Memory (LTM). 
+
+At first glance, Charlie might resemble existing LLM agents like ChatGPT, Claude, and Gemini. However, its distinctive feature is the implementation of LTM, enabling it to learn from every interaction. This includes storing and integrating user messages, assistant responses, and environmental feedback into LTM for future retrieval when relevant to the task at hand.
+
+Charlie Mnemonic employs a combination of Long-Term Memory (LTM), Short-Term Memory (STM), and episodic memory to deliver context-aware responses. This ability to remember interactions over time significantly improves the coherence and personalization of conversations.
+
+Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 
 ## Features
 

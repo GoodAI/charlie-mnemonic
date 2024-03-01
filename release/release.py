@@ -155,8 +155,8 @@ def main() -> None:
 
     parser.add_argument(
         "--docker-repo-pythonenv",
-        default="charlie-mnemonic-python-env",
-        help="Docker repository name (default: charlie-mnemonic-python-env)",
+        default="goodaidev/charlie-mnemonic-python-env",
+        help="Docker repository name (default: goodaidev/charlie-mnemonic-python-env)",
     )
 
     parser.add_argument(

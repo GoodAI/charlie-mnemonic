@@ -1,10 +1,10 @@
 # Charlie Mnemonic
 
-As part of our research efforts in continual learning, we are open-sourcing Charlie Mnemonic, the first personal assistant (LLM agent) equipped with Long-Term Memory (LTM). 
+As part of our research efforts in continual learning, we are open-sourcing **Charlie Mnemonic, the first personal** assistant (LLM agent) equipped with **Long-Term Memory (LTM)**. 
 
-At first glance, Charlie might resemble existing LLM agents like ChatGPT, Claude, and Gemini. However, its distinctive feature is the implementation of LTM, enabling it to learn from every interaction. This includes storing and integrating user messages, assistant responses, and environmental feedback into LTM for future retrieval when relevant to the task at hand.
+At first glance, Charlie might resemble existing LLM agents like ChatGPT, Claude, and Gemini. However, its distinctive feature is the implementation of LTM, enabling it to **learn from every interaction**. This includes **storing and integrating user messages, assistant responses, and environmental feedback into LTM** for future retrieval when relevant to the task at hand.
 
-Charlie Mnemonic employs a combination of Long-Term Memory (LTM), Short-Term Memory (STM), and episodic memory to deliver context-aware responses. This ability to remember interactions over time significantly improves the coherence and personalization of conversations.
+Charlie Mnemonic employs a combination of **Long-Term Memory (LTM), Short-Term Memory (STM)**, and **episodic memory** to deliver **context-aware responses**. This ability to remember interactions over time significantly improves the coherence and personalization of conversations.
 
 Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 

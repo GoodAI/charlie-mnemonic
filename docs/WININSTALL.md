@@ -3,6 +3,7 @@
 ## Install Docker
 
 Install Docker as per instructions from [docker.com](https://docs.docker.com/desktop/install/windows-install/).
+Be sure to follow the system requirements.
 
 ## Download Charlie Mnemonic
 

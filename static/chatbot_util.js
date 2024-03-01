@@ -1,7 +1,11 @@
 // parse a json with json5
 function parseComplexJson(jsonStr) {
-    // Now parse the JSON string using JSON5
-    return JSON5.parse(jsonStr);
+    try {
+        return JSON5.parse(jsonStr);
+    } catch (error) {
+        console.error('Error parsing JSON5:', error);
+        return null;
+    }
 };
 
 function escapeHTML(str) {

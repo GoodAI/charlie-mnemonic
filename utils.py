@@ -534,16 +534,6 @@ class MessageParser:
                                 },
                                 {"role": "user", "content": f"{message}"},
                             ]
-                            # openai_response = OpenAIResponser(
-                            #     openai_model, temperature, 1000, max_responses, username
-                            # )
-                            # response = await openai_response.get_response(
-                            #     username,
-                            #     messages,
-                            #     stream=False,
-                            #     function_metadata=None,
-                            #     function_call="auto",
-                            # )
                             response = None
                             openai_response = llmcalls.OpenAIResponser(
                                 api_keys["openai"], default_params
@@ -1195,16 +1185,6 @@ async def generate_response(
         else:
             prettyprint(f"System: {message['content']}", "green")
 
-    # openai_response = OpenAIResponser(
-    #     openai_model, temperature, max_allowed_tokens, max_responses, username
-    # )
-    # response = await openai_response.get_response(
-    #     username,
-    #     messages,
-    #     function_metadata=function_metadata,
-    #     stream=True,
-    #     chat_id=chat_id,
-    # )
     response = ""
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
     async for resp in openai_response.get_response(

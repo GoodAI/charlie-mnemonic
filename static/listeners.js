@@ -50,6 +50,30 @@ function playButtonHandler(element) {
     // force the browser to reflow the DOM
     element.offsetWidth;
 
+    // make sure the message has no more than 4096 characters
+    var bubbleContainer = element.closest('.bubble');
+
+    var clonedBubbleContainer = bubbleContainer.cloneNode(true);
+
+    var codeBlocks = clonedBubbleContainer.querySelectorAll('code[class^="language-"]');
+    codeBlocks.forEach(function(block) {
+        block.parentNode.removeChild(block);
+    });
+
+    const message = clonedBubbleContainer.innerText;
+
+    if (message.length > 4096) {
+        console.error('Message too long');
+        showErrorModal('The message you are trying to generate audio for is too long. The openAI API has a limit of 4096 characters.');
+        isGeneratingAudio = false;
+        // reset the play button
+        element.classList.remove('fa-spinner');
+        element.classList.add('fa-play');
+        // force the browser to reflow the DOM
+        element.offsetWidth;
+        return;
+    }
+
     request_audio(element).then(audioSrc => {
         var audioElement = document.createElement('audio');
         audioElement.controls = true;

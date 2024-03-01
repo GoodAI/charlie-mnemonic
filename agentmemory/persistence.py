@@ -58,9 +58,12 @@ def export_memory_to_file(path="./memory.json", include_embeddings=True, usernam
     # Export the database to a dictionary
     collections_dict = export_memory_to_json(include_embeddings, username=username)
 
-    # Write the dictionary to a JSON file
-    with open(path, "w") as outfile:
-        json.dump(collections_dict, outfile)
+    try:
+        # Write the dictionary to a JSON file
+        with open(path, "w") as outfile:
+            json.dump(collections_dict, outfile)
+    except Exception as e:
+        print(f"Error exporting to {path}: {e}")
 
 
 def import_json_to_memory(data, replace=True, username=None):

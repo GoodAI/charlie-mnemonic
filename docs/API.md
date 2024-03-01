@@ -12,7 +12,7 @@ CLANG provides several API endpoints for managing users, handling messages, and 
 - `/message_audio/`: Process an audio message from a user.
 - `/generate_audio/`: Generate an audio message from text.
 - `/save_data/`: Save a user’s data to a .zip file.
-- `/delete_data/`: Delete a user’s data. (WIP)
-- `/upload_data/`: Upload a .zip file of a user’s data. (WIP)
+- `/delete_data/`: Delete a user’s data.
+- `/upload_data/`: Upload a .zip file of a user’s data.
 
 For more details on using these endpoints, refer to the FastAPI-generated API documentation at http://127.0.0.1:8002/docs when the application is running.

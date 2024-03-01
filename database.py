@@ -413,7 +413,7 @@ class Database:
 
         # get the token usage
         self.cursor.execute(
-            "SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s",
+            "SELECT total_tokens_used, prompt_tokens, completion_tokens, voice_usage FROM statistics WHERE user_id = %s",
             (user_id,),
         )
         return self.cursor.fetchone()
@@ -453,7 +453,7 @@ class Database:
             # execute the SQL query with the user_id
             self.cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             self.cursor.execute(
-                "SELECT total_tokens_used, prompt_tokens, completion_tokens FROM statistics WHERE user_id = %s",
+                "SELECT total_tokens_used, prompt_tokens, completion_tokens, voice_usage FROM statistics WHERE user_id = %s",
                 (user_id,),
             )
             row = self.cursor.fetchone()
@@ -461,13 +461,16 @@ class Database:
                 prompt_tokens = 0
                 completion_tokens = 0
                 total_tokens_used = 0
+                voice_usage = 0
             else:
                 prompt_tokens = row["prompt_tokens"]
                 completion_tokens = row["completion_tokens"]
                 total_tokens_used = row["total_tokens_used"]
+                voice_usage = row["voice_usage"]
             prompt_cost = round(prompt_tokens * 0.01 / 1000, 5)
             completion_cost = round(completion_tokens * 0.03 / 1000, 5)
-            total_cost = round(prompt_cost + completion_cost, 5)
+            voice_cost = voice_usage
+            total_cost = round(prompt_cost + completion_cost + voice_cost, 5)
             return total_tokens_used, total_cost
 
     def update_message_count(self, username):
@@ -531,20 +534,10 @@ class Database:
         # get the user_id for the given username
         user_id = self.users_dao.get_user_id(username)
 
-        # 0.30$ per 1000 characters
-        voice_usage = round(text_lenght * 0.30 / 1000, 5)
+        # 0.15$ per 1000 characters
+        voice_usage = round(text_lenght * 0.15 / 1000, 5)
 
-        # update or insert the voice usage in the statistics table
-        query = """
-        INSERT INTO statistics (user_id, voice_usage) 
-        VALUES (%s, %s)
-        ON CONFLICT (user_id) DO UPDATE SET voice_usage = statistics.voice_usage + %s
-        """
-        self.cursor.execute(query, (user_id, voice_usage, voice_usage))
-        self.conn.commit()
-
-        # get the voice usage
-        self.cursor.execute(
-            "SELECT voice_usage FROM statistics WHERE user_id = %s", (user_id,)
+        result = self.update_token_usage(
+            username, total_tokens_used=text_lenght, voice_usage=voice_usage
         )
-        return self.cursor.fetchone()
+        return result

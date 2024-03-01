@@ -251,7 +251,7 @@ async function request_audio(button) {
         block.parentNode.removeChild(block);
     });
 
-    var message = clonedBubbleContainer.innerText;
+    const message = clonedBubbleContainer.innerText;
 
     try {
         const response = await fetch(API_URL + '/generate_audio/', {

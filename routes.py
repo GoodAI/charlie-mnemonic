@@ -75,23 +75,6 @@ connections = {}
 
 users_dir = "users"
 
-router.mount(f"/{STATIC}", StaticFiles(directory=get_root(STATIC)), name="static")
-router.mount("/d-id", StaticFiles(directory=get_root("d-id")), name="d-id")
-
-
-@router.get("/d-id/api.json")
-async def read_did_api_json():
-    data = {"key": api_keys["d-id"], "url": "https://api.d-id.com"}
-    return JSONResponse(content=data)
-
-
-@router.get("/d-id/{file}")
-async def read_did(file: str):
-    try:
-        return FileResponse(f"d-id/{file}")
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Item not found")
-
 
 @router.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -345,7 +328,7 @@ async def handle_message(request: Request, message: userMessage):
         tab_data = chat_tabs_dao.get_tab_data(user_id)
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
-        if active_tab_data is None:
+        if message.chat_id is None and active_tab_data is None:
             message.chat_id = "0"
             # put the data in the database
             chat_tabs_dao.insert_tab_data(
@@ -611,9 +594,6 @@ async def handle_message_audio(request: Request, audio_file: UploadFile):
 )
 async def handle_generate_audio(request: Request, message: generateAudioMessage):
     user = request.state.user
-    settings = await SettingsManager.load_settings(users_dir, user.username)
-    if count_tokens(message.prompt) > settings["memory"]["input"]:
-        raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path = await AudioProcessor.generate_audio(
         message.prompt, user.username, users_dir
     )
@@ -647,10 +627,22 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
 async def handle_save_data(request: Request):
     user = request.state.user
 
-    # Paths for memory file and settings file
-    json_file_path = os.path.join(users_dir, user.username, "memory.json")
-    settings_file = os.path.join(users_dir, user.username, "settings.json")
+    if os.environ.get("IS_SINGLE_USER") == "true":
+        # Paths for memory file and settings file
+        json_file_path = os.path.join("data", "user", user.username, "memory.json")
+        settings_file = os.path.join("data", "user", user.username, "settings.json")
+    else:
+        # Paths for memory file and settings file
+        json_file_path = os.path.join(users_dir, user.username, "memory.json")
+        settings_file = os.path.join(users_dir, user.username, "settings.json")
 
+    # create the json_file_path and settings_file if they don't exist
+    if not os.path.exists(json_file_path):
+        with open(json_file_path, "w") as f:
+            json.dump({}, f)
+    if not os.path.exists(settings_file):
+        with open(settings_file, "w") as f:
+            json.dump({}, f)
     # Check if the memory file exists
     if not os.path.exists(json_file_path):
         # todo: add an empty memory file

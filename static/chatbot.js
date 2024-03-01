@@ -418,23 +418,6 @@ function edit_status(category, setting, value) {
         .catch(console.error);
 };
 
-// duplicate function
-// function playButtonHandler() {
-//     var playIcon = this.querySelector('.play-button');
-//     playIcon.classList.remove('fa-play');
-//     playIcon.classList.add('fa-spinner');
-//     var messageBubble = this.parentElement.querySelector('p');
-//     var clonedButton = playIcon.cloneNode(true);
-//     messageBubble.appendChild(clonedButton);
-//     request_audio(clonedButton).then(audioSrc => {
-//         var audioElement = document.createElement('audio');
-//         audioElement.controls = true;
-//         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-//         this.closest('.bubble').appendChild(audioElement);
-//         this.remove();
-//     });
-// }
-
 function setSettings(newSettings) {
     // import the settings and populate the settings menu
     const overlay = document.getElementById('overlay_msg');
@@ -684,17 +667,27 @@ function handlePlanMessage(msg) {
 }
 
 function handleFunctionCall(msg) {
-    var timestamp = new Date().toLocaleTimeString();
-    var addon = msg.message.function;
-    var args = parseComplexJson(msg.message.arguments);
-
-    var callDetails = {
-        "Function": addon,
-        "Arguments": args
-    };
-
-    // Call updateOrCreateDebugBubble to handle the display
-    updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
+    // Ensure msg is an object and has the required properties
+    if (typeof msg === 'object' && msg.message && msg.message.arguments) {
+        var timestamp = new Date().toLocaleTimeString();
+        var addon = msg.message.function;
+        try {
+            // Ensure arguments are stringified if it's an object
+            var argsStr = typeof msg.message.arguments === 'string' ? msg.message.arguments : JSON.stringify(msg.message.arguments);
+            var args = parseComplexJson(argsStr);
+    
+            var callDetails = {
+                "Function": addon,
+                "Arguments": args
+            };
+    
+            updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
+        } catch (error) {
+            console.error('Error parsing JSON:', error);
+        }
+    } else {
+        console.error('Invalid message format received:', msg);
+    }
 }
 
 function handleFunctionResponse(msg) {
@@ -1160,7 +1153,7 @@ async function get_chat_tabs(username) {
             chat_id = active_tab_data.chat_id;
         }
         else {
-            addChatTab();
+            addChatTab(chat_id);
             get_chat_tabs(username);
         }
 
@@ -1342,6 +1335,7 @@ function deleteChatTab(chat_id) {
             // Select new active tab
             if (newActiveTab) {
                 var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
+                console.log('New active tab:', newActiveTabId);
                 setChat(newActiveTabId);
             } else {
                 addChatTab();
@@ -1522,7 +1516,7 @@ function get_settings(username) {
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: user_name }),
+        body: JSON.stringify({ 'username': username }),
         credentials: 'include'
     })
         .then(handleError)

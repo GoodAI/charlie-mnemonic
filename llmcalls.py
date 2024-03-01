@@ -208,7 +208,6 @@ class OpenAIResponser:
                         )
                         if content:
                             collected_messages.append(content)
-                            # print(f"chat_id: {chat_id}, content: {content}")
                             yield await utils.MessageSender.send_message(
                                 {"chunk_message": content, "chat_id": chat_id},
                                 "blue",
@@ -314,6 +313,11 @@ class OpenAIResponser:
         except Exception as e:
             yield f"An error occurred: {e}"
             print(f"An error occurred: {e}")
+            await utils.MessageSender.send_message(
+                {"error": f"An error occurred: {e}", "chat_id": chat_id},
+                "blue",
+                username,
+            )
 
     def get_role_content(self, role, current_date_time):
         """Return the content for the role."""

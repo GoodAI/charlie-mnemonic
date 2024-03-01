@@ -55,6 +55,17 @@ def zip_directory(path: str, zip_name: str) -> str:
     return final_path
 
 
+def push_docker(docker_repo: str, version: str, path: str = "."):
+    print(f"Building and pushing Docker image {docker_repo} from '{path}'")
+    run_command(f"docker image build -t {docker_repo}:{version} {path}")
+
+    run_command(f"docker tag {docker_repo}:{version} {docker_repo}:latest")
+
+    print(f"Pushing to docker repository {docker_repo}")
+    run_command(f"docker push {docker_repo}:{version}")
+    run_command(f"docker push {docker_repo}:latest")
+
+
 def release(
     version: str,
     docker_repo: str,
@@ -63,6 +74,7 @@ def release(
     release_dir: str,
     release_notes: str,
     release_branch: str,
+    docker_repo_pythonenv: str,
     force_push: bool = False,
 ) -> None:
     force_str = " --force" if force_push else ""
@@ -72,14 +84,10 @@ def release(
     zip_directory(release_dir, zip_file)
     zip_path = os.path.join(release_dir, zip_file)
 
-    print("Building and pushing Docker image")
-    run_command(f"docker image build -t {docker_repo}:{version} .")
-
-    run_command(f"docker tag {docker_repo}:{version} {docker_repo}:latest")
-
-    print("Pushing to docker repository")
-    run_command(f"docker push {docker_repo}:{version}")
-    run_command(f"docker push {docker_repo}:latest")
+    push_docker(docker_repo=docker_repo, version=version, path=".")
+    push_docker(
+        docker_repo=docker_repo_pythonenv, version=version, path="./pythondocker"
+    )
 
     print("Creating git tag")
     run_command(f"git tag {version}")
@@ -146,6 +154,12 @@ def main() -> None:
     )
 
     parser.add_argument(
+        "--docker-repo-pythonenv",
+        default="charlie-mnemonic-python-env",
+        help="Docker repository name (default: charlie-mnemonic-python-env)",
+    )
+
+    parser.add_argument(
         "--origin-name", default="opensource", help="Origin name (default: opensource)"
     )
 
@@ -175,9 +189,6 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    docker_repo = args.docker_repo
-    github_repo = args.github_repo
-    origin_name = args.origin_name
     release_dir = "release"
     with open("version.txt", "r") as f:
         current_version = f.read()
@@ -188,13 +199,14 @@ def main() -> None:
     check_version_is_newer(args.version, current_version=current_version)
     release(
         args.version,
-        docker_repo,
-        github_repo=github_repo,
+        docker_repo=args.docker_repo,
+        github_repo=args.github_repo,
         release_dir=release_dir,
-        origin_name=origin_name,
+        origin_name=args.origin_name,
         release_notes=args.release_notes,
         release_branch=args.release_branch,
         force_push=args.force_push,
+        docker_repo_pythonenv=args.docker_repo_pythonenv,
     )
     print("Done, wohoo!")
 

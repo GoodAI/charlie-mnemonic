@@ -33,9 +33,7 @@ services:
       - POSTGRES_HOSTNAME=psdb
 
   python-env:
-    build:
-      context: ./pythondocker
-      dockerfile: Dockerfile
+    image: goodaidev/charlie-mnemonic-python-env:latest
     container_name: python-env
     hostname: python-env
 

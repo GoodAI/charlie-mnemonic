@@ -34,8 +34,10 @@ services:
 
   python-env:
     image: goodaidev/charlie-mnemonic-python-env:latest
-    container_name: python-env
-    hostname: python-env
+    container_name: charlie-mnemonic-python-env
+    hostname: charlie-mnemonic-python-env
+    volumes:
+      - ${HOME}/AppData/Roaming/charlie-mnemonic/data/user/admin/data:/data 
 
 volumes:
   postgres-data:

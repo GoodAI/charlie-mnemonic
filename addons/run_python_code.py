@@ -55,8 +55,12 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
     try:
         client = docker.from_env()
 
-        # Define the path where you want to store media on the host
-        host_path = os.path.join(os.getcwd(), "users", username, "data")
+        if os.environ.get("IS_SINGLE_USER") == "true":
+            # Define the path where you want to store media on the host
+            host_path = os.path.join(os.getcwd(), "data", "user", username, "data")
+        else:
+            # Define the path where you want to store media on the host
+            host_path = os.path.join(os.getcwd(), "users", username, "data")
 
         # Define the path inside the container where you will save media
         container_path = "/data"
@@ -71,7 +75,7 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
 
         # Start a new container with the volume
         container = client.containers.run(
-            "charlie-mnemonic-python-env",
+            "goodaidev/charlie-mnemonic-python-env",
             name=username,
             detach=True,
             tty=True,

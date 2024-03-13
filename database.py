@@ -467,8 +467,8 @@ class Database:
                 completion_tokens = row["completion_tokens"]
                 total_tokens_used = row["total_tokens_used"]
                 voice_usage = row["voice_usage"]
-            prompt_cost = round(prompt_tokens * 0.01 / 1000, 5)
-            completion_cost = round(completion_tokens * 0.03 / 1000, 5)
+                prompt_cost = round(prompt_tokens * 0.00001, 5)
+                completion_cost = round(completion_tokens * 0.00003, 5)
             voice_cost = voice_usage
             total_cost = round(prompt_cost + completion_cost + voice_cost, 5)
             return total_tokens_used, total_cost

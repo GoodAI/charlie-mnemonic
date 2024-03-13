@@ -55,18 +55,20 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
     try:
         client = docker.from_env()
 
-        if os.environ.get("IS_SINGLE_USER") == "true":
-            # Define the path where you want to store media on the host
-            host_path = os.path.join(os.getcwd(), "data", "user", username, "data")
-        else:
-            # Define the path where you want to store media on the host
-            host_path = os.path.join(os.getcwd(), "users", username, "data")
+        # Get the environment variable value
+        charlie_mnemonic_user_dir = os.environ.get(
+            "CHARLIE_MNEMONIC_USER_DIR"
+        ) or os.path.join(os.getcwd(), "users")
 
-        # Define the path inside the container where you will save media
+        full_path = os.path.join(charlie_mnemonic_user_dir, username, "data")
+
+        # Define the path inside the container
         container_path = "/data"
 
         # Define the volume
-        volumes = {host_path: {"bind": container_path, "mode": "rw"}}
+        volumes = {full_path: {"bind": container_path, "mode": "rw"}}
+
+        print(f"the path is: {full_path} linked to {container_path}")
 
         # Remove existing container with the same name
         for c in client.containers.list(all=True):

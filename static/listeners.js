@@ -98,7 +98,7 @@ message.addEventListener("input", function () {
     tokens_used = tokens.length;
     message_lenght = message.value.length;
     // $0.01 / 1K tokens
-    cost = tokens_used * 0.01 / 1000;
+    cost = tokens_used * 0.00001;
     updateCounterDiv(message_lenght, tokens_used, max_message_tokens, cost);
     // limit the message length to 1000 tokens, revert to last valid input if limit is exceeded
     if (tokens_used > max_message_tokens && message.value.trim() != '') {

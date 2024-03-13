@@ -91,19 +91,17 @@ class MessageSender:
                             "red",
                             username,
                         )
-                        # cost based on these formulas prompt: $0.01 / 1K tokens completion: $0.03 / 1K tokens
-                        prompt_cost = round(
-                            response.usage.prompt_tokens * 0.01 / 1000, 5
-                        )
+
+                        prompt_cost = round(response.usage.prompt_tokens * 0.00001, 5)
                         completion_cost = round(
-                            response.usage.completion_tokens * 0.03 / 1000, 5
+                            response.usage.completion_tokens * 0.00003, 5
                         )
                         this_message_total_cost = round(
                             prompt_cost + completion_cost, 5
                         )
 
-                        total_prompt_cost = round(result[1] * 0.01 / 1000, 5)
-                        total_completion_cost = round(result[2] * 0.03 / 1000, 5)
+                        total_prompt_cost = round(result[1] * 0.00001, 5)
+                        total_completion_cost = round(result[2] * 0.00003, 5)
                         total_cost = round(total_prompt_cost + total_completion_cost, 5)
                         await MessageSender.send_message(
                             {

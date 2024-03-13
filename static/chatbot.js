@@ -1620,24 +1620,6 @@ function formatTempReceived(tempReceived) {
     return tempFormatted;
 }
 
-async function handleAvatar(settings, tempReceived) {
-    if (settings.avatar.avatar) {
-        var textToSay = tempReceived.replace(/\n/g, "");
-        var videoDuration = 0;
-        var videoPromise;
-        await import('./d-id/streaming-client-api.js').then(
-            did => { videoPromise = did.generateVideoStream(textToSay); });
-
-        videoDuration = await videoPromise;
-        if (videoDuration > 0) {
-            var numCredits = Math.ceil(videoDuration / 15.0);
-            var cost = 18.0 * numCredits / 120.0;
-            console.log("video stream will start soon. duration: " + videoDuration + "; d-id credits: " + numCredits + "; cost: " + cost);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-        }
-    }
-}
-
 function resetState() {
     tempReceived = '';
     tempFormatted = '';

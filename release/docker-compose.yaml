@@ -9,6 +9,7 @@ services:
       - DEPLOY_ENV=local
       - HOST=0.0.0.0
       - PORT=8002
+      - CHARLIE_MNEMONIC_USER_DIR=${HOME}/AppData/Roaming/charlie-mnemonic/users
     ports:
       - "8002:8002"
     restart: unless-stopped
@@ -37,7 +38,7 @@ services:
     container_name: charlie-mnemonic-python-env
     hostname: charlie-mnemonic-python-env
     volumes:
-      - ${HOME}/AppData/Roaming/charlie-mnemonic/data/user/admin/data:/data 
+      - ${HOME}/AppData/Roaming/charlie-mnemonic/users:/data
 
 volumes:
   postgres-data:

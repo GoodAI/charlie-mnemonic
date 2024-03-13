@@ -89,23 +89,21 @@ def release(
         docker_repo=docker_repo_pythonenv, version=version, path="./pythondocker"
     )
 
-    print("Creating git tag")
-    run_command(f"git tag {version}")
-    print("Pushing git tag")
-    run_command(f"git push {origin_name} {version}")
-
-    print("Creating GitHub release")
-    run_command(
-        f'gh release create {version} {zip_path} --repo {github_repo} --title "Release {version}" --notes "{release_notes}"'
-    )
-
     with open("version.txt", "w") as f:
         f.write(version)
 
     run_command(f"git add version.txt")
-    run_command(f'git commit -m "Release {version}"')
+    run_command(f'git commit -m "Bump version to {version}"')
     run_command(f"git push {force_str} {origin_name} {release_branch}")
 
+    print("Creating git tag")
+    run_command(f"git tag {version}")
+    print("Pushing git tag")
+    run_command(f"git push {origin_name} {version}")
+    print("Creating GitHub release")
+    run_command(
+        f'gh release create {version} {zip_path} --repo {github_repo} --title "Release {version}" --notes "{release_notes}"'
+    )
     print(f"Successfully created and released version {version}")
 
 

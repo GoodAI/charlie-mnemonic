@@ -151,6 +151,10 @@ function createAddonsTabContent(addons, tabId) {
         {
             name: 'visit_website',
             description: 'Visit a website'
+        },
+        {
+            name: 'generate_image',
+            description: 'Generate an image with Dalle 3'
         }
       ];
 
@@ -159,7 +163,8 @@ function createAddonsTabContent(addons, tabId) {
             var status = addons[addon] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
             var menuItem = document.createElement('a');
             menuItem.href = "#";
-            menuItem.innerHTML = addon + ": " + status + "<br/>" + addon_descriptions.find(x => x.name === addon).description;
+            var addonDescription = addon_descriptions.find(x => x.name === addon) || { description: 'No description available' };
+            menuItem.innerHTML = addon + ": " + status + "<br/>" + addonDescription.description;
             menuItem.onclick = (function (addon) {
                 return function (e) {
                     e.preventDefault();

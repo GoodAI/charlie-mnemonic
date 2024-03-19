@@ -37,8 +37,8 @@ def generate_image(prompt, size="1024x1024", quality="standard", n=1, username=N
             size=size,
             quality=quality,
         )
-    except openai.error.OpenAIError as e:
-        return {"error": str(e)}
+    except Exception as e:
+        return str(e)
 
     # Get the user's data directory path
     charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")

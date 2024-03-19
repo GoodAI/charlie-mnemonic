@@ -19,7 +19,7 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from chat_tabs.dao import ChatTabsDAO
-from config import api_keys, default_params, fakedata
+from config import api_keys, default_params, fakedata, USERS_DIR
 from database import Database
 import tiktoken
 from pydub import audio_segment
@@ -581,7 +581,7 @@ class MessageParser:
         username,
         exception_handler,
         merge=True,
-        users_dir="users/",
+        users_dir=USERS_DIR,
         steps_string="",
         full_response=None,
         chat_id=None,
@@ -1201,7 +1201,7 @@ async def process_function_reply(
     function_metadata,
     username,
     merge=True,
-    users_dir="users/",
+    users_dir=USERS_DIR,
     chat_id=None,
 ):
     await MessageSender.send_debug(

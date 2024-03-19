@@ -57,6 +57,7 @@ SINGLE_USER_DISPLAY_NAME = os.environ.get("SINGLE_USER_DISPLAY_NAME", "admin")
 SINGLE_USER_PASSWORD = os.environ.get("SINGLE_USER_PASSWORD", "admin")
 DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE = get_root("users/user.env")
 PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
+USERS_DIR = "users"
 
 
 def origins():

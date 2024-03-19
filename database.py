@@ -534,10 +534,15 @@ class Database:
         # get the user_id for the given username
         user_id = self.users_dao.get_user_id(username)
 
-        # 0.15$ per 1000 characters
-        voice_usage = round(text_lenght * 0.15 / 1000, 5)
+        # 15$ per 1000000 characters
+        voice_usage = round(text_lenght * 15 / 1000000, 5)
 
         result = self.update_token_usage(
             username, total_tokens_used=text_lenght, voice_usage=voice_usage
         )
+        return result
+
+    def add_whisper_usage(self, username, cost):
+        """Add the whisper usage for the given username to the statistics table."""
+        result = self.update_token_usage(username, voice_usage=cost)
         return result

@@ -68,8 +68,6 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
         # Define the volume
         volumes = {full_path: {"bind": container_path, "mode": "rw"}}
 
-        print(f"the path is: {full_path} linked to {container_path}")
-
         # Remove existing container with the same name
         for c in client.containers.list(all=True):
             if c.name == username:

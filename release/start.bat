@@ -7,21 +7,23 @@ if not exist "%CHARLIE_MNEMONIC_USER_DIR%" mkdir "%CHARLIE_MNEMONIC_USER_DIR%"
 
 echo Checking if docker is installed
 docker --version > NUL 2>&1
-
 if not %ERRORLEVEL% == 0 (
     echo Failed to find docker, is it installed?
     exit /b %ERRORLEVEL%
 )
 
-
 echo Checking if docker daemon is running
 docker info > NUL 2>&1
-
 if not %ERRORLEVEL% == 0 (
     echo Docker Compose failed with error level %ERRORLEVEL%, is docker desktop running?
     exit /b %ERRORLEVEL%
 )
 
+echo Stopping current Charlie Mnemonic containers...
+docker-compose --project-name charlie-mnemonic-windows down
+
+echo Pulling the latest images...
+docker-compose --project-name charlie-mnemonic-windows pull
 
 echo Starting Charlie Mnemonic using Docker Compose...
 echo First run takes a while
@@ -41,11 +43,10 @@ if %errorlevel%==0 (
     timeout /t 1 /nobreak >nul
     start %URL%
     docker logs -f charlie-mnemonic
-	docker-compose --project-name charlie-mnemonic-windows down
+    docker-compose --project-name charlie-mnemonic-windows down
 ) else (
     echo Not available yet. Retrying in 5 seconds...
     timeout /t 5 /nobreak >nul
     goto CheckLoop
 )
-
 endlocal

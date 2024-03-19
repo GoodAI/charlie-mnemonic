@@ -146,16 +146,20 @@ function createAddonsTabContent(addons, tabId) {
         },
         {
             name: 'run_python_code',
-            description: 'Run python code'
+            description: 'Run python code (dockerized)'
         },
         {
             name: 'visit_website',
-            description: 'Visit a website'
+            description: 'Visit a website (simple requests only)'
         },
         {
             name: 'generate_image',
             description: 'Generate an image with Dalle 3'
-        }
+        },
+        {
+            name: 'search_duckduckgo',
+            description: 'Search the web with DuckDuckGo'
+        },
       ];
 
     for (let addon in addons) {

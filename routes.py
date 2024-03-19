@@ -84,7 +84,6 @@ async def read_root(request: Request):
         template_name = (
             "maintenance.html" if db.get_maintenance_mode() else "index.html"
         )
-
     context = {
         "request": request,
         "version": version,
@@ -389,7 +388,6 @@ async def regenerate_response(request: Request, message: regenerateMessage):
         last_message = get_last_message(
             "active_brain", message.chat_id, user.username, message.uuid
         )
-        print(f"last message: {last_message}")
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
             message.chat_id = "0"
@@ -916,7 +914,12 @@ async def get_user_profile(request: Request):
         user_profile = json.loads(users.get_user_profile(user.username))
         return templates.TemplateResponse(
             "user_profile.html",
-            {"request": request, "profile": user_profile, "daily_stats": daily_stats},
+            {
+                "request": request,
+                "profile": user_profile,
+                "daily_stats": daily_stats,
+                "production": PRODUCTION,
+            },
         )
 
 

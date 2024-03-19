@@ -462,6 +462,7 @@ class Database:
                 completion_tokens = 0
                 total_tokens_used = 0
                 voice_usage = 0
+                prompt_cost = 0
             else:
                 prompt_tokens = row["prompt_tokens"]
                 completion_tokens = row["completion_tokens"]

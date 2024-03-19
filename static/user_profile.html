@@ -1,79 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <title>User Profile</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="styles.css?v=0.41">
-</head>
-
-<body id="body-profile">
-    <div class="container my-4">
-        <div class="card">
-            <div class="card-header">
-                <h3>User Profile</h3>
+    <head>
+        <title>User Profile</title>
+        <link rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="styles.css?v=0.41">
+    </head>
+    <body id="body-profile">
+        <div class="container my-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>User Profile</h3>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ profile.username }}</h5>
+                    <p class="card-text">
+                        <strong>Display Name:</strong>
+                        <span id="display-name">{{ profile.display_name }}</span>
+                        <br>
+                        <strong>Role:</strong>{{ profile.role }}
+                        {% if profile.role == 'admin' %}
+                            {% if production == true %}<a href="/admin/statistics/1" class="btn btn-link">Admin Panel</a>{% endif %}
+                        {% endif %}
+                        <br>
+                        <strong>Access:</strong>{{ profile.has_access }}
+                        <br>
+                        <strong>Banned:</strong>{{ profile.banned }}
+                        <br>
+                        <strong>Session Time:</strong>{{ profile.session_time }}
+                        <br>
+                        <strong>Addons Used:</strong>{{ profile.addons_used }}
+                        <br>
+                        <strong>Settings Used:</strong>{{ profile.settings_used }}
+                        <br>
+                    </p>
+                </div>
             </div>
-            <div class="card-body">
-                <h5 class="card-title">{{ profile.username }}</h5>
-                <p class="card-text">
-                    <strong>Display Name:</strong>
-                    <span id="display-name">{{ profile.display_name }}</span>
-                    <br>
-                    <strong>Role:</strong>{{ profile.role }}
-                    {% if profile.role == 'admin' %}{% if production == true %}<a href="/admin/statistics/1"
-                        class="btn btn-link">Admin Panel</a>{% endif %}{% endif %}
-                    <br>
-                    <strong>Access:</strong>{{ profile.has_access }}
-                    <br>
-                    <strong>Banned:</strong>{{ profile.banned }}
-                    <br>
-                    <strong>Session Time:</strong>{{ profile.session_time }}
-                    <br>
-                    <strong>Addons Used:</strong>{{ profile.addons_used }}
-                    <br>
-                    <strong>Settings Used:</strong>{{ profile.settings_used }}
-                    <br>
-                </p>
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h3>Daily Stats</h3>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Message Amount</th>
+                                <th>Prompt Tokens</th>
+                                <th>Generation Tokens</th>
+                                <th>Brain Tokens</th>
+                                <th>Spending Count</th>
+                                <th>Average Response Time</th>
+                                <th>Total Response Time</th>
+                                <th>Response Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in daily_stats %}
+                                <tr>
+                                    <td>{{ row.timestamp }}</td>
+                                    <td>{{ row.message_amount }}</td>
+                                    <td>{{ row.prompt_tokens }}</td>
+                                    <td>{{ row.generation_tokens }}</td>
+                                    <td>{{ row.brain_tokens }}</td>
+                                    <td>{{ row.spending_count }}</td>
+                                    <td>{{ row.average_response_time }}</td>
+                                    <td>{{ row.total_response_time }}</td>
+                                    <td>{{ row.response_count }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-        <div class="card mt-4">
-            <div class="card-header">
-                <h3>Daily Stats</h3>
-            </div>
-            <div class="card-body">
-                <table class="table table-striped table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Message Amount</th>
-                            <th>Prompt Tokens</th>
-                            <th>Generation Tokens</th>
-                            <th>Brain Tokens</th>
-                            <th>Spending Count</th>
-                            <th>Average Response Time</th>
-                            <th>Total Response Time</th>
-                            <th>Response Count</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in daily_stats %}
-                        <tr>
-                            <td>{{ row.timestamp }}</td>
-                            <td>{{ row.message_amount }}</td>
-                            <td>{{ row.prompt_tokens }}</td>
-                            <td>{{ row.generation_tokens }}</td>
-                            <td>{{ row.brain_tokens }}</td>
-                            <td>{{ row.spending_count }}</td>
-                            <td>{{ row.average_response_time }}</td>
-                            <td>{{ row.total_response_time }}</td>
-                            <td>{{ row.response_count }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-</body>
-
+    </body>
 </html>

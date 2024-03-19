@@ -15,13 +15,12 @@ from classes import (
     EditTabDescription,
     RecentMessages,
 )
-from routes import users_dir
 from simple_utils import get_root
 from utils import MessageParser, BrainProcessor
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import STATIC, LOGIN_REQUIRED
+from config import STATIC, LOGIN_REQUIRED, USERS_DIR
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
@@ -129,7 +128,7 @@ async def handle_delete_data(request: Request):
     await BrainProcessor.delete_recent_messages(user.username)
     with ChatTabsDAO() as db:
         db.delete_tab_data(user.id)
-    shutil.rmtree(os.path.join(users_dir, user.username), ignore_errors=True)
+    shutil.rmtree(os.path.join(USERS_DIR, user.username), ignore_errors=True)
     return {"message": "User data deleted successfully"}
 
 

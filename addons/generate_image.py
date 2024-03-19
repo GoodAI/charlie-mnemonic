@@ -46,11 +46,13 @@ def generate_image(prompt, size="1024x1024", quality="standard", n=1, username=N
     os.makedirs(user_data_dir, exist_ok=True)
 
     image_paths = []
+    volume_paths = []
     random_string = os.urandom(8).hex()
     for i, data in enumerate(response.data):
         image_url = data.url
         image_filename = f"generated_image_{random_string}_{i+1}.png"
         image_path = os.path.join(user_data_dir, image_filename)
+        volume_path = os.path.join("data", image_filename)
 
         # Download the image and save it to disk
         image_data = requests.get(image_url).content
@@ -58,4 +60,5 @@ def generate_image(prompt, size="1024x1024", quality="standard", n=1, username=N
             file.write(image_data)
 
         image_paths.append(image_path)
-    return {"image_paths": image_paths}
+        volume_paths.append(volume_path)
+    return {"image_paths": volume_paths}

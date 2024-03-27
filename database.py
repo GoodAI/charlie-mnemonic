@@ -462,13 +462,15 @@ class Database:
                 completion_tokens = 0
                 total_tokens_used = 0
                 voice_usage = 0
+                prompt_cost = 0
+                completion_cost = 0
             else:
                 prompt_tokens = row["prompt_tokens"]
                 completion_tokens = row["completion_tokens"]
                 total_tokens_used = row["total_tokens_used"]
                 voice_usage = row["voice_usage"]
-            prompt_cost = round(prompt_tokens * 0.01 / 1000, 5)
-            completion_cost = round(completion_tokens * 0.03 / 1000, 5)
+                prompt_cost = round(prompt_tokens * 0.00001, 5)
+                completion_cost = round(completion_tokens * 0.00003, 5)
             voice_cost = voice_usage
             total_cost = round(prompt_cost + completion_cost + voice_cost, 5)
             return total_tokens_used, total_cost
@@ -534,10 +536,15 @@ class Database:
         # get the user_id for the given username
         user_id = self.users_dao.get_user_id(username)
 
-        # 0.15$ per 1000 characters
-        voice_usage = round(text_lenght * 0.15 / 1000, 5)
+        # 15$ per 1000000 characters
+        voice_usage = round(text_lenght * 15 / 1000000, 5)
 
         result = self.update_token_usage(
             username, total_tokens_used=text_lenght, voice_usage=voice_usage
         )
+        return result
+
+    def add_whisper_usage(self, username, cost):
+        """Add the whisper usage for the given username to the statistics table."""
+        result = self.update_token_usage(username, voice_usage=cost)
         return result

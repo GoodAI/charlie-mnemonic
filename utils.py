@@ -18,9 +18,8 @@ import openai
 from fastapi import HTTPException, BackgroundTasks, UploadFile
 from werkzeug.utils import secure_filename
 from pathlib import Path
-
 from chat_tabs.dao import ChatTabsDAO
-from config import api_keys, default_params, fakedata
+from config import api_keys, default_params, fakedata, USERS_DIR
 from database import Database
 import tiktoken
 from pydub import audio_segment
@@ -91,19 +90,17 @@ class MessageSender:
                             "red",
                             username,
                         )
-                        # cost based on these formulas prompt: $0.01 / 1K tokens completion: $0.03 / 1K tokens
-                        prompt_cost = round(
-                            response.usage.prompt_tokens * 0.01 / 1000, 5
-                        )
+
+                        prompt_cost = round(response.usage.prompt_tokens * 0.00001, 5)
                         completion_cost = round(
-                            response.usage.completion_tokens * 0.03 / 1000, 5
+                            response.usage.completion_tokens * 0.00003, 5
                         )
                         this_message_total_cost = round(
                             prompt_cost + completion_cost, 5
                         )
 
-                        total_prompt_cost = round(result[1] * 0.01 / 1000, 5)
-                        total_completion_cost = round(result[2] * 0.03 / 1000, 5)
+                        total_prompt_cost = round(result[1] * 0.00001, 5)
+                        total_completion_cost = round(result[2] * 0.00003, 5)
                         total_cost = round(total_prompt_cost + total_completion_cost, 5)
                         await MessageSender.send_message(
                             {
@@ -353,7 +350,9 @@ class AudioProcessor:
             language = "en"
 
         # use the saved file path to transcribe the audio
-        transcription = await AudioProcessor.transcribe_audio(filepath, language)
+        transcription = await AudioProcessor.transcribe_audio(
+            filepath, language, username
+        )
         return {"transcription": transcription}
 
     @staticmethod
@@ -367,12 +366,25 @@ class AudioProcessor:
         return True
 
     @staticmethod
-    async def transcribe_audio(audio_file_path, language):
+    async def transcribe_audio(audio_file_path, language, username=""):
+        # Load the audio file using pydub
+        audio = audio_segment.AudioSegment.from_file(audio_file_path)
+
+        # Calculate the duration of the audio in seconds
+        duration_seconds = len(audio) / 1000
+
+        # Calculate the cost of transcription
+        cost_per_minute = 0.006
+        cost = (duration_seconds / 60) * cost_per_minute
+
         openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
         transcription = await openai_response.get_audio_transcription(
             audio_file_path, language, "audio"
         )
-        print(f"Transcription: {transcription}")
+        # Adding this to voice usage for now
+        with Database() as db:
+            db.add_whisper_usage(username, cost)
+
         return transcription.text
 
     @staticmethod
@@ -386,27 +398,7 @@ class AudioProcessor:
 
 
 class BrainProcessor:
-    """This class contains functions to process the brain"""
-
-    @staticmethod
-    async def load_brain(username, users_dir):
-        user_dir = os.path.join(users_dir, username)
-        brain_path = os.path.join(user_dir, "kw_brain.txt")
-        Path(user_dir).mkdir(parents=True, exist_ok=True)
-        if not os.path.exists(brain_path):
-            with open(brain_path, "w") as f:
-                start_brain_path = os.path.join("data", "kw_brain_start.txt")
-                with open(start_brain_path, "r") as f2:
-                    f.write(f2.read())
-        with open(brain_path, "r") as f:
-            return f.read()
-
-    @staticmethod
-    def write_brain(brain, username, users_dir):
-        user_dir = os.path.join(users_dir, username)
-        brain_path = os.path.join(user_dir, "kw_brain.txt")
-        with open(brain_path, "w") as f:
-            f.write(brain)
+    """This class contains functions to process the brain *DEPRECATED*"""
 
     @staticmethod
     async def delete_recent_messages(user):
@@ -438,14 +430,11 @@ class MessageParser:
     @staticmethod
     async def start_image_description(image_path, prompt, file_name):
         """Get the description of an image using the OpenAI Vision API, asynchronously."""
-        print(f"Image details: {image_path}, {prompt}, {file_name}")
         openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
         resp = await openai_response.get_image_description(
             image_path=image_path, prompt=prompt, filename=file_name
         )
-        print(f"Image description: {resp}")
         result = prompts.image_description.format(prompt, file_name, resp)
-        print(f"Image description + prompt: {result}")
         return result
 
     @staticmethod
@@ -464,7 +453,6 @@ class MessageParser:
             for message in recent_messages:
                 # Add the current message to the filtered list
                 filtered_messages.append(message)
-                print(f"Message UUID: {message['metadata']['uid']} - {uuid}")
                 # If the current message's UUID matches the specified UUID, stop adding messages
                 if message["metadata"]["uid"] == uuid:
                     # remove the last message too
@@ -503,6 +491,10 @@ class MessageParser:
     async def convert_function_call_arguments(
         arguments, username, tryAgain=True, chat_id=None
     ):
+        # if arguments is a list, convert it to a dictionary
+        if isinstance(arguments, list):
+            # take the first element of the list for now, dirty fix
+            arguments = arguments[0]
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
@@ -589,7 +581,7 @@ class MessageParser:
         username,
         exception_handler,
         merge=True,
-        users_dir="users/",
+        users_dir=USERS_DIR,
         steps_string="",
         full_response=None,
         chat_id=None,
@@ -599,6 +591,7 @@ class MessageParser:
                 function_call_arguments, username, chat_id=chat_id
             )
         )
+
         # add the username to the arguments
         if converted_function_call_arguments is not None:
             converted_function_call_arguments["username"] = username
@@ -623,7 +616,7 @@ class MessageParser:
         await MessageSender.send_message(new_message, "red", username)
         try:
             # Print the available functions for debugging
-            print(f"Available functions: {list(function_dict.keys())}")
+            # print(f"Available functions: {list(function_dict.keys())}")
 
             # Try to get the module corresponding to the function_call_name
             module = function_dict.get(function_call_name)
@@ -911,7 +904,6 @@ async def process_message(
     last_messages_tokens = MessageParser.num_tokens_from_string(
         last_messages_string, "gpt-4"
     )
-    print(f"last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}")
     if tokens_recent_messages > 100:
         logger.debug(
             f"last_messages_tokens: {last_messages_tokens} count: {len(last_messages)}"
@@ -954,7 +946,6 @@ async def process_message(
             chat_id=chat_id,
         ):
             response = resp
-            print(f"tab description: {response}")
 
         with ChatTabsDAO() as db:
             db.update_tab_description(chat_id, response)
@@ -1176,14 +1167,14 @@ async def generate_response(
         )
     messages.append({"role": "user", "content": f"{og_message}"})
 
-    # print the message in a different color in the terminal
-    for message in messages:
-        if message["role"] == "user":
-            prettyprint(f"User: {message['content']}", "blue")
-        elif message["role"] == "assistant":
-            prettyprint(f"Assistant: {message['content']}", "yellow")
-        else:
-            prettyprint(f"System: {message['content']}", "green")
+    # # print the message in a different color in the terminal
+    # for message in messages:
+    #     if message["role"] == "user":
+    #         prettyprint(f"User: {message['content']}", "blue")
+    #     elif message["role"] == "assistant":
+    #         prettyprint(f"Assistant: {message['content']}", "yellow")
+    #     else:
+    #         prettyprint(f"System: {message['content']}", "green")
 
     response = ""
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
@@ -1210,7 +1201,7 @@ async def process_function_reply(
     function_metadata,
     username,
     merge=True,
-    users_dir="users/",
+    users_dir=USERS_DIR,
     chat_id=None,
 ):
     await MessageSender.send_debug(

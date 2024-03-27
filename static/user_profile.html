@@ -19,7 +19,9 @@
                         <span id="display-name">{{ profile.display_name }}</span>
                         <br>
                         <strong>Role:</strong>{{ profile.role }}
-                        {% if profile.role == 'admin' %}<a href="/admin/statistics/1" class="btn btn-link">Admin Panel</a>{% endif %}
+                        {% if profile.role == 'admin' %}
+                            {% if production == true %}<a href="/admin/statistics/1" class="btn btn-link">Admin Panel</a>{% endif %}
+                        {% endif %}
                         <br>
                         <strong>Access:</strong>{{ profile.has_access }}
                         <br>

@@ -66,14 +66,19 @@ from utils import (
 
 logger = logs.Log("routes", "routes.log").get_logger()
 
-from config import api_keys, STATIC, LOGIN_REQUIRED, PRODUCTION, ADMIN_REQUIRED
+from config import (
+    api_keys,
+    STATIC,
+    LOGIN_REQUIRED,
+    PRODUCTION,
+    ADMIN_REQUIRED,
+    USERS_DIR,
+)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
 
 connections = {}
-
-users_dir = "users"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -84,7 +89,6 @@ async def read_root(request: Request):
         template_name = (
             "maintenance.html" if db.get_maintenance_mode() else "index.html"
         )
-
     context = {
         "request": request,
         "version": version,
@@ -173,8 +177,8 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
 )
 async def handle_get_settings(request: Request):
     username = request.state.user.username
-    await AddonManager.load_addons(username, users_dir)
-    with open(os.path.join(users_dir, username, "settings.json"), "r") as f:
+    await AddonManager.load_addons(username, USERS_DIR)
+    with open(os.path.join(USERS_DIR, username, "settings.json"), "r") as f:
         settings = json.load(f)
     logger.debug(f"Loaded settings for user {username}")
     logger.debug(settings)
@@ -231,7 +235,7 @@ def count_tokens(message):
 async def handle_update_settings(request: Request, user: editSettings):
     username = request.state.user.username
     # create the directory if it doesn't exist
-    user_dir = os.path.join(users_dir, username)
+    user_dir = os.path.join(USERS_DIR, username)
     if not os.path.exists(user_dir):
         os.makedirs(user_dir)
     # check if the settings file exists
@@ -305,7 +309,7 @@ async def handle_update_settings(request: Request, user: editSettings):
 )
 async def handle_message(request: Request, message: userMessage):
     user = request.state.user
-    settings = await SettingsManager.load_settings(users_dir, user.username)
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     (
@@ -353,7 +357,7 @@ async def handle_message(request: Request, message: userMessage):
     return await process_message(
         message.prompt,
         user.username,
-        users_dir,
+        USERS_DIR,
         message.display_name,
         chat_id=message.chat_id,
     )
@@ -362,7 +366,7 @@ async def handle_message(request: Request, message: userMessage):
 @router.post("/regenerate_response/", tags=[LOGIN_REQUIRED])
 async def regenerate_response(request: Request, message: regenerateMessage):
     user = request.state.user
-    settings = await SettingsManager.load_settings(users_dir, user.username)
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
 
     (
         total_tokens_used,
@@ -389,7 +393,6 @@ async def regenerate_response(request: Request, message: regenerateMessage):
         last_message = get_last_message(
             "active_brain", message.chat_id, user.username, message.uuid
         )
-        print(f"last message: {last_message}")
         # if no active tab, set chat_id to 0
         if active_tab_data is None:
             message.chat_id = "0"
@@ -416,7 +419,7 @@ async def regenerate_response(request: Request, message: regenerateMessage):
     return await process_message(
         last_message,
         user.username,
-        users_dir,
+        USERS_DIR,
         display_name,
         chat_id=message.chat_id,
         regenerate=True,
@@ -439,7 +442,7 @@ async def handle_message_image(
 ):
     user = request.state.user
     username = user.username
-    settings = await SettingsManager.load_settings(users_dir, username)
+    settings = await SettingsManager.load_settings(USERS_DIR, username)
     if count_tokens(prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
@@ -482,7 +485,7 @@ async def handle_message_image(
         )
     # save the image to the user's directory
     converted_name = convert_name(username)
-    user_dir = os.path.join(users_dir, converted_name, "data")
+    user_dir = os.path.join(USERS_DIR, converted_name, "data")
     if not os.path.exists(user_dir):
         os.makedirs(user_dir)
     image_path = os.path.join(user_dir, image_file.filename)
@@ -565,7 +568,7 @@ async def handle_message_no_modules(
 )
 async def handle_message_audio(request: Request, audio_file: UploadFile):
     return await AudioProcessor.upload_audio(
-        users_dir, request.state.user.username, audio_file
+        USERS_DIR, request.state.user.username, audio_file
     )
 
 
@@ -595,7 +598,7 @@ async def handle_message_audio(request: Request, audio_file: UploadFile):
 async def handle_generate_audio(request: Request, message: generateAudioMessage):
     user = request.state.user
     audio_path = await AudioProcessor.generate_audio(
-        message.prompt, user.username, users_dir
+        message.prompt, user.username, USERS_DIR
     )
 
     with Database() as db:
@@ -633,8 +636,8 @@ async def handle_save_data(request: Request):
         settings_file = os.path.join("data", "user", user.username, "settings.json")
     else:
         # Paths for memory file and settings file
-        json_file_path = os.path.join(users_dir, user.username, "memory.json")
-        settings_file = os.path.join(users_dir, user.username, "settings.json")
+        json_file_path = os.path.join(USERS_DIR, user.username, "memory.json")
+        settings_file = os.path.join(USERS_DIR, user.username, "settings.json")
 
     # create the json_file_path and settings_file if they don't exist
     if not os.path.exists(json_file_path):
@@ -653,7 +656,7 @@ async def handle_save_data(request: Request):
         export_memory_to_file(path=json_file_path, username=user.username)
 
     # Get the user's notes directory
-    user_notes_dir = os.path.join(users_dir, user.username, "notes")
+    user_notes_dir = os.path.join(USERS_DIR, user.username, "notes")
 
     # Check if the notes directory exists, if not create an empty one
     if not os.path.exists(user_notes_dir):
@@ -680,17 +683,17 @@ async def handle_save_data(request: Request):
 
         # Zip the temporary directory
         shutil.make_archive(
-            os.path.join(users_dir, user.username, "data"), "zip", temp_dir
+            os.path.join(USERS_DIR, user.username, "data"), "zip", temp_dir
         )
 
         # Rename the zip file
         shutil.move(
-            os.path.join(users_dir, user.username, "data.zip"),
-            os.path.join(users_dir, user.username, zip_filename),
+            os.path.join(USERS_DIR, user.username, "data.zip"),
+            os.path.join(USERS_DIR, user.username, zip_filename),
         )
 
     # Serve the zip file
-    file_path = os.path.join(users_dir, user.username, zip_filename)
+    file_path = os.path.join(USERS_DIR, user.username, zip_filename)
     with open(file_path, "rb") as file:
         content = file.read()
 
@@ -727,7 +730,7 @@ async def handle_upload_data(request: Request, data_file: UploadFile = File(...)
     username = user.username
 
     # Save the uploaded file to the user's directory
-    file_path = os.path.join(users_dir, username, data_file.filename)
+    file_path = os.path.join(USERS_DIR, username, data_file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(data_file.file, buffer)
 
@@ -735,19 +738,19 @@ async def handle_upload_data(request: Request, data_file: UploadFile = File(...)
     if zipfile.is_zipfile(file_path):
         # Extract the zip file
         with zipfile.ZipFile(file_path, "r") as zip_ref:
-            zip_ref.extractall(os.path.join(users_dir, username))
+            zip_ref.extractall(os.path.join(USERS_DIR, username))
 
         # Check for 'memory.json', and 'settings.json'
         if "memory.json" not in os.listdir(
-            os.path.join(users_dir, username)
-        ) or "settings.json" not in os.listdir(os.path.join(users_dir, username)):
+            os.path.join(USERS_DIR, username)
+        ) or "settings.json" not in os.listdir(os.path.join(USERS_DIR, username)):
             raise HTTPException(
                 status_code=400, detail="Zip file is missing required files"
             )
 
         # Verify 'memory.json' is a valid JSON file
         try:
-            with open(os.path.join(users_dir, username, "memory.json")) as f:
+            with open(os.path.join(USERS_DIR, username, "memory.json")) as f:
                 json.load(f)
         except json.JSONDecodeError:
             raise HTTPException(
@@ -756,7 +759,7 @@ async def handle_upload_data(request: Request, data_file: UploadFile = File(...)
 
         # Verify 'settings.json' is a valid JSON file
         try:
-            with open(os.path.join(users_dir, username, "settings.json")) as f:
+            with open(os.path.join(USERS_DIR, username, "settings.json")) as f:
                 json.load(f)
         except json.JSONDecodeError:
             raise HTTPException(
@@ -765,7 +768,7 @@ async def handle_upload_data(request: Request, data_file: UploadFile = File(...)
 
         # Import the data into memory
         import_file_to_memory(
-            path=os.path.join(users_dir, username, "memory.json"),
+            path=os.path.join(USERS_DIR, username, "memory.json"),
             replace=True,
             username=username,
         )
@@ -824,10 +827,10 @@ async def handle_abort_button(request: Request, user: UserName):
 )
 async def handle_notoken_message(request: Request, message: noTokenMessage):
     user = request.stat.user
-    settings = await SettingsManager.load_settings(users_dir, user.username)
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, user.username, None, users_dir)
+    return await process_message(message.prompt, user.username, None, USERS_DIR)
 
 
 @router.post(
@@ -855,11 +858,11 @@ async def handle_notoken_message(request: Request, message: noTokenMessage):
 )
 async def handle_notoken_generate_audio(request: Request, message: noTokenMessage):
     user = request.stat.user
-    settings = await SettingsManager.load_settings(users_dir, user.username)
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
     audio_path, audio = await AudioProcessor.generate_audio(
-        message.prompt, user.username, users_dir
+        message.prompt, user.username, USERS_DIR
     )
     return FileResponse(audio_path, media_type="audio/wav")
 
@@ -916,7 +919,12 @@ async def get_user_profile(request: Request):
         user_profile = json.loads(users.get_user_profile(user.username))
         return templates.TemplateResponse(
             "user_profile.html",
-            {"request": request, "profile": user_profile, "daily_stats": daily_stats},
+            {
+                "request": request,
+                "profile": user_profile,
+                "daily_stats": daily_stats,
+                "production": PRODUCTION,
+            },
         )
 
 

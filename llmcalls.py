@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import re
 import time
 import uuid
 from openai import AsyncOpenAI
@@ -223,14 +224,20 @@ class OpenAIResponser:
                                     # print(
                                     #     f"Final accumulated arguments: {accumulated_arguments}"
                                     # )
-                                    parsed_arguments = (
-                                        json.loads(accumulated_arguments)
-                                        if accumulated_arguments
-                                        else accumulated_arguments
-                                    )
-                                    # print(
-                                    #     f"Parsed arguments: {parsed_arguments}"
-                                    # )
+                                    try:
+                                        parsed_arguments = json.loads(
+                                            accumulated_arguments
+                                        )
+                                    except json.JSONDecodeError as e:
+                                        # GPT tends to concatenate multiple JSON objects together so we need to split them
+                                        json_objects = re.findall(
+                                            r"\{.*?\}", accumulated_arguments
+                                        )
+                                        parsed_arguments = []
+                                        for json_str in json_objects:
+                                            data = json.loads(json_str)
+                                            parsed_arguments.append(data)
+                                    # print(f"Parsed arguments: {parsed_arguments}")
                                     tool_response = (
                                         await utils.MessageParser.process_function_call(
                                             accumulated_name,

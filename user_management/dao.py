@@ -188,7 +188,7 @@ class AdminControlsDAO(AbstractDAO):
     def get_admin_controls_json(self) -> str:
         rows = self.session.query(AdminControls).all()
         if not rows:
-            return json.dumps({"id": 1, "daily_spending_limit": 10}, default=str)
+            return json.dumps({"id": 1, "daily_spending_limit": 20}, default=str)
         # Assuming rows[0] is an instance of AdminControls
         return json.dumps(rows[0].__dict__, default=str)
 
@@ -200,7 +200,7 @@ class AdminControlsDAO(AbstractDAO):
         if row:
             return row.daily_spending_limit
         else:
-            return 1
+            return 20
 
     def update_admin_controls(
         self, id: int, daily_spending_limit: int, allow_access: bool, maintenance: bool

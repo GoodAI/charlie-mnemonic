@@ -146,12 +146,20 @@ function createAddonsTabContent(addons, tabId) {
         },
         {
             name: 'run_python_code',
-            description: 'Run python code'
+            description: 'Run python code (dockerized)'
         },
         {
             name: 'visit_website',
-            description: 'Visit a website'
-        }
+            description: 'Visit a website (simple requests only)'
+        },
+        {
+            name: 'generate_image',
+            description: 'Generate an image with Dalle 3'
+        },
+        {
+            name: 'search_duckduckgo',
+            description: 'Search the web with DuckDuckGo'
+        },
       ];
 
     for (let addon in addons) {
@@ -159,7 +167,8 @@ function createAddonsTabContent(addons, tabId) {
             var status = addons[addon] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
             var menuItem = document.createElement('a');
             menuItem.href = "#";
-            menuItem.innerHTML = addon + ": " + status + "<br/>" + addon_descriptions.find(x => x.name === addon).description;
+            var addonDescription = addon_descriptions.find(x => x.name === addon) || { description: 'No description available' };
+            menuItem.innerHTML = addon + ": " + status + "<br/>" + addonDescription.description;
             menuItem.onclick = (function (addon) {
                 return function (e) {
                     e.preventDefault();
@@ -1618,24 +1627,6 @@ function formatTempReceived(tempReceived) {
         tempFormatted = marked(tempReceived);
     }
     return tempFormatted;
-}
-
-async function handleAvatar(settings, tempReceived) {
-    if (settings.avatar.avatar) {
-        var textToSay = tempReceived.replace(/\n/g, "");
-        var videoDuration = 0;
-        var videoPromise;
-        await import('./d-id/streaming-client-api.js').then(
-            did => { videoPromise = did.generateVideoStream(textToSay); });
-
-        videoDuration = await videoPromise;
-        if (videoDuration > 0) {
-            var numCredits = Math.ceil(videoDuration / 15.0);
-            var cost = 18.0 * numCredits / 120.0;
-            console.log("video stream will start soon. duration: " + videoDuration + "; d-id credits: " + numCredits + "; cost: " + cost);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-        }
-    }
 }
 
 function resetState() {

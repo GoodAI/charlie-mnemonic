@@ -86,8 +86,26 @@
             return `<a href="${href}" data-lightbox="${text}" data-title="${title}"><img src="${href}" width="250px" alt="${text}"></a>`;
         };
         renderer.link = function (href, title, text) {
+        if (href.includes('youtube.com') || href.includes('youtu.be')) {
+            // Extract the video ID from the YouTube URL
+            var videoId = '';
+            if (href.includes('youtube.com')) {
+                videoId = href.split('v=')[1];
+                var ampersandPosition = videoId.indexOf('&');
+                if (ampersandPosition !== -1) {
+                    videoId = videoId.substring(0, ampersandPosition);
+                }
+            } else if (href.includes('youtu.be')) {
+                videoId = href.split('/').pop();
+            }
+            
+            // Create an iframe for the YouTube video
+            return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
+        } else {
+            // For non-YouTube links, use the default link rendering
             return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
-        };
+        }
+};
 
         // set the options for marked and a highlighter and copy button
         marked.setOptions({

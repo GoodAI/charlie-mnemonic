@@ -873,6 +873,7 @@ async def process_message(
     tokens_notes = memory_settings.get("notes", 1000)
     tokens_input = memory_settings.get("input", 1000)
     tokens_output = memory_settings.get("output", 1000)
+    remaining_tokens = max_token_usage - token_usage
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(
@@ -884,6 +885,7 @@ async def process_message(
     )
     logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
+    remaining_tokens -= function_call_token_usage
 
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
@@ -961,7 +963,7 @@ async def process_message(
 
     message_tokens = MessageParser.num_tokens_from_string(all_messages, "gpt-4")
     token_usage += message_tokens
-    remaining_tokens = max_token_usage - token_usage
+    remaining_tokens -= message_tokens
     logger.debug(f"1. remaining_tokens: {remaining_tokens}")
     verbose = settings.get("verbose").get("verbose")
 
@@ -983,7 +985,7 @@ async def process_message(
         )
 
         token_usage += token_usage_active_brain
-        remaining_tokens = remaining_tokens - token_usage_active_brain
+        remaining_tokens -= token_usage_active_brain
         logger.debug(f"2. remaining_tokens: {remaining_tokens}")
 
         if tokens_episodic_memory > 100:
@@ -1003,7 +1005,7 @@ async def process_message(
             episodic_memory_string, "gpt-4"
         )
         token_usage += episodic_memory_tokens
-        remaining_tokens = remaining_tokens - episodic_memory_tokens
+        remaining_tokens -= episodic_memory_tokens
         logger.debug(f"3. remaining_tokens: {remaining_tokens}")
 
         if tokens_cat_brain > 100:
@@ -1041,7 +1043,7 @@ async def process_message(
             merged_result_string = ""
 
         token_usage += token_usage_relevant_memory
-        remaining_tokens = remaining_tokens - token_usage_relevant_memory
+        remaining_tokens -= token_usage_relevant_memory
         logger.debug(f"4. remaining_tokens: {remaining_tokens}")
 
         # process the results
@@ -1070,6 +1072,10 @@ async def process_message(
             notes = ""
             notes_string = ""
 
+        notes_tokens = MessageParser.num_tokens_from_string(notes_string, "gpt-4")
+        token_usage += notes_tokens
+        remaining_tokens -= notes_tokens
+
     if image_prompt is not None:
         image_prompt_injection = (
             "Automatically generated image description:\n" + image_prompt
@@ -1092,6 +1098,20 @@ async def process_message(
     cot_settings = settings.get("cot_enabled")
     is_cot_enabled = cot_settings.get("cot_enabled")
     logger.debug(f"is_cot_enabled: {is_cot_enabled}")
+
+    if remaining_tokens < 0:
+        # something went wrong in the calculations, return an error
+        print(f"remaining_tokens: {remaining_tokens}, token_usage: {token_usage}")
+        print(
+            f"message_tokens: {message_tokens}, function_call_token_usage: {function_call_token_usage}, token_usage_active_brain: {token_usage_active_brain}, episodic_memory_tokens: {episodic_memory_tokens}, token_usage_relevant_memory: {token_usage_relevant_memory}, notes_tokens: {notes_tokens}"
+        )
+        print(
+            f"user settings:\ntokens_active_brain: {tokens_active_brain}, tokens_cat_brain: {tokens_cat_brain}, tokens_episodic_memory: {tokens_episodic_memory}, tokens_recent_messages: {tokens_recent_messages}, tokens_notes: {tokens_notes}, tokens_input: {tokens_input}, tokens_output: {tokens_output}, max_token_usage: {max_token_usage}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail="Token limit exceeded. Please reduce the length of your message or adjust memory settings.",
+        )
 
     response = await generate_response(
         full_message,

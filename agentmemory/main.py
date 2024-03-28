@@ -77,6 +77,8 @@ def create_memory(
             debug_log(f"WARNING: Boolean metadata field {key} converted to string")
             metadata[key] = str(value)
 
+    text = str(text)
+
     # insert the document into the collection
     memories.upsert(
         ids=[str(id)],

@@ -80,15 +80,21 @@ def create_memory(
     text = str(text)
 
     # insert the document into the collection
-    memories.upsert(
-        ids=[str(id)],
-        documents=[text],
-        metadatas=[metadata],
-        embeddings=[embedding] if embedding is not None else None,
-    )
-
-    debug_log(f"Created memory {id}: {text}", metadata)
-    return id
+    try:
+        memories.upsert(
+            ids=[str(id)],
+            documents=[text],
+            metadatas=[metadata],
+            embeddings=[embedding] if embedding is not None else None,
+        )
+        debug_log(f"Created memory {id}: {text}", metadata)
+        return id
+    except Exception as e:
+        debug_log(
+            f"ERROR: Could not create memory {id}: {text}", metadata, type="error"
+        )
+        debug_log(f"ERROR: {e}", type="error")
+        return None
 
 
 def create_unique_memory(

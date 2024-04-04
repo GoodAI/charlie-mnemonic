@@ -2,6 +2,7 @@
 setlocal
 set URL=http://localhost:8002
 set HOME=%USERPROFILE%
+set CHARLIE_USER_DIR=%HOME%/AppData/Roaming/charlie-mnemonic/users
 
 echo Checking if docker is installed
 docker --version

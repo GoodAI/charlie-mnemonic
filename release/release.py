@@ -84,17 +84,17 @@ def release(
     zip_directory(release_dir, zip_file)
     zip_path = os.path.join(release_dir, zip_file)
 
-    push_docker(docker_repo=docker_repo, version=version, path=".")
-    push_docker(
-        docker_repo=docker_repo_pythonenv, version=version, path="./pythondocker"
-    )
-
     with open("version.txt", "w") as f:
         f.write(version)
 
     run_command(f"git add version.txt")
     run_command(f'git commit -m "Bump version to {version}"')
     run_command(f"git push {force_str} {origin_name} {release_branch}")
+
+    push_docker(docker_repo=docker_repo, version=version, path=".")
+    push_docker(
+        docker_repo=docker_repo_pythonenv, version=version, path="./pythondocker"
+    )
 
     print("Creating git tag")
     run_command(f"git tag {version}")

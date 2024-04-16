@@ -874,7 +874,7 @@ async def handle_abort_button(request: Request, user: UserName):
 # no token message route
 @router.post(
     "/notoken_message/",
-    tags=["Messaging", LOGIN_REQUIRED],
+    tags=["Messaging"],
     summary="Send a message without token",
     description="This endpoint allows the user to send a message to the AI by providing a prompt, username and password. The AI will respond to the prompt.",
     response_description="Returns the AI's response.",
@@ -889,12 +889,14 @@ async def handle_abort_button(request: Request, user: UserName):
         },
     },
 )
-async def handle_notoken_message(request: Request, message: noTokenMessage):
-    user = request.stat.user
-    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
+async def handle_notoken_message(message: noTokenMessage):
+    user = message.username
+    settings = await SettingsManager.load_settings(USERS_DIR, user)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, user.username, None, USERS_DIR)
+    return await process_message(
+        message.prompt, user, USERS_DIR, message.display_name, chat_id=message.chat_id
+    )
 
 
 @router.post(
@@ -921,7 +923,7 @@ async def handle_notoken_message(request: Request, message: noTokenMessage):
     },
 )
 async def handle_notoken_generate_audio(request: Request, message: noTokenMessage):
-    user = request.stat.user
+    user = request.state.user
     settings = await SettingsManager.load_settings(USERS_DIR, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")

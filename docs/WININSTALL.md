@@ -59,6 +59,4 @@ User data are in:
 
 ## Troubleshooting
 
-If something goes wrong, please copy the text from the terminal or take a screenshot and send it to us. You can either
-create issues on [GitHub](https://github.com/GoodAI/charlie-mnemonic/issues) or email us
-at [charlie-mnemonic@goodai.com](mailto:charlie-mnemonic@goodai.com).
+If something goes wrong, please copy the text from the terminal or take a screenshot and send it to us. You can create issues on [GitHub](https://github.com/GoodAI/charlie-mnemonic/issues)

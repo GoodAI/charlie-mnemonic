@@ -7,6 +7,11 @@ set CHARLIE_USER_DIR=%HOME%/AppData/Roaming/charlie-mnemonic/users
 echo Checking if docker is installed
 docker --version
 
+if not exist .env (
+    echo Creating .env file
+    echo "CHARLIE_USER_DIR=%CHARLIE_USER_DIR%" > .env
+)
+
 if not %ERRORLEVEL% == 0 (
     echo Failed to find docker, is it installed?
     exit /b %ERRORLEVEL%

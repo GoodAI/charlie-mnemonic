@@ -17,13 +17,11 @@ RUN apt-get update && \
 # Add Docker GPG key
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /etc/apt/trusted.gpg.d/docker.gpg
 
-# Add Docker's official APT repository
-RUN echo "deb [arch=amd64] https://download.docker.com/linux/debian buster stable" > /etc/apt/sources.list.d/docker.list
+# Dynamically add the Docker repository based on the detected architecture and release
+RUN echo "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/debian $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
 
-# Install Docker CLI and ffmpeg
-RUN apt-get update && \
-    apt-get install -y docker-ce-cli \
-                       ffmpeg
+# Install Docker CLI and ffmpeg, handle possible failure
+RUN apt-get update && { apt-get install -y docker-ce-cli ffmpeg || true; }
 
 WORKDIR /app
 COPY ./requirements.txt /app/requirements.txt

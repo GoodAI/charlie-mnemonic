@@ -84,6 +84,8 @@ class noTokenMessage(BaseModel):
     prompt: str
     username: str
     password: str
+    chat_id: str
+    display_name: str
 
 
 class editSettings(BaseModel):

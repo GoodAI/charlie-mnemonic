@@ -78,7 +78,8 @@ class OpenAIResponser:
         }
 
         params = {
-            "model": "gpt-4-vision-preview",
+            # "model": "gpt-4-vision-preview",
+            "model": "gpt-4-turbo",
             "messages": [prompt_message],
             "max_tokens": 200,
         }
@@ -149,7 +150,7 @@ class OpenAIResponser:
         params = self.default_params.copy()
         params.update(
             {
-                "model": self.default_params.get("model", "gpt-4-turbo-preview"),
+                "model": self.default_params.get("model", "gpt-4-turbo"),
                 "temperature": self.default_params.get("temperature", 0.7),
                 "max_tokens": self.default_params.get("max_tokens", 250),
                 "n": self.default_params.get("n", 1),

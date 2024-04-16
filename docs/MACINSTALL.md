@@ -20,6 +20,10 @@ Before running the script, you need to install the dependencies, make sure Pytho
 ```
 brew install python
 ```
+Make sure pip is installed
+```
+python3 -m pip install --upgrade pip
+```
 Then, install the required Python libraries using pip
 
 ```

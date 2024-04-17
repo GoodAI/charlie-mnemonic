@@ -15,20 +15,9 @@ git clone https://github.com/GoodAI/charlie-mnemonic.git
 cd charlie-mnemonic
 ```
 ## 2. Install Dependencies
-Before running the script, you need to install the dependencies, make sure Python is installed:
+Before running the script, you need to have docker running, visit https://docs.docker.com/get-docker/ for instructions
 
-```
-brew install python
-```
-Make sure pip is installed
-```
-python3 -m pip install --upgrade pip
-```
-Then, install the required Python libraries using pip
 
-```
-pip install -r requirements.txt
-```
 ## 3. Modify Permissions for start_local.sh
 To ensure the script start_local.sh can be executed, you need to modify its permissions to make it executable:
 

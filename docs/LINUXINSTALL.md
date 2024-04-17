@@ -17,20 +17,9 @@ git clone https://github.com/GoodAI/charlie-mnemonic.git
 cd charlie-mnemonic
 ```
 
-## 2. Set Up Python Virtual Environment
-To isolate and manage Python package dependencies, set up a virtual environment:
+## 2. Install Dependencies
+Before running the script, you need to have docker running, visit https://docs.docker.com/get-docker/ for instructions
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-## 3. Install Dependencies
-With your virtual environment activated, install the required Python libraries:
-
-```bash
-pip install -r requirements.txt
-```
 
 ## 4. Modify Permissions for start_local.sh
 To ensure the script `start_local.sh` can be executed, modify its permissions to make it executable:

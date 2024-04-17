@@ -1,6 +1,6 @@
 ## Installation
 
-Also check out the [Windows](docs/WININSTALL.md), [Mac](docs/MACINSTALL.md) or [Linux](docs/LINUXINSTALL.md) instructions for an alternative way to run the application if you prefer using docker.
+Also check out the [Windows](WININSTALL.md), [Mac](MACINSTALL.md) or [Linux](LINUXINSTALL.md) instructions for an alternative way to run the application if you prefer using docker.
 
 ### Prerequisites
 

@@ -46,6 +46,17 @@ class userMessage(BaseModel):
     chat_id: str
 
 
+class CreateChat(BaseModel):
+    username: str
+    chat_name: str
+    chat_id: str
+
+
+class setActiveChat(BaseModel):
+    username: str
+    chat_id: str
+
+
 class regenerateMessage(BaseModel):
     uuid: str
     username: str
@@ -73,6 +84,8 @@ class noTokenMessage(BaseModel):
     prompt: str
     username: str
     password: str
+    chat_id: str
+    display_name: str
 
 
 class editSettings(BaseModel):

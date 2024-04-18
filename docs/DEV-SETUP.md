@@ -1,6 +1,6 @@
 ## Installation
 
-Also check out the [Docker setup](docs/DOCKER-SETUP.md) for an alternative way to run the application if you prefer using docker.
+Also check out the [Windows](WININSTALL.md), [Mac](MACINSTALL.md) or [Linux](LINUXINSTALL.md) instructions for an alternative way to run the application if you prefer using docker.
 
 ### Prerequisites
 
@@ -65,7 +65,7 @@ PRODUCTION = false
    .env file as follows:
 
 ```bash
-DATABASE_URL=postgres://user:pwd@host:port/db
+DATABASE_URL=postgresql://user:pwd@host:port/db
 ```
 
 Replace `user`, `pwd`, `host`, `port`, and `db` with your PostgreSQL username, password, host, port, and database name
@@ -80,7 +80,7 @@ docker-compose up -d psdb
 In that case, you can use the following connection string:
 
 ```bash
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres
 ```
 
 

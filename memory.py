@@ -666,28 +666,49 @@ class MemoryManager:
         """Process the input data and return the results"""
         lines = string.split("\n")
         result = []
+        valid_categories = [
+            "factual_information",
+            "personal_information",
+            "procedural_knowledge",
+            "conceptual_knowledge",
+            "meta_knowledge",
+            "temporal_information",
+        ]
         for line in lines:
-            if not line.strip():
+            line = line.strip()
+            if not line:
                 continue
-            # Find the first occurrence of ": " to split on
-            split_index = line.find(": ")
-            if split_index == -1:
-                # Handle category without a query
-                if len(line) < 3 or len(line) > 63:
-                    line = "active_brain"  # default category
-                line = re.sub(r"[^a-z0-9-_]", "", line)
-                # make sure the start and end of the string are alphanumeric
-                line = re.sub(r"^[^a-z0-9]*|[^a-z0-9]*$", "", line)
-                category = line.lower().replace(" ", "_")
-                query = ""
+            # Check if the line contains a colon separator
+            if ":" in line:
+                category, query = line.split(":", 1)
+                category = category.strip().lower()
+                query = query.strip()
             else:
-                category = line[:split_index].lower().replace(" ", "_")
-                # clean the category name as before
-                category = re.sub(r"[^a-z0-9-_]", "", category)
-                category = re.sub(r"^[^a-z0-9]*|[^a-z0-9]*$", "", category)
-                category = category.lower().replace(" ", "_")
-                query = line[split_index + 2 :]
-                query = query[:100]
+                # Split the line into category and query
+                parts = line.split(" ", 1)
+                if len(parts) == 1:
+                    category = "active_brain"
+                    query = parts[0]
+                else:
+                    category, query = parts
+                    category = category.lower()
+            # Check if the category is valid
+            if category not in valid_categories:
+                category = "active_brain"
+            # Clean the category name
+            category = re.sub(r"[^a-zA-Z0-9_-]", "", category)
+            category = category[:63]
+            if not category:
+                category = "active_brain"
+            # Make sure the category starts and ends with an alphanumeric character
+            category = re.sub(r"^[^a-zA-Z0-9]+|[^a-zA-Z0-9]+$", "", category)
+            # Remove consecutive periods (..)
+            category = re.sub(r"\.{2,}", ".", category)
+            # Check if the category is a valid IPv4 address
+            if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", category):
+                category = "active_brain"
+            # Truncate the query to a maximum of 100 characters
+            query = query[:100]
             result.append((category, query))
         return result
 

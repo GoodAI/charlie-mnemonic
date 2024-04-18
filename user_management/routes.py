@@ -72,10 +72,10 @@ def set_login_cookies(
     session_token: str, username: str, response: Response, duration_days: int = 90
 ) -> None:
     expiracy_date = datetime.now(timezone.utc) + timedelta(days=duration_days)
+    # Set Samesite to Strict for local deployment
     cookie_params = {
-        "secure": True,
         "httponly": False,
-        "samesite": "None",
+        "samesite": "Strict",
         "expires": expiracy_date,
     }
 

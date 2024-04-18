@@ -12,13 +12,13 @@ services:
       - DEPLOY_ENV=local
       - HOST=0.0.0.0
       - PORT=8002
-      - CHARLIE_MNEMONIC_USER_DIR=${HOME}/AppData/Roaming/charlie-mnemonic/users
+      - CHARLIE_MNEMONIC_USER_DIR=${CHARLIE_USER_DIR}
     ports:
       - "8002:8002"
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${HOME}/AppData/Roaming/charlie-mnemonic/users:/app/users
+      - ${CHARLIE_USER_DIR}:/app/users
     env_file:
       - .env
     privileged: true
@@ -45,7 +45,7 @@ services:
     container_name: charlie-mnemonic-python-env
     hostname: charlie-mnemonic-python-env
     volumes:
-      - ${HOME}/AppData/Roaming/charlie-mnemonic/users:/data
+      - ${CHARLIE_USER_DIR}:/data
 
 volumes:
   postgres-data:

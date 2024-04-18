@@ -78,7 +78,8 @@ class OpenAIResponser:
         }
 
         params = {
-            "model": "gpt-4-vision-preview",
+            # "model": "gpt-4-vision-preview",
+            "model": "gpt-4-turbo",
             "messages": [prompt_message],
             "max_tokens": 200,
         }
@@ -149,7 +150,7 @@ class OpenAIResponser:
         params = self.default_params.copy()
         params.update(
             {
-                "model": self.default_params.get("model", "gpt-4-turbo-preview"),
+                "model": self.default_params.get("model", "gpt-4-turbo"),
                 "temperature": self.default_params.get("temperature", 0.7),
                 "max_tokens": self.default_params.get("max_tokens", 250),
                 "n": self.default_params.get("n", 1),
@@ -342,7 +343,7 @@ class OpenAIResponser:
         if role == "observation":
             role_content = "You get a small chathistory and a last message. Break the last message down in 4 search queries to retrieve relevant messages with a vectorsearch. A subject, 2 queries, a category. Only reply in this format: subject\nquery\nquery\ncategory"
         if role == "categorise_query":
-            role_content = "You get a small chathistory and a last message. Break the last message down in a category (Factual Information, Personal Information, Procedural Knowledge, Conceptual Knowledge, Meta-knowledge or Temporal Information) and a search query to retrieve relevant messages with a vectorsearch. 1 category and 1 query per line. It is important to only reply in this format: category: query\ncategory: query\n,..\nExample:\nProcedural Knowledge: Antony shared my memory code\nPersonal Information: Antony created me\n\nnothing else! It is important to adhere to this format and structure."
+            role_content = "You get a small chathistory and a last message. Break the last message down in a category (Factual Information, Personal Information, Procedural Knowledge, Conceptual Knowledge, Meta-knowledge or Temporal Information) and a search query to retrieve relevant messages with a vectorsearch. 1 category and 1 query per line. It is important to adhere to this format and structure. Expected collection name that (1) contains 3-63 characters, (2) starts and ends with an alphanumeric character, (3) otherwise contains only alphanumeric characters, underscores or hyphens (-), (4) contains no two consecutive periods (..) and (5) is not a valid IPv4 address. It is important to reply in this format: category query\ncategory query\n,..\n\n\nExample:\n\nPersonal_Information Antony loves the game Space Engineers\nTemporal_Information Antony went shopping this morning\n"
         if role == "categorise":
             role_content = "You get a small chathistory and a last message. Break the last message down in a category (Factual Information, Personal Information, Procedural Knowledge, Conceptual Knowledge, Meta-knowledge or Temporal Information). 1 category per line. Only reply in this format: category\ncategory\n\nExample:\nProcedural Knowledge\nPersonal Information\n"
         if role == "retriever":

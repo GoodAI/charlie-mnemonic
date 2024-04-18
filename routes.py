@@ -38,8 +38,10 @@ from google.oauth2 import id_token
 from authentication import Authentication
 from chat_tabs.dao import ChatTabsDAO
 from classes import (
+    CreateChat,
     UserName,
     editSettings,
+    setActiveChat,
     userMessage,
     noTokenMessage,
     UserGoogle,
@@ -339,6 +341,7 @@ async def handle_message(request: Request, message: userMessage):
                 user_id, message.chat_id, "new chat", message.chat_id, True
             )
         # if there is an active tab, set chat_id to the active tab's chat_id
+        # this logic is a bit weird when used as API
         else:
             chat_tabs_dao.update_created_at(user_id, message.chat_id)
             message.chat_id = active_tab_data.chat_id
@@ -361,6 +364,26 @@ async def handle_message(request: Request, message: userMessage):
         message.display_name,
         chat_id=message.chat_id,
     )
+
+
+@router.post("/create_chat_tab/", tags=[LOGIN_REQUIRED])
+async def create_chat_tab(request: Request, message: CreateChat):
+    user = request.state.user
+    with ChatTabsDAO() as chat_tabs_dao:
+        user_id = user.id
+        chat_tabs_dao.insert_tab_data(
+            user_id, message.chat_id, message.chat_name, message.chat_id, False
+        )
+    return {"message": "Chat tab created successfully"}
+
+
+@router.post("/set_active_tab/", tags=[LOGIN_REQUIRED])
+async def set_active_tab(request: Request, message: setActiveChat):
+    user = request.state.user
+    with ChatTabsDAO() as chat_tabs_dao:
+        user_id = user.id
+        chat_tabs_dao.set_active_tab(user_id, message.chat_id)
+    return {"message": "Active tab set successfully"}
 
 
 @router.post("/regenerate_response/", tags=[LOGIN_REQUIRED])
@@ -527,19 +550,60 @@ async def handle_message_image(
         },
     },
 )
-async def handle_message_no_modules(
-    request: Request, message: userMessage, audio_path: str = None
-):
+async def handle_message_no_modules(request: Request, message: userMessage):
     user = request.state.user
-    openai_response = OpenAIResponser("gpt-4-0613", 1, 512, 1, user.username)
-    messages = [
-        {
-            "role": "system",
-            "content": user.username + ": " + message.prompt + "\nAssistant: ",
-        }
-    ]
-    response = await openai_response.get_response(messages)
-    return response.choices[0].message.content
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+    (
+        total_tokens_used,
+        total_cost,
+        daily_limit,
+        total_daily_tokens_used,
+        total_daily_cost,
+        display_name,
+    ) = (0, 0, 0, 0, 0, "")
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
+        # if no active tab, set chat_id to 0
+        if message.chat_id is None and active_tab_data is None:
+            message.chat_id = "0"
+            # put the data in the database
+            chat_tabs_dao.insert_tab_data(
+                user_id, message.chat_id, "new chat", message.chat_id, True
+            )
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+            message.chat_id = active_tab_data.chat_id
+    if not has_access or has_access == "false" or has_access == "False":
+        logger.info(f"user {user.username} does not have access")
+        raise HTTPException(
+            status_code=400,
+            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
+        )
+    if total_daily_cost >= daily_limit:
+        logger.info(f"user {user.username} reached daily limit")
+        raise HTTPException(
+            status_code=400,
+            detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
+        )
+    return await process_message(
+        message.prompt,
+        user.username,
+        USERS_DIR,
+        message.display_name,
+        chat_id=message.chat_id,
+    )
 
 
 # message route with audio
@@ -810,7 +874,7 @@ async def handle_abort_button(request: Request, user: UserName):
 # no token message route
 @router.post(
     "/notoken_message/",
-    tags=["Messaging", LOGIN_REQUIRED],
+    tags=["Messaging"],
     summary="Send a message without token",
     description="This endpoint allows the user to send a message to the AI by providing a prompt, username and password. The AI will respond to the prompt.",
     response_description="Returns the AI's response.",
@@ -825,12 +889,14 @@ async def handle_abort_button(request: Request, user: UserName):
         },
     },
 )
-async def handle_notoken_message(request: Request, message: noTokenMessage):
-    user = request.stat.user
-    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
+async def handle_notoken_message(message: noTokenMessage):
+    user = message.username
+    settings = await SettingsManager.load_settings(USERS_DIR, user)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")
-    return await process_message(message.prompt, user.username, None, USERS_DIR)
+    return await process_message(
+        message.prompt, user, USERS_DIR, message.display_name, chat_id=message.chat_id
+    )
 
 
 @router.post(
@@ -857,7 +923,7 @@ async def handle_notoken_message(request: Request, message: noTokenMessage):
     },
 )
 async def handle_notoken_generate_audio(request: Request, message: noTokenMessage):
-    user = request.stat.user
+    user = request.state.user
     settings = await SettingsManager.load_settings(USERS_DIR, user.username)
     if count_tokens(message.prompt) > settings["memory"]["input"]:
         raise HTTPException(status_code=400, detail="Prompt is too long")

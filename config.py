@@ -6,7 +6,7 @@ from simple_utils import get_root
 api_keys: Dict[str, Optional[str]] = {}
 
 default_params = {
-    "model": "gpt-4-turbo-preview",
+    "model": "gpt-4-turbo",
     "temperature": 0.3,
     "max_tokens": 1000,
 }

@@ -1,12 +1,16 @@
 import os
 from typing import Dict, Optional
 
+from dotenv import load_dotenv
+
 from simple_utils import get_root
+
+load_dotenv()
 
 api_keys: Dict[str, Optional[str]] = {}
 
 default_params = {
-    "model": "gpt-4-turbo",
+    "model": os.getenv("DEFAULT_MODEL", "gpt-4-turbo"),
     "temperature": 0.3,
     "max_tokens": 1000,
 }

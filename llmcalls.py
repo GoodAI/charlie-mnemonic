@@ -21,7 +21,9 @@ class OpenAIResponser:
     def __init__(self, api_key: str, default_params=None):
         if default_params is None:
             default_params = {}
-        self.client = AsyncOpenAI(api_key=api_key)
+            
+        base_url = os.getenv("BASE_URL", None)
+        self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.default_params = default_params
         self.addons = self.load_addons()
 

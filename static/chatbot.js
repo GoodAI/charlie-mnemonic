@@ -625,6 +625,9 @@ function handleDailyUsage(msg) {
 
 }
 
+function handleAuthMessage(msg) {
+    console.log('2 auth message received:', msg);
+}
 
 function handlePlanMessage(msg) {
     var content = msg.content && msg.content.content;
@@ -1494,6 +1497,10 @@ function get_settings(username) {
         }
         else if (msg.tab_description) {
             handleTabDescription(msg);
+        }
+        else if (msg.auth) {
+            console.log('1 auth message received: ', msg);
+            handleAuthMessage(msg);
         }
 
 

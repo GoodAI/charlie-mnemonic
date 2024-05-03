@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import os
 
 from fastapi import (
     APIRouter,
@@ -222,3 +223,43 @@ async def update_controls(
 async def websocket_endpoint(websocket: WebSocket):
     await authenticate_websocket(websocket)
     await websocket.close()
+
+
+@router.get("/oauth2callback")
+async def oauth2callback(request: Request):
+    username = request.query_params.get("username")
+    code = request.query_params.get("code")
+    if not code:
+        return {"error": "Authorization code not found"}
+
+    # Process the code to obtain tokens
+    credentials = authenticate_user(code, username)
+
+    # save credentials to the user's directory
+    full_path = os.path.join("users", username, "token.json")
+    with open(full_path, "w") as f:
+        f.write(credentials.to_json())
+
+    # Redirect user or send a response that authentication was successful
+    return {"message": "Authentication successful"}
+
+
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
+
+
+def authenticate_user(auth_code, username):
+    CREDENTIALS_PATH = os.path.join("users", username, "client_secret.json")
+    flow = InstalledAppFlow.from_client_secrets_file(
+        CREDENTIALS_PATH,
+        SCOPES,
+        redirect_uri="http://localhost:8002/oauth2callback?username=" + username,
+    )
+    flow.fetch_token(code=auth_code)
+    credentials = flow.credentials
+    return credentials

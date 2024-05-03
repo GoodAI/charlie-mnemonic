@@ -7,6 +7,7 @@ import urllib.parse
 import zipfile
 from datetime import datetime
 from typing import Optional
+from agentmemory.main import search_memory
 import llmcalls
 
 import logs
@@ -53,6 +54,9 @@ from memory import (
     export_memory_to_file,
     import_file_to_memory,
     get_last_message,
+    get_memories,
+    update_memory,
+    delete_memory,
 )
 from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO, AdminControlsDAO
@@ -77,8 +81,27 @@ from config import (
     USERS_DIR,
 )
 
+
+def format_timestamp(value, format="%Y-%m-%d %H:%M:%S"):
+    return datetime.fromtimestamp(value).strftime(format)
+
+
+def trim_leading_zeros(value):
+    return value.lstrip("0")
+
+
+def round_number(value, decimals=2):
+    if value is None:
+        return "N/A"
+    return round(value, decimals)
+
+
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
+# Register a custom filter with Jinja2 environment
+templates.env.filters["format_timestamp"] = format_timestamp
+templates.env.filters["trim_leading_zeros"] = trim_leading_zeros
+templates.env.filters["round"] = round_number
 
 connections = {}
 
@@ -107,6 +130,19 @@ async def read_root():
         return FileResponse("static/styles.css")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
+
+
+@router.get(
+    "/memory_explorer/{category}", response_class=HTMLResponse, tags=[LOGIN_REQUIRED]
+)
+async def get_memory_explorer(request: Request, category: str):
+    with UsersDAO() as dao:
+        username = request.state.user.username
+        memories = get_memories(category, username=username)
+        return templates.TemplateResponse(
+            "memory_explorer.html",
+            {"request": request, "category": category, "memories": memories},
+        )
 
 
 async def send_debug_message(username: str, message: str):
@@ -1079,3 +1115,78 @@ async def delete_recent_messages(request: Request, message: UserName):
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(message.username)
     return {"message": "Recent messages deleted successfully"}
+
+
+@router.post("/edit_memory/", tags=[LOGIN_REQUIRED])
+async def edit_memory(
+    request: Request,
+    memory_id: str = Form(...),
+    category: str = Form(...),
+    content: str = Form(...),
+):
+    username = request.state.user.username
+    update_memory(category, memory_id, text=content, username=username)
+    return {"message": "Memory updated successfully"}
+
+
+@router.post("/delete_memory/", tags=[LOGIN_REQUIRED])
+async def delete_memory_route(
+    request: Request, memory_id: str = Form(...), category: str = Form(...)
+):
+    user = request.state.user
+    username = user.username if user else None
+    delete_memory(category, id=memory_id, username=username)
+    return {"message": "Memory deleted successfully"}
+
+
+@router.post("/search_memories/", tags=[LOGIN_REQUIRED])
+async def search_memories(
+    request: Request, category: str = Form(...), search_query: str = Form(...)
+):
+    username = request.state.user.username
+    memories = search_memory(category, search_query, username=username, n_results=20)
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        memory["distance"] = memory.get("distance", 0.0)
+
+    # Sort the memories by distance in ascending order
+    memories.sort(key=lambda x: x.get("distance", 0.0))
+
+    return templates.TemplateResponse(
+        "memory_table_body.html",
+        {"request": request, "category": category, "memories": memories},
+    )
+
+
+@router.post("/sort_memories/", tags=[LOGIN_REQUIRED])
+async def sort_memories(
+    request: Request,
+    category: str = Form(...),
+    sort_by: str = Form(...),
+    sort_order: str = Form(...),
+    search_query: str = Form(...),
+):
+    username = request.state.user.username
+    memories = search_memory(category, search_query, username=username, n_results=20)
+
+    # Sort the memories based on the selected sorting option and order
+    if sort_by == "created_at":
+        memories.sort(
+            key=lambda x: x["metadata"]["created_at"], reverse=sort_order == "desc"
+        )
+    elif sort_by == "distance":
+        memories.sort(
+            key=lambda x: x.get("distance", 0.0), reverse=sort_order == "desc"
+        )
+    else:
+        memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        memory["distance"] = memory.get("distance", 0.0)
+
+    return templates.TemplateResponse(
+        "memory_table_body.html",
+        {"request": request, "category": category, "memories": memories},
+    )

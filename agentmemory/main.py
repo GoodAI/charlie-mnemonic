@@ -648,11 +648,10 @@ def delete_memory(category, id, username=None):
     Example:
         >>> delete_memory("books", "1")
     """
-
     # Get or create the collection for the given category
     memories = get_client(username=username).get_or_create_collection(category)
 
-    if memory_exists(category, id, username) is False:
+    if not memory_exists(category, id, username=username):
         debug_log(
             f"WARNING: Tried could not delete memory {id} in category {category}",
             type="warning",

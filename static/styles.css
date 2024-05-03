@@ -167,15 +167,23 @@ a {
 
 #toggle-chat-tabs {
     position: absolute;
-    left: 8vw;
+    left: 13vw;
     top: 50%;
     transform: translateY(-50%);
     background: none;
     border: none;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 24px;
     z-index: 6;
     color: var(--icon-color);
+}
+
+#toggle-chat-tabs.open {
+    left: 13vw;
+}
+
+#toggle-chat-tabs.closed {
+    left: 0;
 }
 
 #toggle-chat-tabs.open span {
@@ -246,8 +254,8 @@ a {
 
 .chat-container {
     flex-grow: 1;
-    max-width: 80vw;
-    min-width: 80vw;
+    max-width: 87vw;
+    min-width: 87vw;
     max-height: 80vh;
     height: 80vh;
     background: var(--chatbox-bg-color);
@@ -256,10 +264,13 @@ a {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-left: 8vw;
-    transition: margin-left 0.3s;
     position: relative;
     z-index: 5;
+}
+
+.chat-container.open {
+    max-width: 74vw;
+    min-width: 74vw;
 }
 
 .chat-tab.active {
@@ -814,15 +825,19 @@ pre {
 }
 
 .sidenav {
-    height: 74vh;
     width: 13vw;
     position: fixed;
     top: 18vh;
-    left: 0;
+    left: -13vw;
     overflow-x: auto;
-    transition: left 0.5s;
+    transition: left 0.3s;
     color: #c9c8c8;
     z-index: 5;
+    bottom: 13vh;
+}
+
+.sidenav.open {
+    left: 0;
 }
 
 .sidenav a {
@@ -1501,7 +1516,8 @@ pre {
     margin-bottom: 10px;
 }
 
-.message.debug:hover .expandable-content {
+.message.debug:hover .expandable-content,
+.message.debug.active .expandable-content {
     display: block;
 }
 
@@ -1510,17 +1526,21 @@ pre {
     position: relative;
     top: 0;
     right: -10px;
-    border-width: 10px;
-    border-style: solid;
-    border-color: transparent transparent transparent #333;
+    border: 5px solid transparent;
+    border-bottom-color: var(--bot-bubble-text-color);
 }
 
+.message.debug.active:after {
+    border-bottom-color: transparent;
+    border-top-color: var(--bot-bubble-text-color);
+}
+
+
 .typing-indicator {
-    display: inline;
+    display: inline-block;
     vertical-align: middle;
     margin-left: 7px;
     margin-bottom: 2px;
-
 }
 
 .dot {
@@ -1528,7 +1548,7 @@ pre {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #000;
+    background-color: var(--bot-bubble-text-color);
     animation: pulse 1s infinite ease-in-out;
 }
 

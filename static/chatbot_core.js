@@ -60,7 +60,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
         else {
             message = message.replace(/\n/g, "<br>");
         }
-        message += '<div class="typing-indicator"><div class="dot"></div></div>';
+        message += '<span class="typing-indicator"><span class="dot"></span></span>';
     }
 
     // Apply Markdown formatting

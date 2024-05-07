@@ -6,7 +6,7 @@ import tempfile
 import urllib.parse
 import zipfile
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from agentmemory.main import search_memory
 import llmcalls
 
@@ -557,6 +557,86 @@ async def handle_message_image(
     result = await MessageParser.start_image_description(
         image_path, prompt, image_file.filename
     )
+    return await process_message(
+        prompt, username, "users", display_name, result, chat_id
+    )
+
+
+@router.post("/message_with_files/", tags=["Messaging", LOGIN_REQUIRED])
+async def handle_message_files(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    prompt: str = Form(...),
+    chat_id: str = Form(...),
+):
+    file_details = ""
+    user = request.state.user
+    username = user.username
+    settings = await SettingsManager.load_settings(USERS_DIR, username)
+    if count_tokens(prompt) > settings["memory"]["input"]:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
+        # if no active tab, set chat_id to 0
+        if active_tab_data is None:
+            chat_id = "0"
+            # put the data in the database
+            chat_tabs_dao.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            chat_tabs_dao.update_created_at(user_id, chat_id)
+            chat_id = active_tab_data.chat_id
+    if not has_access or has_access == "false" or has_access == "False":
+        logger.info(f"user {username} does not have access")
+        raise HTTPException(
+            status_code=400,
+            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
+        )
+    if total_daily_cost >= daily_limit:
+        logger.info(f"user {username} reached daily limit")
+        raise HTTPException(
+            status_code=400,
+            detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
+        )
+    # check the total size of all files, if it's too big +200mb, return an error
+    total_size = sum(file.size for file in files)
+    if total_size > 200000000:
+        raise HTTPException(
+            status_code=400,
+            detail="Total file size is too big, please use files that are less than 20mb in total",
+        )
+    # save the files to the user's directory
+    converted_name = convert_name(username)
+    user_dir = os.path.join(USERS_DIR, converted_name, "data")
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+    file_paths = []
+    for file in files:
+        file_path = os.path.join(user_dir, file.filename)
+        with open(file_path, "wb") as f:
+            f.write(file.file.read())
+        file_paths.append(file_path)
+    # add the file paths to the prompt
+    for file_path in file_paths:
+        if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+            url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
+            file_details += f'\n![image](data/{url_encoded_image} "image")'
+        else:
+            url_encoded_file = urllib.parse.quote(os.path.basename(file_path))
+            file_details += (
+                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})"
+            )
+    prompt = file_details + "<p>" + prompt + "</p>"
+    result = MessageParser.add_file_paths_to_message(prompt, file_details)
     return await process_message(
         prompt, username, "users", display_name, result, chat_id
     )

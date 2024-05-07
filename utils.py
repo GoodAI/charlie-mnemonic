@@ -438,6 +438,12 @@ class MessageParser:
         return result
 
     @staticmethod
+    def add_file_paths_to_message(message, file_paths):
+        """Add file paths to the message"""
+        new_message = file_paths + "\n" + message
+        return new_message
+
+    @staticmethod
     async def get_recent_messages(
         username: str, chat_id: str, regenerator: bool = False, uuid: str = None
     ) -> List[Dict[str, Any]]:

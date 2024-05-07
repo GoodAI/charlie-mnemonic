@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import origins
 from user_management.dao import UsersDAO
+from agentmemory.check_model import check_model, default_model_path
 
 
 def default_middleware() -> List[Type[BaseHTTPMiddleware]]:
@@ -62,6 +63,12 @@ def create_app(
     import utils
 
     nltk.download("punkt")
+
+    model_name = "all-MiniLM-L6-v2"
+    model_path = default_model_path
+    downloaded_model_path = check_model(model_name=model_name, model_path=model_path)
+
+    os.environ["MODEL_PATH"] = downloaded_model_path
 
     version = utils.SettingsManager.get_version()
 

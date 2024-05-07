@@ -62,7 +62,7 @@ class OpenAIResponser:
         )
         return transcription
 
-    async def get_image_description(self, image_path, prompt, filename):
+    async def get_image_description(self, image_path, prompt):
         """Asynchronously get a description of an image using the OpenAI Vision API."""
         # Encode the image to base64
         with open(image_path, "rb") as image_file:
@@ -81,7 +81,7 @@ class OpenAIResponser:
             # "model": "gpt-4-vision-preview",
             "model": "gpt-4-turbo",
             "messages": [prompt_message],
-            "max_tokens": 200,
+            "max_tokens": 1000,
         }
 
         response = await self.client.chat.completions.create(**params)

@@ -141,6 +141,13 @@ function closeDebugNavOnClickOutside(event) {
     }
 }
 
+// function to open the memory explorer page
+// todo: use a modal instead of a new tab
+function showMemoryExplorer() {
+    var url = "/memory_explorer/active_brain";
+    window.open(url, '_blank');
+}
+
 function insertPresetText(text) {
     var messageInput = document.getElementById('message');
     messageInput.value += text;
@@ -159,30 +166,38 @@ function closeNav() {
 
 function openTabs() {
     const toggle = document.getElementById("toggle-chat-tabs");
-    toggle.style.left = "13vw";
     toggle.classList.remove("closed");
     toggle.classList.add("open");
-    toggle.onclick = closeTabs;
 
-    document.getElementById("sideNav").style.left = "0";
-    document.getElementById("chat-container").style.marginLeft = "8vw";
+    document.getElementById("sideNav").classList.add("open");
+    const container = document.getElementById("chat-container");
+    container.classList.add("open");
     toggle.setAttribute("data-tooltip", "Hide Chat tabs");
 
     localStorage.setItem("tabsState", "open");
+
+    setTimeout(() => {
+        toggle.style.transition = "none";
+        container.style.transition = "none";
+    }, 500);
 }
 
 function closeTabs() {
     const toggle = document.getElementById("toggle-chat-tabs");
-    toggle.style.left = "0";
     toggle.classList.remove("open");
     toggle.classList.add("closed");
-    toggle.onclick = openTabs;
     toggle.setAttribute("data-tooltip", "Show Chat tabs");
 
-    document.getElementById("sideNav").style.left = "-18vw";
-    document.getElementById("chat-container").style.marginLeft = "0";
+    document.getElementById("sideNav").classList.remove("open");
+    const container = document.getElementById("chat-container");
+    container.classList.remove("open");
     
     localStorage.setItem("tabsState", "closed");
+
+    setTimeout(() => {
+        toggle.style.transition = "none";
+        container.style.transition = "none";
+    }, 500);
 }
 
 

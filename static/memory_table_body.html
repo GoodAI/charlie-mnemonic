@@ -1,0 +1,30 @@
+{% for memory in memories %}
+    <tr>
+        <td>
+            <strong>ID:</strong> {{ memory.id | trim_leading_zeros }}
+            <br>
+            <strong>Created At:</strong> {{ memory.metadata.created_at | format_timestamp }}
+            <br>
+            <strong>Updated At:</strong> {{ memory.metadata.updated_at | format_timestamp }}
+            <br>
+            <strong>Chat ID:</strong> {{ memory.metadata.chat_id }}
+            <br>
+            <strong>UID:</strong> {{ memory.metadata.uid }}
+            <br>
+            <strong>Version:</strong> {{ memory.metadata.version }}
+            <br>
+            <strong>Role:</strong> {{ memory.metadata.username }}
+            <br>
+            <strong>Distance:</strong> {{ memory.distance | round(3) }}
+        </td>
+        <td>
+            <textarea id="memory-{{ memory.id }}" rows="4" cols="50" class="form-control">{{ memory.document }}</textarea>
+        </td>
+        <td class="actions">
+            <button class="btn btn-primary"
+                    onclick="editMemory('{{ memory.id }}', '{{ category }}')">Save</button>
+            <button class="btn btn-danger"
+                    onclick="deleteMemory('{{ memory.id }}', '{{ category }}')">Delete</button>
+        </td>
+    </tr>
+{% endfor %}

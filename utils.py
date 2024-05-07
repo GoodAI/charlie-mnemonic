@@ -188,15 +188,15 @@ class AddonManager:
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "memory": {
-                "functions": 500,
-                "ltm1": 1000,
-                "ltm2": 1000,
-                "episodic": 300,
-                "recent": 700,
-                "notes": 1000,
-                "input": 1000,
-                "output": 1000,
-                "max_tokens": 6500,
+                "functions": 640,
+                "ltm1": 1200,
+                "ltm2": 1200,
+                "episodic": 400,
+                "recent": 880,
+                "notes": 1200,
+                "input": 1280,
+                "output": 1200,
+                "max_tokens": 8000,
                 "min_tokens": 500,
             },
         }
@@ -456,6 +456,12 @@ class MessageParser:
         )
         result = prompts.image_description.format(prompt, file_name, resp)
         return result
+
+    @staticmethod
+    def add_file_paths_to_message(message, file_paths):
+        """Add file paths to the message"""
+        new_message = file_paths + "\n" + message
+        return new_message
 
     @staticmethod
     async def get_recent_messages(
@@ -847,6 +853,37 @@ class SettingsManager:
         settings_file = os.path.join(users_dir, username, "settings.json")
         with open(settings_file, "r") as f:
             settings = json.load(f)
+
+        # Update memory settings to the new format if needed
+        if "memory" in settings:
+            memory_settings = settings["memory"]
+            if isinstance(memory_settings.get("ltm1"), float):
+                max_tokens = memory_settings.get("max_tokens", 6500)
+                memory_settings["functions"] = int(
+                    memory_settings.get("functions", 0.05) * max_tokens
+                )
+                memory_settings["ltm1"] = int(
+                    memory_settings.get("ltm1", 0.15) * max_tokens
+                )
+                memory_settings["ltm2"] = int(
+                    memory_settings.get("ltm2", 0.15) * max_tokens
+                )
+                memory_settings["episodic"] = int(
+                    memory_settings.get("episodic", 0.05) * max_tokens
+                )
+                memory_settings["recent"] = int(
+                    memory_settings.get("recent", 0.10) * max_tokens
+                )
+                memory_settings["notes"] = int(
+                    memory_settings.get("notes", 0.15) * max_tokens
+                )
+                memory_settings["input"] = int(
+                    memory_settings.get("input", 0.15) * max_tokens
+                )
+                memory_settings["output"] = int(
+                    memory_settings.get("output", 0.25) * max_tokens
+                )
+
         return settings
 
 
@@ -885,15 +922,21 @@ async def process_message(
     # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
     token_usage = 500
     # Extract individual settings with defaults if not found
-    max_token_usage = max(memory_settings.get("max_tokens", 6500), 120000)
-    tokens_active_brain = memory_settings.get("ltm1", 1000)
-    tokens_cat_brain = memory_settings.get("ltm2", 700)
-    tokens_episodic_memory = memory_settings.get("episodic", 650)
-    tokens_recent_messages = memory_settings.get("recent", 650)
-    tokens_notes = memory_settings.get("notes", 1000)
-    tokens_input = memory_settings.get("input", 1000)
-    tokens_output = memory_settings.get("output", 1000)
+    max_token_usage = max(memory_settings.get("max_tokens", 4000), 120000)
     remaining_tokens = max_token_usage - token_usage
+
+    # Calculate token allocations based on percentages
+    tokens_active_brain = int(memory_settings.get("ltm1", 0.15) * max_token_usage)
+    tokens_cat_brain = int(memory_settings.get("ltm2", 0.15) * max_token_usage)
+    tokens_episodic_memory = int(
+        memory_settings.get("episodic", 0.05) * max_token_usage
+    )
+    tokens_recent_messages = int(memory_settings.get("recent", 0.10) * max_token_usage)
+    tokens_notes = int(memory_settings.get("notes", 0.15) * max_token_usage)
+    tokens_input = int(memory_settings.get("input", 0.15) * max_token_usage)
+    tokens_output = min(
+        int(memory_settings.get("output", 0.25) * max_token_usage), 4000
+    )
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(

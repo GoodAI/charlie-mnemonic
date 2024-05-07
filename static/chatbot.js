@@ -28,60 +28,21 @@ function populateSettingsMenu(settings) {
 
     var slider = document.getElementById('slider');
 
-    var startValues = [settings.memory.functions, settings.memory.ltm1, settings.memory.ltm2, settings.memory.episodic, settings.memory.recent, settings.memory.notes, settings.memory.input, settings.memory.output];
+    var startValues = [
+        settings.memory.functions,
+        settings.memory.functions + settings.memory.ltm1,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent + settings.memory.notes,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent + settings.memory.notes + settings.memory.input,
+        maxRange
+    ];
 
-    for (var i = 1; i < startValues.length; i++) {
-        startValues[i] += startValues[i - 1];
-    }
-    
-    noUiSlider.create(slider, {
-        start: startValues,
-        connect: true,
-        range: {
-            'min': 0,
-            'max': maxRange
-        },
-        step: 100,
-    });
+    // Convert the start values to percentages
+    var startPercentages = startValues.map(value => value / maxRange);
 
-    slider.noUiSlider.on('update', function(values) {
-        var values = values.map(Number).map(Math.round);
-        categoryValues = values.map(function(value, index, array) {
-            return index === 0 ? value : value - array[index - 1];
-        });
-
-        document.getElementById('value-functions').innerHTML = ((categoryValues[0]/maxRange)*100).toFixed(2) + '% (' + categoryValues[0] + ')';
-        document.getElementById('value-ltm1').innerHTML = ((categoryValues[1]/maxRange)*100).toFixed(2) + '% (' + categoryValues[1] + ')';
-        document.getElementById('value-ltm2').innerHTML = ((categoryValues[2]/maxRange)*100).toFixed(2) + '% (' + categoryValues[2] + ')';
-        document.getElementById('value-episodicmemory').innerHTML = ((categoryValues[3]/maxRange)*100).toFixed(2) + '% (' + categoryValues[3] + ')';
-        document.getElementById('value-recentmessages').innerHTML = ((categoryValues[4]/maxRange)*100).toFixed(2) + '% (' + categoryValues[4] + ')';
-        document.getElementById('value-notes').innerHTML = ((categoryValues[5]/maxRange)*100).toFixed(2) + '% (' + categoryValues[5] + ')';
-        document.getElementById('value-input').innerHTML = ((categoryValues[6]/maxRange)*100).toFixed(2) + '% (' + categoryValues[6] + ')';
-        document.getElementById('value-output').innerHTML = ((categoryValues[7]/maxRange)*100).toFixed(2) + '% (' + categoryValues[7] + ')';
-    });
-
-    slider.noUiSlider.on('slide', function(values, handle) {
-        var values = values.map(Number).map(Math.round);
-
-        // Check the first handle
-        if (handle === 0 && values[0] !== minRange) {
-            slider.noUiSlider.setHandle(0, minRange);
-        }
-        // last handle can't be moved
-        if (handle === 7) {
-            slider.noUiSlider.setHandle(7, maxRange);
-        }
-        // make sure input and output category values are at least 500
-        if (handle === 6 && values[6] < values[5] + minRange) {
-            slider.noUiSlider.setHandle(6, values[5] + minRange);
-        }
-        if (handle === 6 && values[7] < values[6] + minRange) {
-            slider.noUiSlider.setHandle(6, values[7] - minRange);
-        }
-        if (handle === 5 && values[6] < values[5] + minRange) {
-            slider.noUiSlider.setHandle(5, values[6] - minRange);
-        }
-    });
+    slider.noUiSlider.set(startPercentages);
 
     var categories = document.getElementsByClassName('category');
     for (var i = 0; i < categories.length; i++) {
@@ -89,7 +50,7 @@ function populateSettingsMenu(settings) {
     }
 
     switchTab(currentActiveTab); // make the first tab active by default
-};
+}
 
 function createTabNav(tabs) {
     var tabNav = document.createElement('ul');
@@ -328,6 +289,22 @@ function createMemoryTabContent(tabId) {
     h3.textContent = 'Memory Configuration';
     tabContent.appendChild(h3);
 
+    var maxTokensLabel = document.createElement('label');
+    maxTokensLabel.textContent = 'Max Total Tokens: ';
+    tabContent.appendChild(maxTokensLabel);
+
+    var maxTokensDropdown = document.createElement('select');
+    maxTokensDropdown.id = 'max-tokens-dropdown';
+    var presetValues = [8000, 16000, 32000, 64000, 128000];
+    presetValues.forEach(value => {
+        var option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        maxTokensDropdown.appendChild(option);
+    });
+    maxTokensDropdown.value = settings.memory.max_tokens;
+    tabContent.appendChild(maxTokensDropdown);
+
     var container = document.createElement('div');
     container.id = 'container';
 
@@ -342,18 +319,20 @@ function createMemoryTabContent(tabId) {
     categories.forEach(cat => {
         var p = document.createElement('p');
         p.className = 'category';
-        p.innerHTML = `${cat}: <span id="value-${cat.toLowerCase().replace(' ', '')}"></span>`;
+        var span = document.createElement('span');
+        span.id = `value-${cat.toLowerCase().replace(' ', '')}`;
+        p.innerHTML = `${cat}: `;
+        p.appendChild(span);
         values.appendChild(p);
     });
 
     container.appendChild(values);
     tabContent.appendChild(container);
 
-    // button to load default memory configuration
     var resetButton = document.createElement('button');
     resetButton.textContent = 'Reset to Default';
     resetButton.onclick = function () {
-        var defaultValues = [500, 1500, 2500, 2800, 3500, 4500, 5500, 6500];
+        var defaultValues = [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0];
         slider.noUiSlider.set(defaultValues);
     };
     tabContent.appendChild(resetButton);
@@ -363,6 +342,40 @@ function createMemoryTabContent(tabId) {
     saveButton.onclick = saveMemoryConfiguration;
     tabContent.appendChild(saveButton);
 
+    noUiSlider.create(slider, {
+        start: [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0],
+        connect: true,
+        range: {
+            'min': 0,
+            'max': 1
+        },
+        step: 0.01,
+    });
+
+    var updateDisplayedValues = function() {
+        var maxTokens = parseInt(maxTokensDropdown.value);
+        var values = slider.noUiSlider.get();
+        var values = values.map(Number);
+        categoryValues = values.map(function(value, index, array) {
+            return index === 0 ? value * 100 : (value - array[index - 1]) * 100;
+        });
+        var percentages = categoryValues.map(value => value / 100);
+        var tokenValues = percentages.map(percentage => Math.round(percentage * maxTokens));
+
+        categories.forEach((cat, index) => {
+            var spanId = `value-${cat.toLowerCase().replace(' ', '')}`;
+            var span = document.getElementById(spanId);
+            if (span) {
+                span.textContent = `${(percentages[index] * 100).toFixed(2)}% (${tokenValues[index]})`;
+            }
+        });
+    };
+
+    slider.noUiSlider.on('update', updateDisplayedValues);
+    maxTokensDropdown.addEventListener('change', updateDisplayedValues);
+
+    updateDisplayedValues();
+
     return tabContent;
 }
 
@@ -371,17 +384,25 @@ function saveMemoryConfiguration() {
     const overlayMessage = document.getElementById('overlay-message');
     overlayMessage.textContent = "Updating Settings...";
     overlay.style.display = 'flex';
+
+    var maxTokensDropdown = document.getElementById('max-tokens-dropdown');
+    var maxTokens = parseInt(maxTokensDropdown.value);
+
+    var values = slider.noUiSlider.get();
+    var tokenValues = values.map(value => Math.round(value * maxTokens));
+
     var memorySettings = {
-        functions: categoryValues[0],
-        ltm1: categoryValues[1],
-        ltm2: categoryValues[2],
-        episodic: categoryValues[3],
-        recent: categoryValues[4],
-        notes: categoryValues[5],
-        input: categoryValues[6],
-        output: categoryValues[7]
+        functions: tokenValues[0],
+        ltm1: tokenValues[1] - tokenValues[0],
+        ltm2: tokenValues[2] - tokenValues[1],
+        episodic: tokenValues[3] - tokenValues[2],
+        recent: tokenValues[4] - tokenValues[3],
+        notes: tokenValues[5] - tokenValues[4],
+        input: tokenValues[6] - tokenValues[5],
+        output: maxTokens - tokenValues[6],
+        max_tokens: maxTokens
     };
-    max_message_tokens = categoryValues[6];
+    max_message_tokens = memorySettings.input;
     updateCounterDiv(0, 0, max_message_tokens, 0);
 
     fetch(API_URL + '/update_settings/', {
@@ -961,7 +982,7 @@ function handleChunkMessage(msg) {
     if (lastMessage) {
         // Appending the new chunk to the existing content of the last message
         var tempcontent = tempFullChunk;
-        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, false);
+        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
 
     } else {
         // If there is no last message, create a new message element for the chunk
@@ -1095,6 +1116,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         } else {
             lastMessageWrapper.innerHTML += expandableContent;
         }
+
     } else {
         // Create new debug bubble
         let botMessage = `
@@ -1112,6 +1134,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         messagesContainer.appendChild(botMessageWrapper);
     }
 }
+
 
 function formatContent(value) {
     if (typeof value === 'object') {

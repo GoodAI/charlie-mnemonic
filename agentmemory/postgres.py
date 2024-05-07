@@ -275,8 +275,7 @@ class PostgresClient:
         from pgvector.psycopg2 import register_vector
 
         register_vector(self.cur)  # Register PGVector functions
-        full_model_path = check_model(model_name=model_name, model_path=model_path)
-        self.model_path = full_model_path
+        self.model_path = model_path
 
     def _table_name(self, category):
         return f"memory_{category}"

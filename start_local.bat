@@ -9,7 +9,7 @@ docker --version
 
 if not exist .env (
     echo Creating .env file
-    echo "CHARLIE_USER_DIR=%CHARLIE_USER_DIR%" > .env
+    echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
 )
 
 if not %ERRORLEVEL% == 0 (
@@ -38,7 +38,7 @@ if not %ERRORLEVEL% == 0 (
 )
 
 :CheckLoop
-echo Checking if the Charlie Mnemonic started
+echo Checking if Charlie Mnemonic started
 powershell -Command "(Invoke-WebRequest -Uri %URL% -UseBasicParsing -TimeoutSec 2).StatusCode" 1>nul 2>nul
 if %errorlevel%==0 (
     echo Charlie Mnemonic is up! Opening %URL% in the default browser!

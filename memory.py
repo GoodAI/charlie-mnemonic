@@ -27,6 +27,8 @@ from agentmemory import (
     search_memory_by_date,
     create_alternative_memory,
     get_last_message,
+    update_memory,
+    delete_memory,
 )
 import utils
 from dateutil.parser import parse

@@ -20,7 +20,7 @@ def _download(url: str, fname: Path, chunk_size: int = 1024) -> None:
             bar.update(size)
 
 
-default_model_path = str(Path.home() / ".cache" / "onnx_models")
+default_model_path = str(Path.home() / ".cache" / "chroma" / "onnx_models")
 
 
 def check_model(model_name="all-MiniLM-L6-v2", model_path=default_model_path) -> str:

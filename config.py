@@ -7,7 +7,7 @@ api_keys: Dict[str, Optional[str]] = {}
 
 default_params = {
     "model": "gpt-4-turbo",
-    "temperature": 0.3,
+    "temperature": 0.1,
     "max_tokens": 1000,
 }
 

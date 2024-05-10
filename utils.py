@@ -310,21 +310,6 @@ class AddonManager:
                             "red",
                             username,
                         )
-                    # Check for an onEnable function in the module and call it
-                    if hasattr(module, "onEnable"):
-                        auth_url = await module.onEnable(username, users_dir)
-                        print(f"auth_url: {auth_url}")
-                        if auth_url:
-                            # Send the auth URL to the user
-                            # await MessageSender.send_message(
-                            #     {"auth": auth_url}, "red", username
-                            # )
-                            # create a new file in the user's directory with the auth url
-                            # this is temporary until i find a better way to handle this
-                            with open(
-                                os.path.join(users_dir, username, "auth_url.txt"), "w"
-                            ) as f:
-                                f.write(auth_url)
 
         with open(settings_file, "w") as f:
             json.dump(settings, f)
@@ -333,11 +318,6 @@ class AddonManager:
             function_metadata = fakedata
 
         return function_dict, function_metadata
-
-    @staticmethod
-    async def load_addon_onEnabled(username, users_dir):
-        # todo: load the addon onEnabled function to get the additial data
-        return None
 
 
 class AudioProcessor:
@@ -837,6 +817,14 @@ class MessageParser:
 
 class SettingsManager:
     """This class contains functions to load settings"""
+
+    @staticmethod
+    def get_user_dir():
+        # get the CHARLIE_USER_DIR
+        full_path = os.getenv("CHARLIE_USER_DIR")
+        if full_path is None:
+            full_path = USERS_DIR
+        return full_path
 
     @staticmethod
     def get_version():

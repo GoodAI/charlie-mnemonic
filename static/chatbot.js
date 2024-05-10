@@ -472,8 +472,20 @@ function setSettings(newSettings) {
             handleDailyUsage(newSettings);
         }
     }
+    // check if there is a google auth uri in the settings
+    if (settings.auth_uri) {
+        // if there is, show the google auth modal
+        showGoogleAuthModal(settings.auth_uri);
+    }
     applyTooltips('[data-tooltip]');
 };
+
+function showGoogleAuthModal(auth_uri) {
+    var googleAuthModal = document.getElementById('googleAuthModal');
+    var googleAuthLink = document.getElementById('googleAuthLink');
+    googleAuthLink.href = auth_uri;
+    $(googleAuthModal).modal('show');
+}
 
 function handleAudioSettings(newSettings) {
     // Handle voice input settings

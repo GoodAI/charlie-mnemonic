@@ -592,6 +592,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     applyTooltips('[data-tooltip]');
+
 });
 
 function toggleTabs() {

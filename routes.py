@@ -318,6 +318,25 @@ async def handle_update_settings(request: Request, user: editSettings):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+
+    # check if the calendar_addon or gmail_addon is enabled
+    if (
+        "calendar_addon" in settings["addons"]
+        and settings["addons"]["calendar_addon"]
+        or "gmail_addon" in settings["addons"]
+        and settings["addons"]["gmail_addon"]
+    ):
+        from gworkspace.google_auth import onEnable
+
+        auth_uri = await onEnable(username, USERS_DIR)
+        if auth_uri:
+            settings["auth_uri"] = auth_uri
+        else:
+            settings["error"] = "Google client secret path not found"
+            # TODO: redirect to the configuration page
+            settings["addons"]["calendar_addon"] = False
+            settings["addons"]["gmail_addon"] = False
+
     return settings
 
 

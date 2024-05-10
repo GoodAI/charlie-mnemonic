@@ -151,7 +151,7 @@ class OpenAIResponser:
         params.update(
             {
                 "model": self.default_params.get("model", "gpt-4-turbo"),
-                "temperature": self.default_params.get("temperature", 0.7),
+                "temperature": self.default_params.get("temperature", 0.1),
                 "max_tokens": self.default_params.get("max_tokens", 250),
                 "n": self.default_params.get("n", 1),
                 "top_p": 1,

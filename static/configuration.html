@@ -23,7 +23,7 @@
             <h1>System configuration</h1>
             <p>Welcome to Charlie Mnemonic! Please enter the following information to start using it.</p>
             <div id="alert-wrap"></div>
-            <form id="configuration-form" method="post" action="/configuration/">
+            <form id="configuration-form" method="post" action="/configuration/" enctype="multipart/form-data">
                 {% for key, value in config.items() %}
                     <div class="mb-3">
                         <label for="field-{{ key }}" class="form-label">
@@ -65,30 +65,22 @@
 
     async function updateConfiguration(event) {
         event.preventDefault();
-        let formData = new FormData(this)
-        let formObject = {};
-        formData.forEach((value, key) => {
-            formObject[key] = value;
-        });
+        let formData = new FormData(this);
         fetch(this.action, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formObject),
+            body: formData,
         }).then(response => response.json().then(data => ({
             ok: response.ok,
             status: response.status,
             body: data
         }))).then(response => {
-            if (response.ok) { // Check if response status code is not ok (200-299)
+            if (response.ok) {
                 success(response.body["message"]);
                 setTimeout(() => {
                     window.location.href = "/";
                 }, 1000);
             } else {
-                error(response.body["detail"]);
-            }
+                error(response.body["detail"]);        }
         }).catch((err) => {
             error(err);
         });

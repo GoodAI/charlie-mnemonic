@@ -52,7 +52,10 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
         message += '\n```';
     }
     
-    // if outside of code block, add the typing indicator
+    // Apply Markdown formatting
+    message = marked(message);
+
+    // If outside of code block, add the typing indicator and replace newline characters
     if (count % 2 === 0 && addIndicator) {
         if (!replaceNewLines) {
             message = message.replace(/\n/g, "");
@@ -63,8 +66,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
         message += '<span class="typing-indicator"><span class="dot"></span></span>';
     }
 
-    // Apply Markdown formatting
-    return `<div class="markdown">${marked(message)}</div>`;
+    return `<div class="markdown">${message}</div>`;
 }
 
 function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {

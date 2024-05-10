@@ -1114,141 +1114,6 @@ pre {
     }
 }
 
-
-/* D-ID specific styles */
-.peerConnectionState-new {
-    color: cornflowerblue;
-}
-
-.peerConnectionState-connecting {
-    color: orange;
-}
-
-.peerConnectionState-connected {
-    color: green;
-}
-
-.peerConnectionState-disconnected,
-.peerConnectionState-closed,
-.peerConnectionState-failed {
-    color: red;
-}
-
-.iceConnectionState-new {
-    color: cornflowerblue;
-}
-
-.iceConnectionState-checking {
-    color: orange;
-}
-
-.iceConnectionState-connected,
-.iceConnectionState-completed {
-    color: green;
-}
-
-.peerConnectionState-disconnected,
-.peerConnectionState-closed,
-.peerConnectionState-failed {
-    color: red;
-}
-
-.iceGatheringState-new {
-    color: cornflowerblue;
-}
-
-.iceGatheringState-gathering {
-    color: orange;
-}
-
-.iceGatheringState-complete {
-    color: black;
-}
-
-.signalingState-stable {
-    color: green;
-}
-
-.signalingState-have-local-offer,
-.signalingState-have-remote-offer,
-.signalingState-have-local-pranswer,
-.signalingState-have-remote-pranswer {
-    color: cornflowerblue;
-}
-
-.signalingState-closed {
-    color: red;
-}
-
-.streamingState-streaming {
-    color: green;
-}
-
-.streamingState-empty {
-    color: grey;
-}
-
-#content {
-    width: 820px;
-    position: relative;
-    margin: 0 auto;
-}
-
-#buttons {
-    clear: both;
-    padding: 0 0 0 0;
-    text-align: center;
-}
-
-#connect-button {
-    padding: 10px 20px;
-    border-radius: 5px;
-    border: none;
-    font-size: 16px;
-    margin: 0 5px;
-    background-color: #7459fe;
-    color: #fff;
-}
-
-#connect-button:hover {
-    background-color: #9480ff;
-    cursor: pointer;
-    transition: all 0.2s ease-out;
-}
-
-#status {
-    clear: both;
-    padding: 20px 0 0 0;
-    text-align: left;
-    display: inline-block;
-    zoom: 1;
-    line-height: 140%;
-    font-size: 15px;
-}
-
-#status div {
-    padding-bottom: 10px;
-}
-
-#video-wrapper {
-    background-position: top;
-}
-
-#video-wrapper div {
-    width: 400px;
-    margin: 0 auto;
-    /*padding: 50px 0 0 0;*/
-}
-
-#talk-video {
-    display: block;
-    /*border:1px solid;*/
-    border-radius: 50%;
-    background-color: #fff;
-}
-
-/* END D-ID specific styles */
-
 .image-wrapper {
     position: relative;
     display: inline-block;
@@ -1281,6 +1146,38 @@ pre {
 .hover-text i {
     color: red;
     border-radius: 50%;
+}
+
+#settingsModal {
+    z-index: 1060;
+}
+
+#googleAuthModal {
+    z-index: 1065;
+}
+
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.767);
+    z-index: 1040;
+}
+
+.modal-backdrop-auth {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1050;
+}
+
+.modal-open {
+    overflow: hidden;
 }
 
 .modal-confirm {
@@ -1677,19 +1574,8 @@ pre {
 .dropdown-menu ul li:hover {
     background-color: var(--chat-tab-menu-hover-bg);
 }
-
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: none;
-    z-index: 1000;
-  }
   
-  .share-modal-content {
+.share-modal-content {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -1701,9 +1587,9 @@ pre {
     max-height: 90%;
     overflow-y: auto;
     z-index: 1001;
-  }
+}
   
-  .bottom-buttons-container > div {
+.bottom-buttons-container > div {
     display: inline-block;
     margin-right: 10px;
 }

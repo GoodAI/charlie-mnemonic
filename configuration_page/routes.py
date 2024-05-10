@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException, Request
+import os
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.params import Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
@@ -26,10 +28,21 @@ async def configuration(request: Request):
 
 
 @router.post(CONFIGURATION_URL, response_class=JSONResponse)
-async def update_configuration(config_data: ConfigurationData):
+async def update_configuration(
+    OPENAI_API_KEY: str = Form(...),
+    GOOGLE_CLIENT_SECRET_PATH: UploadFile = File(None),
+):
     # TODO: security check for login
     try:
-        filtered = {k: v for k, v in config_data.dict().items() if v is not None}
+        filtered = {"OPENAI_API_KEY": OPENAI_API_KEY}
+        #
+        if GOOGLE_CLIENT_SECRET_PATH.size > 0:
+            user_dir = SettingsManager.get_user_dir()
+            file_path = f"{user_dir}/google_client_secret.json"
+            with open(file_path, "wb") as f:
+                f.write(GOOGLE_CLIENT_SECRET_PATH.file.read())
+            filtered["GOOGLE_CLIENT_SECRET_PATH"] = file_path
+            os.environ["GOOGLE_CLIENT_SECRET_PATH"] = file_path
         modify_settings(filtered)
         return {"message": "Configuration updated successfully"}
     except Exception as e:

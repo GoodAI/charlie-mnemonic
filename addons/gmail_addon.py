@@ -7,10 +7,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+from gworkspace.google_auth import onEnable
 
-from fastapi import APIRouter, HTTPException, Request
-
-router = APIRouter()
 
 description = """
 Used to read, send, delete, and retrieve emails using the Google Workspace API.
@@ -61,28 +59,6 @@ parameters = {
     "required": ["action"],
 }
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/gmail.modify",
-]
-
-
-async def onEnable(username, users_dir):
-    creds = None
-    full_path = os.path.join(users_dir, username, "token.json")
-    if os.path.exists(full_path):
-        creds = Credentials.from_authorized_user_file(full_path, SCOPES)
-    if not creds or not creds.valid:
-        CREDENTIALS_PATH = os.path.join(users_dir, username, "client_secret.json")
-        flow = InstalledAppFlow.from_client_secrets_file(
-            CREDENTIALS_PATH,
-            SCOPES,
-            redirect_uri="http://localhost:8002/oauth2callback?username=" + username,
-        )
-        auth_uri, _ = flow.authorization_url()
-        return auth_uri
-
 
 def gmail_addon(
     action,
@@ -101,7 +77,7 @@ def gmail_addon(
         os.path.join(users_dir, username, "token.json") if path is None else path
     )
     if os.path.exists(full_path):
-        creds = Credentials.from_authorized_user_file(full_path, SCOPES)
+        creds = Credentials.from_authorized_user_file(full_path, None)
     if not creds or not creds.valid:
         return "Error: Invalid or missing credentials. Please restart the client or run the 'onEnable' function."
     service = build("gmail", "v1", credentials=creds)

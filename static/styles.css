@@ -1134,9 +1134,6 @@ pre {
 
 .hover-text {
     position: absolute;
-    top: 70%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     text-align: center;
     display: none;
     font-size: small;
@@ -1178,6 +1175,39 @@ pre {
 
 .modal-open {
     overflow: hidden;
+}
+
+.image-wrapper:hover .hover-text {
+    display: block;
+}
+
+.file-preview {
+    display: inline-block;
+    margin-right: 5px;
+    position: relative;
+}
+
+.file-preview i {
+    font-size: 24px;
+    color: var(--icon-color);
+}
+
+.file-preview span {
+    display: none;
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--tooltip-bg-color);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.file-preview:hover span {
+    display: block;
 }
 
 .modal-confirm {

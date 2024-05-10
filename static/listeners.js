@@ -9,6 +9,7 @@ var limit = Math.floor((viewportHeight * 0.7) / lineHeight); // max lines based 
 var min = 1; // minimum number of lines
 
 let pastedImageFile;
+let pastedFiles = [];
 let isGeneratingAudio = false;
 
 // check for session token when page loads
@@ -120,122 +121,122 @@ document.getElementById('errorModalClose').addEventListener('click', function ()
 });
 
 
-document.getElementById('upload-image').addEventListener('click', function () {
 
-    const fileInput = document.getElementById('uploadImageInput');
+
+
+document.getElementById('upload-file').addEventListener('click', function () {
+    const fileInput = document.getElementById('uploadFileInput');
     if (fileInput.files.length > 0) {
-        //send_image(fileInput.files[0]);
-    }
-    else {
+        // send_files(fileInput.files);
+    } else {
         // trigger the file input as if the user clicked it
-        document.getElementById('uploadImageInput').click();
+        document.getElementById('uploadFileInput').click();
     }
 });
 
-// check if the preview image was clicked, is so, remove it, show the upload-image button and clear the file input
-document.getElementById('image-preview').addEventListener('click', function () {
-    // remove the preview image
-    document.getElementById('preview-image').src = '';
-    // hide the preview image
-    document.getElementById('image-preview').style.display = 'none';
-    // show the upload-image button
-    document.getElementById('upload-image').style.display = 'block';
+// check if the preview files were clicked, if so, remove them, show the upload-file button and clear the file input
+document.getElementById('file-preview').addEventListener('click', function () {
+    // remove the preview files
+    document.getElementById('preview-files').innerHTML = '';
+    // hide the preview files
+    document.getElementById('file-preview').style.display = 'none';
+    // show the upload-file button
+    document.getElementById('upload-file').style.display = 'block';
     // clear the file input
-    document.getElementById('uploadImageInput').value = '';
-    // clear the pastedImageFile variable
-    pastedImageFile = null;
+    document.getElementById('uploadFileInput').value = '';
+    // clear the pastedFiles array
+    pastedFiles = [];
     // set the .icon-container-right padding to 25
     document.querySelector('.icon-container-right').style.right = '25px';
 });
 
-
-
-
-// check if an image was uploaded
-document.getElementById('uploadImageInput').addEventListener('change', function () {
+// check if files were uploaded
+document.getElementById('uploadFileInput').addEventListener('change', function () {
     if (this.files.length > 0) {
-        // check the size of the image, max 20MB
-        if (this.files[0].size > 20000000) {
-            showErrorModal('The image is too large, max 20MB!');
-            // clear the file input
-            this.value = '';
-            return;
-        }
-        const file = this.files[0];
-        if (!file.type.startsWith('image/')) { // if the file is not an image
-            showErrorMessage('Invalid file type. Please select an image file.', true);
-            this.value = ''; // reset the input
-        } else {
-            handleImageFile(file);
-        }
+        handleFiles(this.files);
     }
 });
 
-function handleImageFile(imageFile) {
-    // Check if the file is an image
-    if (imageFile.type.indexOf('image') === -1) {
-        // If not, reject the file and return
-        showErrorMessage('Invalid file type. Please upload an image file.', true);
+function handleFiles(files) {
+    // Check if the total size of all files is less than 20MB
+    let totalSize = 0;
+    for (let i = 0; i < files.length; i++) {
+        totalSize += files[i].size;
+    }
+    if (totalSize > 20000000) {
+        showErrorModal('The total size of the files is too large, max 20MB!');
+        // clear the file input
+        document.getElementById('uploadFileInput').value = '';
         return;
     }
-    
-    // create a new FileReader object
-    let reader = new FileReader();
 
-    reader.onload = function (event) {
-        // create a new Image object
-        let img = new Image();
+    // Clear the previous preview
+    document.getElementById('preview-files').innerHTML = '';
 
-        img.onload = function() {
-            // Apply CSS constraints to get thumbnail size
-            let thumbnailWidth = Math.min(100, img.width);
-            let thumbnailHeight = Math.min(36, img.height);
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.type.startsWith('image/')) {
+            // create a new FileReader object
+            let reader = new FileReader();
+            reader.onload = function (event) {
+                // create a new Image object
+                let img = new Image();
+                img.onload = function () {
+                    // Apply CSS constraints to get thumbnail size
+                    let thumbnailWidth = Math.min(100, img.width);
+                    let thumbnailHeight = Math.min(36, img.height);
 
-            // Preserve aspect ratio
-            if (img.width > 100 || img.height > 36) {
-                let ratio = Math.min(100 / img.width, 36 / img.height);
-                thumbnailWidth = img.width * ratio;
-                thumbnailHeight = img.height * ratio;
-            }
+                    // Preserve aspect ratio
+                    if (img.width > 100 || img.height > 36) {
+                        let ratio = Math.min(100 / img.width, 36 / img.height);
+                        thumbnailWidth = img.width * ratio;
+                        thumbnailHeight = img.height * ratio;
+                    }
 
-            console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
-            document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
+                    console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
+                    document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
 
-            // Set image src to the result of FileReader
-            document.getElementById('preview-image').src = event.target.result;
-            // Show the image-preview
-            document.getElementById('image-preview').style.display = 'block';
-            // Hide the upload-image button
-            document.getElementById('upload-image').style.display = 'none';
+                    // Create a preview element for the image
+                    let preview = document.createElement('div');
+                    preview.className = 'file-preview';
+                    preview.innerHTML = `<img src="${event.target.result}" alt="${file.name}" width="${thumbnailWidth}" height="${thumbnailHeight}">`;
+                    document.getElementById('preview-files').appendChild(preview);
+                };
+                // Set image src to the result of FileReader
+                img.src = event.target.result;
+            };
+            // Read the image file as a data URL
+            reader.readAsDataURL(file);
+        } else {
+            // Create a preview element for non-image files
+            let preview = document.createElement('div');
+            preview.className = 'file-preview';
+            preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
+            document.getElementById('preview-files').appendChild(preview);
+        }
+    }
 
-            let imageWrapper = document.querySelector('.image-wrapper');
-            imageWrapper.addEventListener('mouseover', function () {
-                this.querySelector('.hover-text').style.display = 'block';
-            });
-            imageWrapper.addEventListener('mouseout', function () {
-                this.querySelector('.hover-text').style.display = 'none';
-            });
-        };
+    // Show the file-preview
+    document.getElementById('file-preview').style.display = 'block';
+    // Hide the upload-file button
+    document.getElementById('upload-file').style.display = 'none';
 
-        // Set image src to the result of FileReader
-        img.src = event.target.result;
-    };
+    let fileWrapper = document.querySelector('.file-wrapper');
+    fileWrapper.addEventListener('mouseover', function () {
+        this.querySelector('.hover-text').style.display = 'block';
+    });
+    fileWrapper.addEventListener('mouseout', function () {
+        this.querySelector('.hover-text').style.display = 'none';
+    });
 
-    // Read the image file as a data URL
-    reader.readAsDataURL(imageFile);
-
-    // Store the image file for later use
-    pastedImageFile = imageFile;
+    // Store the files for later use
+    pastedFiles = Array.from(files);
 }
 
 window.addEventListener('paste', function (event) {
-    // check if there's an image in the clipboard
-    for (let i = 0; i < event.clipboardData.items.length; i++) {
-        if (event.clipboardData.items[i].type.indexOf('image') > -1) {
-            // get the image file
-            let imageFile = event.clipboardData.items[i].getAsFile();
-            handleImageFile(imageFile);
-        }
+    // check if there are files in the clipboard
+    if (event.clipboardData.files.length > 0) {
+        handleFiles(event.clipboardData.files);
     }
 });
 
@@ -246,19 +247,9 @@ window.addEventListener('dragover', function (event) {
 window.addEventListener('drop', function (event) {
     event.preventDefault();
 
-    // check if there's an image in the dropped files
-    if (event.dataTransfer.files.length > 0 && event.dataTransfer.files[0].type.indexOf('image') > -1) {
-        // get the image file
-        let imageFile = event.dataTransfer.files[0];
-        // check if the image is too large
-        if (imageFile.size > 20000000) {
-            showErrorModal('The image is too large, max 20MB!');
-            // clear the file input
-            this.value = '';
-            return;
-
-        }
-        handleImageFile(imageFile);
+    // check if there are files in the dropped data
+    if (event.dataTransfer.files.length > 0) {
+        handleFiles(event.dataTransfer.files);
     }
 });
 
@@ -266,37 +257,14 @@ document.getElementById('send').addEventListener('click', async function () {
     if (document.getElementById('message').value.trim() === '') {
         return;
     }
-    if (pastedImageFile) {
-        let reader = new FileReader();
-        reader.onload = function (event) {
-            let img = new Image();
-            img.onload = function() {
-                // Apply CSS constraints to get thumbnail size
-                let thumbnailWidth = Math.min(100, img.width);
-                let thumbnailHeight = Math.min(36, img.height);
-
-                // Preserve aspect ratio
-                if (img.width > 100 || img.height > 36) {
-                    let ratio = Math.min(100 / img.width, 36 / img.height);
-                    thumbnailWidth = img.width * ratio;
-                    thumbnailHeight = img.height * ratio;
-                }
-
-                console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
-                document.querySelector('.icon-container-right').style.right = 45 + 'px';
-
-                // Image sending operations
-                send_image(pastedImageFile);
-                document.getElementById('uploadImageInput').value = '';
-                document.getElementById('preview-image').src = '';
-                document.getElementById('image-preview').style.display = 'none';
-                document.getElementById('upload-image').style.display = 'block';
-                pastedImageFile = null;
-                document.getElementById('message').value = '';
-            };
-            img.src = event.target.result;
-        };
-        reader.readAsDataURL(pastedImageFile);
+    if (pastedFiles.length > 0) {
+        send_files(pastedFiles, document.getElementById('message').value);
+        document.getElementById('uploadFileInput').value = '';
+        document.getElementById('preview-files').innerHTML = '';
+        document.getElementById('file-preview').style.display = 'none';
+        document.getElementById('upload-file').style.display = 'block';
+        pastedFiles = [];
+        document.getElementById('message').value = '';
     } else {
         sendMessageToServer();
     }

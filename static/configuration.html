@@ -23,7 +23,10 @@
             <h1>System configuration</h1>
             <p>Welcome to Charlie Mnemonic! Please enter the following information to start using it.</p>
             <div id="alert-wrap"></div>
-            <form id="configuration-form" method="post" action="/configuration/" enctype="multipart/form-data">
+            <form id="configuration-form"
+                  method="post"
+                  action="/configuration/"
+                  enctype="multipart/form-data">
                 {% for key, value in config.items() %}
                     <div class="mb-3">
                         <label for="field-{{ key }}" class="form-label">

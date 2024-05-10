@@ -329,13 +329,13 @@ async def handle_update_settings(request: Request, user: editSettings):
         from gworkspace.google_auth import onEnable
 
         auth_uri = await onEnable(username, USERS_DIR)
-        if auth_uri:
-            settings["auth_uri"] = auth_uri
-        else:
+        if auth_uri == "error":
             settings["error"] = "Google client secret path not found"
             # TODO: redirect to the configuration page
             settings["addons"]["calendar_addon"] = False
             settings["addons"]["gmail_addon"] = False
+        else:
+            settings["auth_uri"] = auth_uri
 
     return settings
 

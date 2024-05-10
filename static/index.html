@@ -298,7 +298,11 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Google Authentication</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="closeAuth()">
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeAuth()">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
@@ -402,8 +406,8 @@
                                                       rows="1"
                                                       autofocus="autofocus"></textarea>
                                             <div class="icon-container-right">
-                                                <input type="file" id="uploadImageInput" accept="image/*" hidden>
-                                                <button id="upload-image" class="upload-button" data-tooltip="Upload Image">
+                                                <input type="file" id="uploadFileInput" multiple hidden>
+                                                <button id="upload-file" class="upload-button" data-tooltip="Upload File">
                                                     <i class="fa fa-paperclip cogwheel"></i>
                                                 </button>
                                                 <button id="record" class="record-button" data-tooltip="Start recording">
@@ -421,9 +425,9 @@
                                                 </button>
                                             </div>
                                         </div>
-                                        <div id="image-preview" style="display: none;">
-                                            <div class="image-wrapper">
-                                                <img id="preview-image" alt="uploaded image">
+                                        <div id="file-preview" style="display: none;">
+                                            <div class="file-wrapper">
+                                                <div id="preview-files"></div>
                                                 <div class="hover-text">
                                                     <i class="fa fa-times-circle deletebutton"></i>
                                                     <p>Delete</p>

@@ -45,7 +45,7 @@ async def onEnable(username, users_dir):
                 auth_uri, _ = flow.authorization_url(include_granted_scopes="true")
                 return auth_uri
             else:
-                return None
+                return "error"
 
     # Save the updated credentials
     with open(full_path, "w") as token_file:

@@ -16,6 +16,7 @@ Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 - User data management including import/export of data. (WIP)
 - Extensible with additional modules (addons).
 - WebSocket support for real-time communication.
+- Use local Ollama instance instead of OpenAI.
 
 ## Installation
 
@@ -24,7 +25,7 @@ Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 
 - How to install, develop and run Charlie Mnemonic [manually](docs/DEV-SETUP.md)
 
-
+- To use Ollama please look at [Ollama](https://ollama.com/) to download and setup the Ollama server.
 
 ## Links
 

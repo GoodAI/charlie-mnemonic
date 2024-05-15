@@ -85,7 +85,7 @@ def test_configuration_page_working(client, fake_openai_key):
 
 
 def test_updating_invalid_key(client, fake_openai_key):
-    response = client.post(CONFIGURATION_URL, json={"testkey": "value"})
+    response = client.post(CONFIGURATION_URL, data={"testkey": "value"})
     content = response.json()
     assert (
         response.status_code == 422
@@ -106,7 +106,8 @@ def test_updating_invalid_key(client, fake_openai_key):
 
 def test_updating_set_openai_key(client, config_file_path, fake_openai_key):
     response = client.post(
-        CONFIGURATION_URL, json={"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}value"}
+        CONFIGURATION_URL,
+        data={"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}value"},
     )
     content = response.json()
     assert response.status_code == 200
@@ -134,7 +135,11 @@ Content:
 """
     assert "detail" in content
     assert content["detail"] == [
-        {"loc": ["body"], "msg": "field required", "type": "value_error.missing"}
+        {
+            "loc": ["body", "OPENAI_API_KEY"],
+            "msg": "field required",
+            "type": "value_error.missing",
+        }
     ]
 
 

@@ -253,9 +253,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict["error"] = (
-                    "timeline does not contain the required elements"
-                )
+                process_dict[
+                    "error"
+                ] = "timeline does not contain the required elements"
 
         if (
             subject.lower() == "none"

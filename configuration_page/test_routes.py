@@ -1,5 +1,4 @@
 import os
-
 import openai
 import pytest
 from fastapi.testclient import TestClient
@@ -65,7 +64,10 @@ def test_middleware_redirects_random_url(client):
 def test_update_configuration(client):
     test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
 
-    response = client.post(CONFIGURATION_URL, json=test_data)
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
     assert response.status_code == 200
     assert response.json() == {"message": "Configuration updated successfully"}
     assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
@@ -73,7 +75,10 @@ def test_update_configuration(client):
 
 def test_update_configuration_missing_required(client):
     test_data = {"INVALID_KEY": "new_key_value"}
-    response = client.post(CONFIGURATION_URL, json=test_data)
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
     assert (
         response.status_code == 422
     ), f"""
@@ -89,3 +94,19 @@ Json: {response.json()}
             }
         ]
     }
+
+
+def test_update_configuration_with_file(client, tmp_path):
+    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
+    google_client_secret_path = tmp_path / "google_client_secret.json"
+    google_client_secret_path.write_text("{}")
+
+    with open(google_client_secret_path, "rb") as f:
+        files = {"GOOGLE_CLIENT_SECRET_PATH": (google_client_secret_path.name, f)}
+        response = client.post(
+            CONFIGURATION_URL,
+            data=test_data,
+            files=files,
+        )
+        assert response.status_code == 200
+        assert response.json() == {"message": "Configuration updated successfully"}

@@ -35,8 +35,8 @@ async def update_configuration(
     # TODO: security check for login
     try:
         filtered = {"OPENAI_API_KEY": OPENAI_API_KEY}
-        #
-        if GOOGLE_CLIENT_SECRET_PATH.size > 0:
+
+        if GOOGLE_CLIENT_SECRET_PATH is not None and GOOGLE_CLIENT_SECRET_PATH.size > 0:
             user_dir = SettingsManager.get_user_dir()
             file_path = f"{user_dir}/google_client_secret.json"
             with open(file_path, "wb") as f:

@@ -46,7 +46,7 @@ class MemoryManager:
     """A class to manage the memory of the agent."""
 
     def __init__(self):
-        self.model_used = config.api_keys["memory_model"]
+        self.model_used = config.MEMORY_MODEL
         pass
 
     async def create_memory(
@@ -253,9 +253,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"

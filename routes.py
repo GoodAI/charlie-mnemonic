@@ -228,6 +228,14 @@ async def handle_get_settings(request: Request):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+    # check if the google_client_secret.json exists in the users directory
+    if os.path.exists(os.path.join(USERS_DIR, "google_client_secret.json")):
+        from gworkspace.google_auth import onEnable
+
+        auth_uri = await onEnable(username, USERS_DIR)
+        if auth_uri == "error":
+            settings["error"] = "Google client secret path not found"
+        settings["auth_uri"] = auth_uri
     return settings
 
 

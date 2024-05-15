@@ -13,7 +13,7 @@ parameters = {
             "items": {
                 "type": "string",
             },
-            "description": "The paths to the image files",
+            "description": "The paths to the image files. Example: ['data/image1.jpg', 'data/image2.jpg']",
         },
         "prompt": {
             "type": "string",
@@ -29,11 +29,8 @@ async def get_image_descriptions(image_paths, prompt, username=None):
     descriptions = []
 
     for image_path in image_paths:
-        full_image_path = "/" + os.path.join("app", "users", username, image_path)
-        # remove the leading slash if there is more than one (gpt is sometimes adding an extra slash)
-        full_image_path = (
-            full_image_path[1:] if full_image_path.startswith("//") else full_image_path
-        )
+        full_image_path = os.path.join("/app", "users", username, image_path)
+
         print(f"Getting description for image at path: {full_image_path}")
 
         try:

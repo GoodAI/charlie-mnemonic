@@ -1,31 +1,42 @@
 #!/bin/bash
 
-# This takes the current user's home directory and sets the CHARLIE_USER_DIR to be in the .local/share/charlie-mnemonic/users directory
-# note when running as root, the $HOME variable will be /root, so the CHARLIE_USER_DIR will be /root/.local/share/charlie-mnemonic/users
+# This script sets up and runs the Charlie Mnemonic application using Docker Compose
+
+# Export home directory
 export HOME=${HOME:-$(eval echo ~$USER)}
 export CHARLIE_USER_DIR=${HOME}/.local/share/charlie-mnemonic/users
 
-# Set URL
+# Set URL for health check
 URL="http://localhost:8002"
 
+# Check if Docker is installed
+echo "Checking if Docker is installed..."
+docker --version || { echo "Failed to find Docker. Please install Docker before running this script."; exit 1; }
+
+# Check if Docker daemon is running
+echo "Checking if Docker daemon is running..."
+docker info || { echo "Docker daemon is not running. Please start Docker before running this script."; exit 1; }
+
+# Ensure that Docker Compose is not already running using the same names
+echo "Stopping existing Docker containers to prevent name conflicts..."
+docker-compose down || true
+
+# Attempt to remove containers explicitly, suppressing errors for non-existing containers
+docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env || true
+
+# Check if required files exist and create if necessary
 if [ ! -f .env ]; then
     echo "Creating .env file..."
     touch .env
 fi
 
-echo "Checking if docker is installed..."
-docker --version || { echo "Failed to find docker, is it installed?"; exit 1; }
-
-echo "Checking if docker daemon is running..."
-docker info || { echo "Docker Compose failed with error level $?, is docker desktop running?"; exit 1; }
-
-echo "Starting Charlie Mnemonic using Docker Compose..."
-echo "First run takes a while"
+# Start the application using Docker Compose
+echo "Starting Charlie Mnemonic using Docker Compose. First run may take a while..."
 docker-compose up --build || { echo "Docker Compose failed with error level $?."; exit 1; }
 
-# Check loop
+# Monitoring loop to check if the application is running
 while true; do
-    echo "Checking if Charlie Mnemonic started"
+    echo "Checking if Charlie Mnemonic started..."
     if curl --output /dev/null --silent --head --fail "$URL"; then
         echo "Charlie Mnemonic is up! Opening $URL in the default browser..."
         sleep 1
@@ -34,13 +45,13 @@ while true; do
         docker-compose down
         exit 0
     else
-        echo "Not available yet. Retrying in 5 seconds..."
+        echo "Charlie Mnemonic is not available yet. Retrying in 5 seconds..."
         sleep 5
     fi
-    
+
     # Check if the Docker container is still running
     if [ $(docker ps -q -f name=charlie-mnemonic | wc -l) -eq 0 ]; then
-        echo "Charlie Mnemonic has been stopped."
+        echo "Charlie Mnemonic has stopped unexpectedly."
         exit 0
     fi
 done

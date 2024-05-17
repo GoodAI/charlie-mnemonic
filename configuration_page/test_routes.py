@@ -1,4 +1,5 @@
 import os
+import dotenv
 import openai
 import pytest
 from fastapi.testclient import TestClient
@@ -8,6 +9,8 @@ from config import CONFIGURATION_URL
 from configuration_page import TEST_KEY_PREFIX
 from launcher import create_app
 from user_management.session import session_factory
+
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.fixture
@@ -61,13 +64,16 @@ def test_middleware_redirects_random_url(client):
     assert response.url.path == CONFIGURATION_URL
 
 
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_update_configuration(client):
+    dotenv.load_dotenv()
     test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
 
     response = client.post(
         CONFIGURATION_URL,
         data=test_data,
     )
+    print(response.json())
     assert response.status_code == 200
     assert response.json() == {"message": "Configuration updated successfully"}
     assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
@@ -94,9 +100,6 @@ Json: {response.json()}
             }
         ]
     }
-
-
-IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")

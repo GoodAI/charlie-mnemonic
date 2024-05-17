@@ -1,15 +1,14 @@
-import os
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.params import Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-
 from classes import ConfigurationData
 from config import STATIC, CONFIGURATION_URL
 from configuration_page import modify_settings
 from database import Database
 from simple_utils import get_root
 from utils import SettingsManager
+import os
 
 templates = Jinja2Templates(directory=get_root(STATIC))
 router = APIRouter()
@@ -35,8 +34,8 @@ async def update_configuration(
     # TODO: security check for login
     try:
         filtered = {"OPENAI_API_KEY": OPENAI_API_KEY}
-        #
-        if GOOGLE_CLIENT_SECRET_PATH.size > 0:
+
+        if GOOGLE_CLIENT_SECRET_PATH and GOOGLE_CLIENT_SECRET_PATH.size > 0:
             file_path = os.path.join("users", "google_client_secret.json")
             with open(file_path, "wb") as f:
                 f.write(GOOGLE_CLIENT_SECRET_PATH.file.read())

@@ -10,6 +10,8 @@ from configuration_page import TEST_KEY_PREFIX
 from launcher import create_app
 from user_management.session import session_factory
 
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
+
 
 @pytest.fixture
 def client():
@@ -104,15 +106,19 @@ def test_updating_invalid_key(client, fake_openai_key):
     ]
 
 
+@pytest.mark.skipif(
+    IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions, needs valid key"
+)
 def test_updating_set_openai_key(client, config_file_path, fake_openai_key):
+    dotenv.load_dotenv()
+    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}value"}
     response = client.post(
         CONFIGURATION_URL,
-        data={"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}value"},
+        data=test_data,
     )
-    content = response.json()
     assert response.status_code == 200
-    assert "message" in content
-    assert content["message"] == "Configuration updated successfully"
+    assert "message" in response.json()
+    assert response.json()["message"] == "Configuration updated successfully"
     with open(config_file_path) as f:
         assert (
             f.read()

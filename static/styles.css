@@ -1,6 +1,6 @@
 /* Light Theme Variables */
 :root {
-    --background-color:linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    --background-color: linear-gradient(135deg, #f5f7fa, #c3cfe2);
     --chatbox-bg-color: #fff;
     --text-color: #4c4c4c;
     --bubble-bg-color: #ddd;
@@ -21,7 +21,7 @@
     --debug-window-bg-color: #4b4b4b;
     --socket-status-bg-color: #f2f2f2;
     --socket-status-border-color: #ccc;
-    --socket-status-shadow-color: rgba(0,0,0,0.1);
+    --socket-status-shadow-color: rgba(0, 0, 0, 0.1);
     --debug-stats-bg-color: #f2f2f2;
     --table-header-text-color: #ddd;
     --link-color: #5084d8;
@@ -29,6 +29,8 @@
     --icon-color: #184386;
     --chat-tab-menu-bg: #c3cfe2;
     --chat-tab-menu-hover-bg: #a6c1ee;
+    --scrollbar-thumb-color: #a6c1ee;
+    --scrollbar-track-color: #c3cfe2;
 }
 
 /* Dark Theme Variables */
@@ -54,7 +56,7 @@
     --debug-window-bg-color: #333;
     --socket-status-bg-color: #333;
     --socket-status-border-color: #444;
-    --socket-status-shadow-color: rgba(0,0,0,0.3);
+    --socket-status-shadow-color: rgba(0, 0, 0, 0.3);
     --debug-stats-bg-color: #595656;
     --table-header-text-color: #ddd;
     --link-color: #5b9eff;
@@ -62,15 +64,34 @@
     --icon-color: #4a91ff;
     --chat-tab-menu-bg: #333;
     --chat-tab-menu-hover-bg: #444;
+    --scrollbar-thumb-color: #555;
+    --scrollbar-track-color: #333;
 }
 
+/* Scrollbar Styles */
+::-webkit-scrollbar {
+    width: 8px;
+}
 
-@-ms-viewport{
+::-webkit-scrollbar-track {
+    background: var(--scrollbar-track-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb-color);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-color);
+}
+
+@-ms-viewport {
     width: device-width;
 }
 
 html {
-    height:100%;
+    height: 100%;
 }
 
 body {
@@ -190,6 +211,7 @@ a {
     display: inline-block;
     transform: rotate(0deg);
 }
+
 #toggle-chat-tabs.closed span {
     display: inline-block;
     transform: rotate(60deg);
@@ -231,14 +253,14 @@ a {
     border-radius: 5px;
     cursor: pointer;
     text-align: left;
-    font-size: smaller;    
+    font-size: smaller;
     overflow: hidden;
     /* Mask for text fade out starting at 90% of the parent's width */
     -webkit-mask-image: linear-gradient(to right, black 11vw, transparent 13vw);
     mask-image: linear-gradient(to right, black 11vw, transparent 13vw);
     width: 100%;
     white-space: nowrap;
-    
+
 }
 
 .chat-tab:hover {
@@ -300,7 +322,7 @@ table tr td {
     margin-bottom: 1rem;
 }
 
-.markdown th, 
+.markdown th,
 .markdown td {
     border: 1px solid var(--bot-bubble-text-color);
     padding: 8px;
@@ -421,6 +443,7 @@ table tr td {
     border: none;
     cursor: pointer;
 }
+
 .input-field .stop-button {
     color: var(--icon-color);
     border: none;
@@ -643,11 +666,12 @@ table tr td {
 }
 
 .message.user .bubble a {
-    color:#eef1f7;
+    color: #eef1f7;
     text-decoration: underline;
 }
+
 .message.user .bubble a:hover {
-    color:#eef1f7;
+    color: #eef1f7;
     text-decoration: none;
 }
 
@@ -692,7 +716,7 @@ pre {
     padding-left: 10px;
     border-radius: 5px;
     overflow: auto;
-    color:#111;
+    color: #111;
 }
 
 .language {
@@ -1138,6 +1162,7 @@ pre {
     display: none;
     font-size: small;
     text-shadow: 1px 1px black;
+    top: 0;
 }
 
 .hover-text i {
@@ -1299,7 +1324,7 @@ pre {
     outline: none;
 }
 
-#SidenavAddons > div {
+#SidenavAddons>div {
     display: block;
 }
 
@@ -1316,6 +1341,7 @@ pre {
     text-decoration: none;
     margin-bottom: 10px;
 }
+
 #SidenavAddons .tab-content a:hover {
     display: block;
     color: #333;
@@ -1358,6 +1384,7 @@ pre {
     border-color: #ccc #ccc #fff;
     background-color: #a6c1ee;
 }
+
 .settings-dialog {
     max-width: 800px;
     width: 80vw;
@@ -1376,14 +1403,47 @@ pre {
     cursor: pointer;
     z-index: 10;
 }
-#slider .noUi-connect:nth-child(0) { background: #000000; } /* Light Steel Blue */
-#slider .noUi-connect:nth-child(1) { background: #B0C4DE; } /* Light Steel Blue */
-#slider .noUi-connect:nth-child(2) { background: #D3D3D3; } /* Light Gray */
-#slider .noUi-connect:nth-child(3) { background: #ADD8E6; } /* Light Blue */
-#slider .noUi-connect:nth-child(4) { background: #90EE90; } /* Light Green */
-#slider .noUi-connect:nth-child(5) { background: #87CEFA; } /* Light Sky Blue */
-#slider .noUi-connect:nth-child(6) { background: #9370DB; } /* Medium Purple */
-#slider .noUi-connect:nth-child(7) { background: #FFB6C1; } /* Light Pink */
+
+#slider .noUi-connect:nth-child(0) {
+    background: #000000;
+}
+
+/* Light Steel Blue */
+#slider .noUi-connect:nth-child(1) {
+    background: #B0C4DE;
+}
+
+/* Light Steel Blue */
+#slider .noUi-connect:nth-child(2) {
+    background: #D3D3D3;
+}
+
+/* Light Gray */
+#slider .noUi-connect:nth-child(3) {
+    background: #ADD8E6;
+}
+
+/* Light Blue */
+#slider .noUi-connect:nth-child(4) {
+    background: #90EE90;
+}
+
+/* Light Green */
+#slider .noUi-connect:nth-child(5) {
+    background: #87CEFA;
+}
+
+/* Light Sky Blue */
+#slider .noUi-connect:nth-child(6) {
+    background: #9370DB;
+}
+
+/* Medium Purple */
+#slider .noUi-connect:nth-child(7) {
+    background: #FFB6C1;
+}
+
+/* Light Pink */
 
 .category {
     display: flex;
@@ -1400,13 +1460,33 @@ pre {
     border-radius: 50%;
 }
 
-.category:nth-child(2)::before { background: #B0C4DE; }
-.category:nth-child(3)::before { background: #D3D3D3; }
-.category:nth-child(4)::before { background: #ADD8E6; }
-.category:nth-child(5)::before { background: #90EE90; }
-.category:nth-child(6)::before { background: #87CEFA; }
-.category:nth-child(7)::before { background: #9370DB; }
-.category:nth-child(8)::before { background: #FFB6C1; }
+.category:nth-child(2)::before {
+    background: #B0C4DE;
+}
+
+.category:nth-child(3)::before {
+    background: #D3D3D3;
+}
+
+.category:nth-child(4)::before {
+    background: #ADD8E6;
+}
+
+.category:nth-child(5)::before {
+    background: #90EE90;
+}
+
+.category:nth-child(6)::before {
+    background: #87CEFA;
+}
+
+.category:nth-child(7)::before {
+    background: #9370DB;
+}
+
+.category:nth-child(8)::before {
+    background: #FFB6C1;
+}
 
 .nav {
     margin-bottom: 30px;
@@ -1418,18 +1498,25 @@ pre {
     align-items: center;
 }
 
-.loading-icon, .other-icon {
+.loading-icon,
+.other-icon {
     margin-right: 10px;
 }
 
 .typewriter-text {
     overflow: hidden;
     white-space: nowrap;
-    animation: typing 1.5s steps(30, end)}
+    animation: typing 1.5s steps(30, end)
+}
 
 @keyframes typing {
-    from { width: 0 }
-    to { width: 100% }
+    from {
+        width: 0
+    }
+
+    to {
+        width: 100%
+    }
 }
 
 .expandable-content {
@@ -1480,9 +1567,12 @@ pre {
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.5);
     }
@@ -1511,33 +1601,40 @@ pre {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes windup-spin {
     0% {
-      transform: rotate(0deg);
+        transform: rotate(0deg);
     }
+
     50% {
-      transform: rotate(180deg);
+        transform: rotate(180deg);
     }
+
     100% {
-      transform: rotate(360deg);
+        transform: rotate(360deg);
     }
-  }
-  
-  .fa-spinner {
+}
+
+.fa-spinner {
     display: inline-block;
     animation: windup-spin 2s infinite linear;
-  }
+}
 
-  .play-button {
+.play-button {
     cursor: pointer;
     color: var(--icon-color);
-  }
+}
 
-  
+
 /* Styles for the tooltip */
 .dynamic-tooltip {
     position: absolute;
@@ -1549,8 +1646,10 @@ pre {
     font-size: 14px;
     line-height: 1.2;
     border-radius: 5px;
-    z-index: 9999; /* High z-index to ensure it's on top */
-    visibility: hidden; /* Initially hidden */
+    z-index: 9999;
+    /* High z-index to ensure it's on top */
+    visibility: hidden;
+    /* Initially hidden */
     opacity: 0;
     transition: opacity 0.3s ease-in-out;
 }
@@ -1582,7 +1681,7 @@ pre {
     right: 0;
     background-color: var(--chat-tab-menu-bg);
     min-width: 100px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
     z-index: 999999;
     width: 150px;
 }
@@ -1604,7 +1703,7 @@ pre {
 .dropdown-menu ul li:hover {
     background-color: var(--chat-tab-menu-hover-bg);
 }
-  
+
 .share-modal-content {
     position: fixed;
     top: 50%;
@@ -1618,8 +1717,8 @@ pre {
     overflow-y: auto;
     z-index: 1001;
 }
-  
-.bottom-buttons-container > div {
+
+.bottom-buttons-container>div {
     display: inline-block;
     margin-right: 10px;
 }

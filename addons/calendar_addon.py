@@ -143,6 +143,8 @@ def calendar_addon(
                     event_count += 1
                     if event_count == max_results:
                         break
+            if not result:
+                return "No events found."
             return result
 
         elif action == "create":

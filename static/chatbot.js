@@ -208,6 +208,95 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(displayNameItem);
 
+    // Populate System Prompt settings
+    h3 = document.createElement('h3');
+    h3.textContent = 'System Prompt';
+    tabContent.appendChild(h3);
+
+    var systemPromptContainer = document.createElement('div');
+    systemPromptContainer.id = 'system-prompt-container';
+
+    var systemPromptSwitch = document.createElement('div');
+    systemPromptSwitch.className = 'form-check form-switch';
+    var systemPromptSwitchInput = document.createElement('input');
+    systemPromptSwitchInput.className = 'form-check-input';
+    systemPromptSwitchInput.type = 'checkbox';
+    systemPromptSwitchInput.id = 'system-prompt-switch';
+    systemPromptSwitch.appendChild(systemPromptSwitchInput);
+    var systemPromptSwitchLabel = document.createElement('label');
+    systemPromptSwitchLabel.className = 'form-check-label';
+    systemPromptSwitchLabel.htmlFor = 'system-prompt-switch';
+    systemPromptSwitchLabel.textContent = 'Enable System Prompt';
+    systemPromptSwitch.appendChild(systemPromptSwitchLabel);
+    systemPromptContainer.appendChild(systemPromptSwitch);
+
+    var systemPromptDropdown = document.createElement('select');
+    systemPromptDropdown.id = 'system-prompt-dropdown';
+    systemPromptDropdown.className = 'form-select';
+    var option1 = document.createElement('option');
+    option1.value = 'None';
+    option1.text = 'None';
+    systemPromptDropdown.appendChild(option1);
+    var option2 = document.createElement('option');
+    option2.value = 'stoic';
+    option2.text = 'Stoic';
+    systemPromptDropdown.appendChild(option2);
+    var option3 = document.createElement('option');
+    option3.value = 'custom';
+    option3.text = 'Custom';
+    systemPromptDropdown.appendChild(option3);
+    systemPromptContainer.appendChild(systemPromptDropdown);
+
+    var systemPromptTextarea = document.createElement('textarea');
+    systemPromptTextarea.id = 'system-prompt-textarea';
+    systemPromptTextarea.className = 'form-control';
+    systemPromptTextarea.rows = 4;
+    systemPromptTextarea.maxLength = 1000;
+    systemPromptTextarea.style.display = 'none';
+    systemPromptContainer.appendChild(systemPromptTextarea);
+
+    tabContent.appendChild(systemPromptContainer);
+
+    // Set initial values based on settings
+    if (settings.system_prompt && settings.system_prompt.system_prompt !== 'None') {
+        systemPromptSwitchInput.checked = true;
+        systemPromptDropdown.value = settings.system_prompt.system_prompt;
+        if (settings.system_prompt.system_prompt === 'custom') {
+            systemPromptTextarea.value = settings.system_prompt.custom_prompt;
+            systemPromptTextarea.style.display = 'block';
+        }
+    }
+
+    // Event listeners
+    systemPromptSwitchInput.onchange = function () {
+        if (this.checked) {
+            systemPromptDropdown.disabled = false;
+            if (systemPromptDropdown.value === 'custom') {
+                systemPromptTextarea.style.display = 'block';
+            }
+        } else {
+            systemPromptDropdown.disabled = true;
+            systemPromptTextarea.style.display = 'none';
+            edit_status('system_prompt', 'system_prompt', 'None');
+        }
+    };
+
+    systemPromptDropdown.onchange = function () {
+        if (this.value === 'custom') {
+            systemPromptTextarea.style.display = 'block';
+        } else {
+            systemPromptTextarea.style.display = 'none';
+            edit_status('system_prompt', 'system_prompt', this.value);
+        }
+    };
+
+    systemPromptTextarea.onchange = function () {
+        if (this.value.trim() !== '') {
+            edit_status('system_prompt', 'system_prompt', this.value);
+        }
+    };
+
+
     // Other settings
     h3 = document.createElement('h3');
     h3.textContent = 'Other settings';
@@ -431,12 +520,19 @@ function edit_status(category, setting, value) {
     overlayMessage.textContent = "Updating Settings...";
     overlay.style.display = 'flex';
 
+    let requestBody;
+    if (typeof value === 'object') {
+        requestBody = JSON.stringify({ category: category, setting: setting, value: JSON.stringify(value), username: user_name });
+    } else {
+        requestBody = JSON.stringify({ category: category, setting: setting, value: value, username: user_name });
+    }
+
     fetch(API_URL + '/update_settings/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ category: category, setting: setting, value: value, username: user_name }),
+        body: requestBody,
         credentials: 'include'
     })
         .then(response => response.json())
@@ -470,6 +566,31 @@ function setSettings(newSettings) {
         }
         if (newSettings.daily_usage != "" && newSettings.daily_usage != null) {
             handleDailyUsage(newSettings);
+        }
+
+        // Update the system prompt settings
+        if (newSettings.system_prompt) {
+            var systemPromptSwitch = document.getElementById('system-prompt-switch');
+            var systemPromptDropdown = document.getElementById('system-prompt-dropdown');
+            var systemPromptTextarea = document.getElementById('system-prompt-textarea');
+
+            if (newSettings.system_prompt.system_prompt === 'None') {
+                systemPromptSwitch.checked = false;
+                systemPromptDropdown.disabled = true;
+                systemPromptTextarea.style.display = 'none';
+            } else {
+                systemPromptSwitch.checked = true;
+                systemPromptDropdown.disabled = false;
+
+                if (newSettings.system_prompt.system_prompt === 'stoic') {
+                    systemPromptDropdown.value = 'stoic';
+                    systemPromptTextarea.style.display = 'none';
+                } else {
+                    systemPromptDropdown.value = 'custom';
+                    systemPromptTextarea.value = newSettings.system_prompt.system_prompt;
+                    systemPromptTextarea.style.display = 'block';
+                }
+            }
         }
     }
     // check if there is a google auth uri in the settings

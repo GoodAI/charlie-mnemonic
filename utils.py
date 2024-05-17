@@ -179,12 +179,13 @@ class AddonManager:
 
     @staticmethod
     async def load_addons(username, users_dir):
+
         default_settings = {
             "addons": {},
             "audio": {"voice_input": True, "voice_output": True},
             "avatar": {"avatar": False},
             "language": {"language": "en"},
-            "system_prompt": {"system_prompt": "Not implemented yet"},
+            "system_prompt": {"system_prompt": "stoic"},
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "memory": {
@@ -1223,7 +1224,18 @@ async def generate_response(
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
+
+    # get the system prompt settings
+    settings = await SettingsManager.load_settings(users_dir, username)
+    settings_system_prompt = settings.get("system_prompt").get("system_prompt")
     system_prompt = prompts.system_prompt
+
+    if settings_system_prompt == "None":
+        system_prompt = prompts.system_prompt
+    elif settings_system_prompt == "stoic":
+        system_prompt = prompts.stoic_system_prompt + "\n" + prompts.system_prompt
+    else:
+        system_prompt = settings_system_prompt + "\n" + prompts.system_prompt
 
     # add time in front of system prompt
     current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")

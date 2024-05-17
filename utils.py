@@ -179,7 +179,6 @@ class AddonManager:
 
     @staticmethod
     async def load_addons(username, users_dir):
-
         default_settings = {
             "addons": {},
             "audio": {"voice_input": True, "voice_output": True},

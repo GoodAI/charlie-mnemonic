@@ -121,8 +121,7 @@ class OpenAIResponser:
                 }
             ]
 
-        now = datetime.datetime.now()
-        current_date_time = now.strftime("%d/%m/%Y %H:%M:%S")
+        current_date_time = await utils.SettingsManager.get_current_date_time(username)
         role_content = self.get_role_content(role, current_date_time)
 
         # If a role is present, add the role content to the message

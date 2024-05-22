@@ -206,10 +206,14 @@ function closeTabs() {
 }
 
 
-function updateCounterDiv(message_lenght, tokens_used, max_message_tokens, cost) {
+function updateCounterDiv(message_length, tokens_used, max_message_tokens, cost) {
     const countDiv = document.getElementById("tokenCount");
-    countDiv.innerHTML = `Characters: ${message_lenght}, tokens: ${tokens_used}/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
+    let tokensColor = tokens_used > max_message_tokens ? "<span style='color: red;'>" : "<span>";
+    
+    countDiv.innerHTML = `Characters: ${message_length}, tokens: ${tokensColor}${tokens_used}</span>/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
 }
+
+
 
 function formatTime(seconds) {
     const pad = (num) => (num < 10 ? '0' : '') + num;
@@ -220,4 +224,57 @@ function formatTime(seconds) {
 
 function getUuidFromMessage(messageElement) {
     return messageElement.dataset.uuid;
+}
+
+function showTextFileModal(fileName, fileContent) {
+    // Create the modal HTML
+    let modalHtml = `
+        <div class="modal" id="textFileModal">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Text File: ${fileName}</h5>
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Choose an option for the text file:</p>
+                        <button id="includeTextBtn">Include in Input</button>
+                        <button id="uploadTextBtn">Upload as File</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Append the modal to the body
+    document.body.innerHTML += modalHtml;
+
+    // Get references to the modal and buttons
+    let modal = document.getElementById('textFileModal');
+    let includeTextBtn = document.getElementById('includeTextBtn');
+    let uploadTextBtn = document.getElementById('uploadTextBtn');
+
+    // Show the modal
+    $(modal).modal('show');
+
+    // Handle the "Include in Input" button click
+    includeTextBtn.onclick = function () {
+        let inputText = `${fileName}\n\n${fileContent}`;
+        document.getElementById('message').value += inputText;
+        $(modal).modal('hide');
+    };
+
+    // Handle the "Upload as File" button click
+    uploadTextBtn.onclick = function () {
+        // Add the file to the pastedFiles array
+        pastedFiles.push(new File([fileContent], fileName));
+        // handle the file upload
+        handleFiles(pastedFiles);
+        $(modal).modal('hide');
+    };
+
+    // Remove the modal from the DOM when hidden
+    $(modal).on('hidden.bs.modal', function () {
+        modal.remove();
+    });
 }

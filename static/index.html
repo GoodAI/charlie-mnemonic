@@ -383,6 +383,12 @@
                                     <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
                                     <p id="userStats"></p>
                                 </div>
+                                <div id="files-preview" style="display: none;">
+                                    <div class="file-wrapper">
+                                        <div id="preview-files"></div>
+                                        <div class="hover-text"></div>
+                                    </div>
+                                </div>
                                 <div class="input-field">
                                     <div class="textarea-container">
                                         <div class="icon-container-left">
@@ -423,15 +429,6 @@
                                                         onclick="stopStream()">
                                                     <i class="fa fa-stop"></i>
                                                 </button>
-                                                <div id="file-preview" style="display: none;">
-                                                    <div class="file-wrapper">
-                                                        <div id="preview-files"></div>
-                                                        <div class="hover-text">
-                                                            <i class="fa fa-times-circle deletebutton"></i>
-                                                            <p>Delete</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </div>
                                     </div>

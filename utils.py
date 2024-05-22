@@ -27,11 +27,12 @@ import logs
 import prompts
 from unidecode import unidecode
 import llmcalls
-
 from simple_utils import get_root
 from user_management.dao import UsersDAO
-
 from typing import List, Dict, Any
+from datetime import datetime
+import pytz
+from tzlocal import get_localzone
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -187,6 +188,7 @@ class AddonManager:
             "system_prompt": {"system_prompt": "stoic"},
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
+            "timezone": {"timezone": "Auto"},
             "memory": {
                 "functions": 640,
                 "ltm1": 1200,
@@ -846,7 +848,7 @@ class SettingsManager:
         if "memory" in settings:
             memory_settings = settings["memory"]
             if isinstance(memory_settings.get("ltm1"), float):
-                max_tokens = memory_settings.get("max_tokens", 6500)
+                max_tokens = memory_settings.get("max_tokens", 8000)
                 memory_settings["functions"] = int(
                     memory_settings.get("functions", 0.05) * max_tokens
                 )
@@ -873,6 +875,28 @@ class SettingsManager:
                 )
 
         return settings
+
+    @staticmethod
+    async def get_current_date_time(username):
+        settings = await SettingsManager().load_settings("users", username)
+        timezone = settings.get("timezone", {}).get("timezone", "auto")
+
+        if timezone == "auto":
+            # If the timezone is set to 'auto', use the local timezone
+            user_tz = get_localzone()
+        else:
+            # Convert the timezone from 'UTC+X' format to a valid pytz timezone name
+            if timezone.startswith("UTC"):
+                offset = timezone[3:]
+                if offset.startswith("+"):
+                    offset = offset[1:]
+                offset_hours = int(offset)
+                user_tz = pytz.FixedOffset(offset_hours * 60)
+            else:
+                user_tz = pytz.timezone(timezone)
+
+        current_date_time = datetime.now(user_tz).strftime("%d/%m/%Y %H:%M:%S")
+        return current_date_time
 
 
 def needsTabDescription(chat_id):
@@ -937,8 +961,6 @@ async def process_message(
     logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
     remaining_tokens -= function_call_token_usage
-
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
     last_messages = await MessageParser.get_recent_messages(
         username, chat_id, regenerate, uuid
@@ -1237,7 +1259,7 @@ async def generate_response(
         system_prompt = settings_system_prompt + "\n" + prompts.system_prompt
 
     # add time in front of system prompt
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
+    current_date_time = await SettingsManager.get_current_date_time(username)
     system_prompt = current_date_time + "\n" + system_prompt
     messages = [
         {"role": "system", "content": system_prompt + "\n" + memory_message},

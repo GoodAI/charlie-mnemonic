@@ -125,7 +125,10 @@ class ConfigurationData(BaseModel):
     GOOGLE_CLIENT_SECRET_PATH: str = Field(
         None,
         title="Google Client Secret JSON path",
-        description="The path to the Google Client Secret JSON file.",
+        description="""The path to the Google Client Secret JSON file. Create a project in the 
+                    <a href='https://console.cloud.google.com/' target='_blank'>Google Cloud Console</a> 
+                    and download the JSON file.<br>This is needed for the Google Workspace integration, but not required.
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#guideModal">Click here for a detailed guide</a>.""",
         required=False,
     )
 

@@ -116,3 +116,5 @@ duckduckgo_search==5.1.0
 google-auth==2.29.0
 google-auth-oauthlib==1.2.0
 google-api-python-client==2.125.0
+tzlocal==5.2
+pytz==2024.1

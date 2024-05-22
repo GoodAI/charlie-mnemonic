@@ -1,5 +1,7 @@
 import asyncio
-import datetime
+from datetime import datetime
+import pytz
+from tzlocal import get_localzone
 import json
 import os
 import re
@@ -279,9 +281,7 @@ class MemoryManager:
             # Try parsing the date with each format
             for date_format in date_formats:
                 try:
-                    parsed_date = datetime.datetime.strptime(
-                        subject.strip(), date_format
-                    )
+                    parsed_date = datetime.strptime(subject.strip(), date_format)
                     logger.debug(f"parsed_date: {parsed_date}")
                     break
                 except ValueError:
@@ -301,7 +301,7 @@ class MemoryManager:
             logger.debug(f"episodic_messages: {len(episodic_messages)}")
             for memory in episodic_messages:
                 date = memory["metadata"]["created_at"]
-                formatted_date = datetime.datetime.fromtimestamp(date).strftime(
+                formatted_date = datetime.fromtimestamp(date).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
                 results_string += f"{formatted_date} - {memory['document']} (score: {memory['distance']})\n"
@@ -396,7 +396,7 @@ class MemoryManager:
                         document = result.get("document")
                         distance = round(result.get("distance"), 3)
                         date = result["metadata"]["created_at"]
-                        formatted_date = datetime.datetime.fromtimestamp(date).strftime(
+                        formatted_date = datetime.fromtimestamp(date).strftime(
                             "%Y-%m-%d %H:%M:%S"
                         )
                         results_list.append((id, document, distance, formatted_date))
@@ -622,7 +622,7 @@ class MemoryManager:
                     document = result.get("document")
                     distance = round(result.get("distance"), 3)
                     date = result["metadata"]["created_at"]
-                    formatted_date = datetime.datetime.fromtimestamp(date).strftime(
+                    formatted_date = datetime.fromtimestamp(date).strftime(
                         "%Y-%m-%d %H:%M:%S"
                     )
                     full_search_result += (
@@ -807,7 +807,7 @@ class MemoryManager:
             return f"{files_content_string}"
 
         else:
-            timestamp = time.strftime("%d/%m/%Y %H:%M:%S")
+            timestamp = await utils.SettingsManager.get_current_date_time(username)
             process_dict["timestamp"] = timestamp
 
             # count tokens of the message

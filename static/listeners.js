@@ -135,19 +135,18 @@ document.getElementById('upload-file').addEventListener('click', function () {
 });
 
 // check if the preview files were clicked, if so, remove them, show the upload-file button and clear the file input
-document.getElementById('file-preview').addEventListener('click', function () {
-    // remove the preview files
-    document.getElementById('preview-files').innerHTML = '';
-    // hide the preview files
-    document.getElementById('file-preview').style.display = 'none';
-    // show the upload-file button
-    document.getElementById('upload-file').style.display = 'block';
-    // clear the file input
-    document.getElementById('uploadFileInput').value = '';
-    // clear the pastedFiles array
-    pastedFiles = [];
-    // set the .icon-container-right padding to 25
-    document.querySelector('.icon-container-right').style.right = '25px';
+document.getElementById('preview-files').addEventListener('click', function (event) {
+    if (event.target.classList.contains('file-delete-icon')) {
+        let index = event.target.getAttribute('data-index');
+        pastedFiles.splice(index, 1);
+        event.target.parentNode.remove();
+
+        if (pastedFiles.length === 0) {
+            document.getElementById('files-preview').style.display = 'none';
+            document.getElementById('upload-file').style.display = 'block';
+            document.querySelector('.icon-container-right').style.right = '25px';
+        }
+    }
 });
 
 // check if files were uploaded
@@ -163,8 +162,8 @@ function handleFiles(files) {
     for (let i = 0; i < files.length; i++) {
         totalSize += files[i].size;
     }
-    if (totalSize > 20000000) {
-        showErrorModal('The total size of the files is too large, max 20MB!');
+    if (totalSize > 200000000) {
+        showErrorModal('The total size of the files is too large, max 200MB!');
         // clear the file input
         document.getElementById('uploadFileInput').value = '';
         return;
@@ -175,7 +174,14 @@ function handleFiles(files) {
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        if (file.type.startsWith('image/')) {
+        if (file.type.startsWith('text/') || file.name.match(/\.(txt|html|css|js|cs)$/i)) {
+            // Handle text files
+            let reader = new FileReader();
+            reader.onload = function (event) {
+                showTextFileModal(file.name, event.target.result);
+            };
+            reader.readAsText(file);
+        } else if (file.type.startsWith('image/')) {
             // create a new FileReader object
             let reader = new FileReader();
             reader.onload = function (event) {
@@ -204,6 +210,12 @@ function handleFiles(files) {
                 };
                 // Set image src to the result of FileReader
                 img.src = event.target.result;
+            // Add delete icon and tooltip
+            let deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-times-circle file-delete-icon';
+            deleteIcon.setAttribute('data-index', i);
+            deleteIcon.setAttribute('title', 'Delete');
+            preview.appendChild(deleteIcon);
             };
             // Read the image file as a data URL
             reader.readAsDataURL(file);
@@ -213,13 +225,20 @@ function handleFiles(files) {
             preview.className = 'file-preview';
             preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
             document.getElementById('preview-files').appendChild(preview);
+            // Add delete icon and tooltip
+            let deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-times-circle file-delete-icon';
+            deleteIcon.setAttribute('data-index', i);
+            deleteIcon.setAttribute('title', 'Delete');
+            preview.appendChild(deleteIcon);
         }
     }
 
     // Show the file-preview
-    document.getElementById('file-preview').style.display = 'block';
+    document.getElementById('files-preview').style.display = 'flex';
+    document.getElementById('files-preview').style.justifyContent = 'center';
     // Hide the upload-file button
-    document.getElementById('upload-file').style.display = 'none';
+    // document.getElementById('upload-file').style.display = 'none';
 
     let fileWrapper = document.querySelector('.file-wrapper');
     fileWrapper.addEventListener('mouseover', function () {
@@ -261,7 +280,7 @@ document.getElementById('send').addEventListener('click', async function () {
         send_files(pastedFiles, document.getElementById('message').value);
         document.getElementById('uploadFileInput').value = '';
         document.getElementById('preview-files').innerHTML = '';
-        document.getElementById('file-preview').style.display = 'none';
+        document.getElementById('files-preview').style.display = 'none';
         document.getElementById('upload-file').style.display = 'block';
         pastedFiles = [];
         document.getElementById('message').value = '';

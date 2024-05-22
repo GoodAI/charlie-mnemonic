@@ -31,10 +31,7 @@
                     <div class="mb-3">
                         <label for="field-{{ key }}" class="form-label">
                             {{ value.title }}
-                            {% if value.required %}
-                                (required)
-                            {% endif
-                            %}
+                            {% if value.required %}(required){% endif %}
                         </label>
                         <input id="field-{{ key }}"
                                name="{{ key }}"
@@ -44,54 +41,93 @@
                                class="form-control"
                                {% if value.required %}required="required"{% endif %}
                                aria-describedby="help-{{ key }}" />
-                        <div id="help-{{ key }}" class="form-text">{{ value.help_text }}</div>
+                        <div id="help-{{ key }}" class="form-text">{{ value.help_text|safe }}</div>
                     </div>
                 {% endfor %}
                 <a class="btn btn-secondary" href="/">To the agent</a>
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
         </div>
+        <!-- Modal -->
+        <div class="modal fade"
+             id="guideModal"
+             tabindex="-1"
+             aria-labelledby="guideModalLabel"
+             aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="guideModalLabel">Google Developer Console Guide</h5>
+                        <button type="button"
+                                class="btn-close"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h5>Step-by-Step Guide</h5>
+                        <ol>
+                            <li>
+                                Create a project in the <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a>.
+                            </li>
+                            <li>Enable the Gmail API and Calendar API.</li>
+                            <li>Go to the "Credentials" tab and click "Create Credentials".</li>
+                            <li>Select "OAuth 2.0 Client IDs" and configure the consent screen.</li>
+                            <li>Download the JSON file with your credentials.</li>
+                            <li>Add the Authorized JavaScript origins and redirect URIs as needed.</li>
+                        </ol>
+                        <p>
+                            For more detailed instructions, refer to the official <a href="https://developers.google.com/workspace/guides/create-credentials"
+    target="_blank">Google Workspace guide</a>.
+                        </p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <script>
-    function success(message) {
-        document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-success alert-dismissible fade show" role="alert">
-        <span class="alert-message">${message}</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>`
-    }
+function success(message) {
+    document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-success alert-dismissible fade show" role="alert">
+    <span class="alert-message">${message}</span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`
+}
 
-    function error(message) {
-        document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-danger alert-dismissible fade show" role="alert">
-        <span class="alert-message">${message}</span>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>`
-    }
+function error(message) {
+    document.getElementById("alert-wrap").innerHTML = `<div id="alert" class="alert alert-danger alert-dismissible fade show" role="alert">
+    <span class="alert-message">${message}</span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>`
+}
 
-    async function updateConfiguration(event) {
-        event.preventDefault();
-        let formData = new FormData(this);
-        fetch(this.action, {
-            method: 'POST',
-            body: formData,
-        }).then(response => response.json().then(data => ({
-            ok: response.ok,
-            status: response.status,
-            body: data
-        }))).then(response => {
-            if (response.ok) {
-                success(response.body["message"]);
-                setTimeout(() => {
-                    window.location.href = "/";
-                }, 1000);
-            } else {
-                error(response.body["detail"]);        }
-        }).catch((err) => {
-            error(err);
-        });
+async function updateConfiguration(event) {
+    event.preventDefault();
+    let formData = new FormData(this);
+    fetch(this.action, {
+        method: 'POST',
+        body: formData,
+    }).then(response => response.json().then(data => ({
+        ok: response.ok,
+        status: response.status,
+        body: data
+    }))).then(response => {
+        if (response.ok) {
+            success(response.body["message"]);
+            setTimeout(() => {
+                window.location.href = "/";
+            }, 1000);
+        } else {
+            error(response.body["detail"]);
+        }
+    }).catch((err) => {
+        error(err);
+    });
 
-        return false;
-    }
+    return false;
+}
 
-    document.getElementById("configuration-form").addEventListener("submit", updateConfiguration);
+document.getElementById("configuration-form").addEventListener("submit", updateConfiguration);
         </script>
     </body>
 </html>

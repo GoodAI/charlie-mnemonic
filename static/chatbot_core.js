@@ -611,14 +611,14 @@ function send_audio(file) {
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first
-            const fileInput = document.getElementById('uploadImageInput');
+            const fileInput = document.getElementById('uploadFileInput');
             if (fileInput.files.length > 0) {
-                send_image(fileInput.files[0], data.transcription);
-                // clear the file input
-                fileInput.value = '';
-                // clear the image preview
-                document.getElementById('image-preview').innerHTML = '';
-                // clear the message input
+                send_files(fileInput.files, data.transcription);
+                document.getElementById('uploadFileInput').value = '';
+                document.getElementById('preview-files').innerHTML = '';
+                document.getElementById('files-preview').style.display = 'none';
+                document.getElementById('upload-file').style.display = 'block';
+                pastedFiles = [];
                 document.getElementById('message').value = '';
             } else {
                 console.log('Sending audio transcription to server: ' + data.transcription);

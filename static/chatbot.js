@@ -313,6 +313,70 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
+    // Populate timezone settings
+    h3 = document.createElement('h3');
+    h3.textContent = 'Timezone';
+    tabContent.appendChild(h3);
+
+    var timezoneItem = document.createElement('select');
+    timezoneItem.id = 'timezone';
+    timezoneItem.name = 'timezone';
+    var timezones = [
+        'Auto',
+        'UTC-12',
+        'UTC-11',
+        'UTC-10',
+        'UTC-9',
+        'UTC-8',
+        'UTC-7',
+        'UTC-6',
+        'UTC-5',
+        'UTC-4',
+        'UTC-3',
+        'UTC-2',
+        'UTC-1',
+        'UTC',
+        'UTC+1',
+        'UTC+2',
+        'UTC+3',
+        'UTC+4',
+        'UTC+5',
+        'UTC+6',
+        'UTC+7',
+        'UTC+8',
+        'UTC+9',
+        'UTC+10',
+        'UTC+11',
+        'UTC+12',
+    ];
+    timezones.forEach(function (timezone) {
+        var option = document.createElement('option');
+        option.value = timezone;
+        option.text = timezone;
+        timezoneItem.appendChild(option);
+    });
+
+    // Detect user's timezone if settings.timezone.timezone is set to "auto"
+    if (settings.timezone && settings.timezone.timezone === 'auto') {
+        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var utcOffset = new Date().getTimezoneOffset() / -60;
+        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+        timezoneItem.value = utcOffsetString;
+    } else {
+        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
+    }
+
+    timezoneItem.onchange = function (e) {
+        if (e.target.value === 'Auto') {
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+            edit_status('timezone', 'timezone', utcOffsetString);
+        } else {
+            edit_status('timezone', 'timezone', e.target.value);
+        }
+    }
+    tabContent.appendChild(timezoneItem);
     // Populate chain of thought settings (disabled for now)
     // var cotItem = document.createElement('a');
     // cotItem.href = "#";
@@ -591,6 +655,21 @@ function setSettings(newSettings) {
                     systemPromptTextarea.style.display = 'block';
                 }
             }
+        }
+        // Check if the timezone setting is not defined or set to "auto"
+        if (!newSettings.timezone || newSettings.timezone.timezone.toLowerCase() === 'auto') {
+            // Detect the user's timezone
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+
+            // Update the timezone setting
+            newSettings.timezone = {
+                timezone: utcOffsetString
+            };
+
+            // Save the updated settings
+            edit_status('timezone', 'timezone', utcOffsetString);
         }
     }
     // check if there is a google auth uri in the settings

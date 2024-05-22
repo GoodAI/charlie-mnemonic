@@ -226,14 +226,14 @@ function getUuidFromMessage(messageElement) {
     return messageElement.dataset.uuid;
 }
 
-function showTextFileModal(fileName, fileContent) {
+function showTextFileModal(file, fileContent) {
     // Create the modal HTML
     let modalHtml = `
         <div class="modal" id="textFileModal">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Text File: ${fileName}</h5>
+                        <h5 class="modal-title">Text File: ${file.name}</h5>
                         <button type="button" class="close" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body">
@@ -259,7 +259,7 @@ function showTextFileModal(fileName, fileContent) {
 
     // Handle the "Include in Input" button click
     includeTextBtn.onclick = function () {
-        let inputText = `${fileName}\n\n${fileContent}`;
+        let inputText = `${file.name}\n\n${fileContent}`;
         document.getElementById('message').value += inputText;
         $(modal).modal('hide');
     };
@@ -267,10 +267,19 @@ function showTextFileModal(fileName, fileContent) {
     // Handle the "Upload as File" button click
     uploadTextBtn.onclick = function () {
         // Add the file to the pastedFiles array
-        pastedFiles.push(new File([fileContent], fileName));
-        // handle the file upload
-        handleFiles(pastedFiles);
+        pastedFiles.push(new File([fileContent], file.name));
         $(modal).modal('hide');
+        // Create a preview element for non-image files
+        let preview = document.createElement('div');
+        preview.className = 'file-preview';
+        preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
+        document.getElementById('preview-files').appendChild(preview);
+        // Add delete icon and tooltip
+        let deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-times-circle file-delete-icon';
+        deleteIcon.setAttribute('data-index', i);
+        deleteIcon.setAttribute('title', 'Delete');
+        preview.appendChild(deleteIcon);
     };
 
     // Remove the modal from the DOM when hidden

@@ -126,12 +126,12 @@ document.getElementById('errorModalClose').addEventListener('click', function ()
 
 document.getElementById('upload-file').addEventListener('click', function () {
     const fileInput = document.getElementById('uploadFileInput');
-    if (fileInput.files.length > 0) {
-        // send_files(fileInput.files);
-    } else {
+    // if (fileInput.files.length > 0) {
+    //     // send_files(fileInput.files);
+    // } else {
         // trigger the file input as if the user clicked it
-        document.getElementById('uploadFileInput').click();
-    }
+    document.getElementById('uploadFileInput').click();
+    //}
 });
 
 // check if the preview files were clicked, if so, remove them, show the upload-file button and clear the file input
@@ -178,10 +178,10 @@ function handleFiles(files) {
             // Handle text files
             let reader = new FileReader();
             reader.onload = function (event) {
-                showTextFileModal(file.name, event.target.result);
+                showTextFileModal(file, event.target.result);
             };
             reader.readAsText(file);
-        } else if (file.type.startsWith('image/')) {
+        }else if (file.type.startsWith('image/')) {
             // create a new FileReader object
             let reader = new FileReader();
             reader.onload = function (event) {
@@ -207,15 +207,15 @@ function handleFiles(files) {
                     preview.className = 'file-preview';
                     preview.innerHTML = `<img src="${event.target.result}" alt="${file.name}" width="${thumbnailWidth}" height="${thumbnailHeight}">`;
                     document.getElementById('preview-files').appendChild(preview);
+                    // Add delete icon and tooltip
+                    let deleteIcon = document.createElement('i');
+                    deleteIcon.className = 'fas fa-times-circle file-delete-icon';
+                    deleteIcon.setAttribute('data-index', i);
+                    deleteIcon.setAttribute('title', 'Delete');
+                    preview.appendChild(deleteIcon);
                 };
                 // Set image src to the result of FileReader
                 img.src = event.target.result;
-            // Add delete icon and tooltip
-            let deleteIcon = document.createElement('i');
-            deleteIcon.className = 'fas fa-times-circle file-delete-icon';
-            deleteIcon.setAttribute('data-index', i);
-            deleteIcon.setAttribute('title', 'Delete');
-            preview.appendChild(deleteIcon);
             };
             // Read the image file as a data URL
             reader.readAsDataURL(file);

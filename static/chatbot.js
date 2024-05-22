@@ -118,9 +118,22 @@ function createAddonsTabContent(addons, tabId) {
             description: 'Generate an image with Dalle 3'
         },
         {
-            name: 'search_duckduckgo',
-            description: 'Search the web with DuckDuckGo'
+            name: 'get_image_descriptions',
+            description: 'Get descriptions of uploaded images using OpenAI GPT-4o'
         },
+        {
+            name: 'calendar_addon',
+            description: 'Google Calendar integration to add/edit/delete events'
+        },
+        {
+            name: 'gmail_addon',
+            description: 'Gmail Integration to read/write/delete emails'
+        },
+        {
+            name: 'google_search',
+            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
+        }
+        
       ];
 
     for (let addon in addons) {

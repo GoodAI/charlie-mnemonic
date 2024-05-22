@@ -28,60 +28,21 @@ function populateSettingsMenu(settings) {
 
     var slider = document.getElementById('slider');
 
-    var startValues = [settings.memory.functions, settings.memory.ltm1, settings.memory.ltm2, settings.memory.episodic, settings.memory.recent, settings.memory.notes, settings.memory.input, settings.memory.output];
+    var startValues = [
+        settings.memory.functions,
+        settings.memory.functions + settings.memory.ltm1,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent + settings.memory.notes,
+        settings.memory.functions + settings.memory.ltm1 + settings.memory.ltm2 + settings.memory.episodic + settings.memory.recent + settings.memory.notes + settings.memory.input,
+        maxRange
+    ];
 
-    for (var i = 1; i < startValues.length; i++) {
-        startValues[i] += startValues[i - 1];
-    }
-    
-    noUiSlider.create(slider, {
-        start: startValues,
-        connect: true,
-        range: {
-            'min': 0,
-            'max': maxRange
-        },
-        step: 100,
-    });
+    // Convert the start values to percentages
+    var startPercentages = startValues.map(value => value / maxRange);
 
-    slider.noUiSlider.on('update', function(values) {
-        var values = values.map(Number).map(Math.round);
-        categoryValues = values.map(function(value, index, array) {
-            return index === 0 ? value : value - array[index - 1];
-        });
-
-        document.getElementById('value-functions').innerHTML = ((categoryValues[0]/maxRange)*100).toFixed(2) + '% (' + categoryValues[0] + ')';
-        document.getElementById('value-ltm1').innerHTML = ((categoryValues[1]/maxRange)*100).toFixed(2) + '% (' + categoryValues[1] + ')';
-        document.getElementById('value-ltm2').innerHTML = ((categoryValues[2]/maxRange)*100).toFixed(2) + '% (' + categoryValues[2] + ')';
-        document.getElementById('value-episodicmemory').innerHTML = ((categoryValues[3]/maxRange)*100).toFixed(2) + '% (' + categoryValues[3] + ')';
-        document.getElementById('value-recentmessages').innerHTML = ((categoryValues[4]/maxRange)*100).toFixed(2) + '% (' + categoryValues[4] + ')';
-        document.getElementById('value-notes').innerHTML = ((categoryValues[5]/maxRange)*100).toFixed(2) + '% (' + categoryValues[5] + ')';
-        document.getElementById('value-input').innerHTML = ((categoryValues[6]/maxRange)*100).toFixed(2) + '% (' + categoryValues[6] + ')';
-        document.getElementById('value-output').innerHTML = ((categoryValues[7]/maxRange)*100).toFixed(2) + '% (' + categoryValues[7] + ')';
-    });
-
-    slider.noUiSlider.on('slide', function(values, handle) {
-        var values = values.map(Number).map(Math.round);
-
-        // Check the first handle
-        if (handle === 0 && values[0] !== minRange) {
-            slider.noUiSlider.setHandle(0, minRange);
-        }
-        // last handle can't be moved
-        if (handle === 7) {
-            slider.noUiSlider.setHandle(7, maxRange);
-        }
-        // make sure input and output category values are at least 500
-        if (handle === 6 && values[6] < values[5] + minRange) {
-            slider.noUiSlider.setHandle(6, values[5] + minRange);
-        }
-        if (handle === 6 && values[7] < values[6] + minRange) {
-            slider.noUiSlider.setHandle(6, values[7] - minRange);
-        }
-        if (handle === 5 && values[6] < values[5] + minRange) {
-            slider.noUiSlider.setHandle(5, values[6] - minRange);
-        }
-    });
+    slider.noUiSlider.set(startPercentages);
 
     var categories = document.getElementsByClassName('category');
     for (var i = 0; i < categories.length; i++) {
@@ -89,7 +50,7 @@ function populateSettingsMenu(settings) {
     }
 
     switchTab(currentActiveTab); // make the first tab active by default
-};
+}
 
 function createTabNav(tabs) {
     var tabNav = document.createElement('ul');
@@ -157,9 +118,22 @@ function createAddonsTabContent(addons, tabId) {
             description: 'Generate an image with Dalle 3'
         },
         {
-            name: 'search_duckduckgo',
-            description: 'Search the web with DuckDuckGo'
+            name: 'get_image_descriptions',
+            description: 'Get descriptions of uploaded images using OpenAI GPT-4o'
         },
+        {
+            name: 'calendar_addon',
+            description: 'Google Calendar integration to add/edit/delete events'
+        },
+        {
+            name: 'gmail_addon',
+            description: 'Gmail Integration to read/write/delete emails'
+        },
+        {
+            name: 'google_search',
+            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
+        }
+        
       ];
 
     for (let addon in addons) {
@@ -247,6 +221,95 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(displayNameItem);
 
+    // Populate System Prompt settings
+    h3 = document.createElement('h3');
+    h3.textContent = 'System Prompt';
+    tabContent.appendChild(h3);
+
+    var systemPromptContainer = document.createElement('div');
+    systemPromptContainer.id = 'system-prompt-container';
+
+    var systemPromptSwitch = document.createElement('div');
+    systemPromptSwitch.className = 'form-check form-switch';
+    var systemPromptSwitchInput = document.createElement('input');
+    systemPromptSwitchInput.className = 'form-check-input';
+    systemPromptSwitchInput.type = 'checkbox';
+    systemPromptSwitchInput.id = 'system-prompt-switch';
+    systemPromptSwitch.appendChild(systemPromptSwitchInput);
+    var systemPromptSwitchLabel = document.createElement('label');
+    systemPromptSwitchLabel.className = 'form-check-label';
+    systemPromptSwitchLabel.htmlFor = 'system-prompt-switch';
+    systemPromptSwitchLabel.textContent = 'Enable System Prompt';
+    systemPromptSwitch.appendChild(systemPromptSwitchLabel);
+    systemPromptContainer.appendChild(systemPromptSwitch);
+
+    var systemPromptDropdown = document.createElement('select');
+    systemPromptDropdown.id = 'system-prompt-dropdown';
+    systemPromptDropdown.className = 'form-select';
+    var option1 = document.createElement('option');
+    option1.value = 'None';
+    option1.text = 'None';
+    systemPromptDropdown.appendChild(option1);
+    var option2 = document.createElement('option');
+    option2.value = 'stoic';
+    option2.text = 'Stoic';
+    systemPromptDropdown.appendChild(option2);
+    var option3 = document.createElement('option');
+    option3.value = 'custom';
+    option3.text = 'Custom';
+    systemPromptDropdown.appendChild(option3);
+    systemPromptContainer.appendChild(systemPromptDropdown);
+
+    var systemPromptTextarea = document.createElement('textarea');
+    systemPromptTextarea.id = 'system-prompt-textarea';
+    systemPromptTextarea.className = 'form-control';
+    systemPromptTextarea.rows = 4;
+    systemPromptTextarea.maxLength = 1000;
+    systemPromptTextarea.style.display = 'none';
+    systemPromptContainer.appendChild(systemPromptTextarea);
+
+    tabContent.appendChild(systemPromptContainer);
+
+    // Set initial values based on settings
+    if (settings.system_prompt && settings.system_prompt.system_prompt !== 'None') {
+        systemPromptSwitchInput.checked = true;
+        systemPromptDropdown.value = settings.system_prompt.system_prompt;
+        if (settings.system_prompt.system_prompt === 'custom') {
+            systemPromptTextarea.value = settings.system_prompt.custom_prompt;
+            systemPromptTextarea.style.display = 'block';
+        }
+    }
+
+    // Event listeners
+    systemPromptSwitchInput.onchange = function () {
+        if (this.checked) {
+            systemPromptDropdown.disabled = false;
+            if (systemPromptDropdown.value === 'custom') {
+                systemPromptTextarea.style.display = 'block';
+            }
+        } else {
+            systemPromptDropdown.disabled = true;
+            systemPromptTextarea.style.display = 'none';
+            edit_status('system_prompt', 'system_prompt', 'None');
+        }
+    };
+
+    systemPromptDropdown.onchange = function () {
+        if (this.value === 'custom') {
+            systemPromptTextarea.style.display = 'block';
+        } else {
+            systemPromptTextarea.style.display = 'none';
+            edit_status('system_prompt', 'system_prompt', this.value);
+        }
+    };
+
+    systemPromptTextarea.onchange = function () {
+        if (this.value.trim() !== '') {
+            edit_status('system_prompt', 'system_prompt', this.value);
+        }
+    };
+
+
     // Other settings
     h3 = document.createElement('h3');
     h3.textContent = 'Other settings';
@@ -263,6 +326,70 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
+    // Populate timezone settings
+    h3 = document.createElement('h3');
+    h3.textContent = 'Timezone';
+    tabContent.appendChild(h3);
+
+    var timezoneItem = document.createElement('select');
+    timezoneItem.id = 'timezone';
+    timezoneItem.name = 'timezone';
+    var timezones = [
+        'Auto',
+        'UTC-12',
+        'UTC-11',
+        'UTC-10',
+        'UTC-9',
+        'UTC-8',
+        'UTC-7',
+        'UTC-6',
+        'UTC-5',
+        'UTC-4',
+        'UTC-3',
+        'UTC-2',
+        'UTC-1',
+        'UTC',
+        'UTC+1',
+        'UTC+2',
+        'UTC+3',
+        'UTC+4',
+        'UTC+5',
+        'UTC+6',
+        'UTC+7',
+        'UTC+8',
+        'UTC+9',
+        'UTC+10',
+        'UTC+11',
+        'UTC+12',
+    ];
+    timezones.forEach(function (timezone) {
+        var option = document.createElement('option');
+        option.value = timezone;
+        option.text = timezone;
+        timezoneItem.appendChild(option);
+    });
+
+    // Detect user's timezone if settings.timezone.timezone is set to "auto"
+    if (settings.timezone && settings.timezone.timezone === 'auto') {
+        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var utcOffset = new Date().getTimezoneOffset() / -60;
+        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+        timezoneItem.value = utcOffsetString;
+    } else {
+        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
+    }
+
+    timezoneItem.onchange = function (e) {
+        if (e.target.value === 'Auto') {
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+            edit_status('timezone', 'timezone', utcOffsetString);
+        } else {
+            edit_status('timezone', 'timezone', e.target.value);
+        }
+    }
+    tabContent.appendChild(timezoneItem);
     // Populate chain of thought settings (disabled for now)
     // var cotItem = document.createElement('a');
     // cotItem.href = "#";
@@ -328,6 +455,22 @@ function createMemoryTabContent(tabId) {
     h3.textContent = 'Memory Configuration';
     tabContent.appendChild(h3);
 
+    var maxTokensLabel = document.createElement('label');
+    maxTokensLabel.textContent = 'Max Total Tokens: ';
+    tabContent.appendChild(maxTokensLabel);
+
+    var maxTokensDropdown = document.createElement('select');
+    maxTokensDropdown.id = 'max-tokens-dropdown';
+    var presetValues = [8000, 16000, 32000, 64000, 128000];
+    presetValues.forEach(value => {
+        var option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        maxTokensDropdown.appendChild(option);
+    });
+    maxTokensDropdown.value = settings.memory.max_tokens;
+    tabContent.appendChild(maxTokensDropdown);
+
     var container = document.createElement('div');
     container.id = 'container';
 
@@ -342,18 +485,20 @@ function createMemoryTabContent(tabId) {
     categories.forEach(cat => {
         var p = document.createElement('p');
         p.className = 'category';
-        p.innerHTML = `${cat}: <span id="value-${cat.toLowerCase().replace(' ', '')}"></span>`;
+        var span = document.createElement('span');
+        span.id = `value-${cat.toLowerCase().replace(' ', '')}`;
+        p.innerHTML = `${cat}: `;
+        p.appendChild(span);
         values.appendChild(p);
     });
 
     container.appendChild(values);
     tabContent.appendChild(container);
 
-    // button to load default memory configuration
     var resetButton = document.createElement('button');
     resetButton.textContent = 'Reset to Default';
     resetButton.onclick = function () {
-        var defaultValues = [500, 1500, 2500, 2800, 3500, 4500, 5500, 6500];
+        var defaultValues = [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0];
         slider.noUiSlider.set(defaultValues);
     };
     tabContent.appendChild(resetButton);
@@ -363,6 +508,40 @@ function createMemoryTabContent(tabId) {
     saveButton.onclick = saveMemoryConfiguration;
     tabContent.appendChild(saveButton);
 
+    noUiSlider.create(slider, {
+        start: [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0],
+        connect: true,
+        range: {
+            'min': 0,
+            'max': 1
+        },
+        step: 0.01,
+    });
+
+    var updateDisplayedValues = function() {
+        var maxTokens = parseInt(maxTokensDropdown.value);
+        var values = slider.noUiSlider.get();
+        var values = values.map(Number);
+        categoryValues = values.map(function(value, index, array) {
+            return index === 0 ? value * 100 : (value - array[index - 1]) * 100;
+        });
+        var percentages = categoryValues.map(value => value / 100);
+        var tokenValues = percentages.map(percentage => Math.round(percentage * maxTokens));
+
+        categories.forEach((cat, index) => {
+            var spanId = `value-${cat.toLowerCase().replace(' ', '')}`;
+            var span = document.getElementById(spanId);
+            if (span) {
+                span.textContent = `${(percentages[index] * 100).toFixed(2)}% (${tokenValues[index]})`;
+            }
+        });
+    };
+
+    slider.noUiSlider.on('update', updateDisplayedValues);
+    maxTokensDropdown.addEventListener('change', updateDisplayedValues);
+
+    updateDisplayedValues();
+
     return tabContent;
 }
 
@@ -371,17 +550,25 @@ function saveMemoryConfiguration() {
     const overlayMessage = document.getElementById('overlay-message');
     overlayMessage.textContent = "Updating Settings...";
     overlay.style.display = 'flex';
+
+    var maxTokensDropdown = document.getElementById('max-tokens-dropdown');
+    var maxTokens = parseInt(maxTokensDropdown.value);
+
+    var values = slider.noUiSlider.get();
+    var tokenValues = values.map(value => Math.round(value * maxTokens));
+
     var memorySettings = {
-        functions: categoryValues[0],
-        ltm1: categoryValues[1],
-        ltm2: categoryValues[2],
-        episodic: categoryValues[3],
-        recent: categoryValues[4],
-        notes: categoryValues[5],
-        input: categoryValues[6],
-        output: categoryValues[7]
+        functions: tokenValues[0],
+        ltm1: tokenValues[1] - tokenValues[0],
+        ltm2: tokenValues[2] - tokenValues[1],
+        episodic: tokenValues[3] - tokenValues[2],
+        recent: tokenValues[4] - tokenValues[3],
+        notes: tokenValues[5] - tokenValues[4],
+        input: tokenValues[6] - tokenValues[5],
+        output: maxTokens - tokenValues[6],
+        max_tokens: maxTokens
     };
-    max_message_tokens = categoryValues[6];
+    max_message_tokens = memorySettings.input;
     updateCounterDiv(0, 0, max_message_tokens, 0);
 
     fetch(API_URL + '/update_settings/', {
@@ -410,12 +597,19 @@ function edit_status(category, setting, value) {
     overlayMessage.textContent = "Updating Settings...";
     overlay.style.display = 'flex';
 
+    let requestBody;
+    if (typeof value === 'object') {
+        requestBody = JSON.stringify({ category: category, setting: setting, value: JSON.stringify(value), username: user_name });
+    } else {
+        requestBody = JSON.stringify({ category: category, setting: setting, value: value, username: user_name });
+    }
+
     fetch(API_URL + '/update_settings/', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ category: category, setting: setting, value: value, username: user_name }),
+        body: requestBody,
         credentials: 'include'
     })
         .then(response => response.json())
@@ -450,9 +644,61 @@ function setSettings(newSettings) {
         if (newSettings.daily_usage != "" && newSettings.daily_usage != null) {
             handleDailyUsage(newSettings);
         }
+
+        // Update the system prompt settings
+        if (newSettings.system_prompt) {
+            var systemPromptSwitch = document.getElementById('system-prompt-switch');
+            var systemPromptDropdown = document.getElementById('system-prompt-dropdown');
+            var systemPromptTextarea = document.getElementById('system-prompt-textarea');
+
+            if (newSettings.system_prompt.system_prompt === 'None') {
+                systemPromptSwitch.checked = false;
+                systemPromptDropdown.disabled = true;
+                systemPromptTextarea.style.display = 'none';
+            } else {
+                systemPromptSwitch.checked = true;
+                systemPromptDropdown.disabled = false;
+
+                if (newSettings.system_prompt.system_prompt === 'stoic') {
+                    systemPromptDropdown.value = 'stoic';
+                    systemPromptTextarea.style.display = 'none';
+                } else {
+                    systemPromptDropdown.value = 'custom';
+                    systemPromptTextarea.value = newSettings.system_prompt.system_prompt;
+                    systemPromptTextarea.style.display = 'block';
+                }
+            }
+        }
+        // Check if the timezone setting is not defined or set to "auto"
+        if (!newSettings.timezone || newSettings.timezone.timezone.toLowerCase() === 'auto') {
+            // Detect the user's timezone
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+
+            // Update the timezone setting
+            newSettings.timezone = {
+                timezone: utcOffsetString
+            };
+
+            // Save the updated settings
+            edit_status('timezone', 'timezone', utcOffsetString);
+        }
+    }
+    // check if there is a google auth uri in the settings
+    if (settings.auth_uri) {
+        // if there is, show the google auth modal
+        showGoogleAuthModal(settings.auth_uri);
     }
     applyTooltips('[data-tooltip]');
 };
+
+function showGoogleAuthModal(auth_uri) {
+    var googleAuthModal = document.getElementById('googleAuthModal');
+    var googleAuthLink = document.getElementById('googleAuthLink');
+    googleAuthLink.href = auth_uri;
+    $(googleAuthModal).modal('show');
+}
 
 function handleAudioSettings(newSettings) {
     // Handle voice input settings
@@ -625,6 +871,9 @@ function handleDailyUsage(msg) {
 
 }
 
+function handleAuthMessage(msg) {
+    console.log('2 auth message received:', msg);
+}
 
 function handlePlanMessage(msg) {
     var content = msg.content && msg.content.content;
@@ -958,7 +1207,7 @@ function handleChunkMessage(msg) {
     if (lastMessage) {
         // Appending the new chunk to the existing content of the last message
         var tempcontent = tempFullChunk;
-        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, false);
+        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
 
     } else {
         // If there is no last message, create a new message element for the chunk
@@ -1092,6 +1341,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         } else {
             lastMessageWrapper.innerHTML += expandableContent;
         }
+
     } else {
         // Create new debug bubble
         let botMessage = `
@@ -1109,6 +1359,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         messagesContainer.appendChild(botMessageWrapper);
     }
 }
+
 
 function formatContent(value) {
     if (typeof value === 'object') {
@@ -1494,6 +1745,10 @@ function get_settings(username) {
         }
         else if (msg.tab_description) {
             handleTabDescription(msg);
+        }
+        else if (msg.auth) {
+            console.log('1 auth message received: ', msg);
+            handleAuthMessage(msg);
         }
 
 

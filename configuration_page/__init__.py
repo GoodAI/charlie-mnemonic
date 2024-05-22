@@ -16,7 +16,20 @@ def update_openai_api_key(value: str):
     openai.api_key = value
 
 
+def update_google_client_key(value: str):
+    os.environ["GOOGLE_CLIENT_SECRET_PATH"] = value
+
+
 TEST_KEY_PREFIX = "test-token-"
+
+
+def validate_google_client_key(value: str):
+    if value.startswith(TEST_KEY_PREFIX):
+        # when we see this prefix, we ignore the validator (used in tests)
+        return
+    print("file path:", value)
+    if not os.path.exists(value):
+        raise ValueError("Google client secret file does not exist.")
 
 
 def validate_openai_key(value: str):
@@ -59,6 +72,11 @@ configuration_meta_list = [
         update_callback=update_openai_api_key,
         validate_callback=validate_openai_key,
         is_valid=lambda: openai.api_key and os.environ.get("OPENAI_API_KEY", None),
+    ),
+    ConfigurationMeta(
+        key="GOOGLE_CLIENT_SECRET_PATH",
+        update_callback=update_google_client_key,
+        input_type="file",
     ),
 ]
 

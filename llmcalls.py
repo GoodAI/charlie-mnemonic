@@ -11,6 +11,7 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import aiohttp
 import utils
+from config import CHATGPT_MODEL
 
 load_dotenv()
 
@@ -21,7 +22,9 @@ class OpenAIResponser:
     def __init__(self, api_key: str, default_params=None):
         if default_params is None:
             default_params = {}
-        self.client = AsyncOpenAI(api_key=api_key)
+
+        base_url = os.getenv("BASE_URL", None)
+        self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.default_params = default_params
         self.addons = self.load_addons()
 
@@ -62,7 +65,7 @@ class OpenAIResponser:
         )
         return transcription
 
-    async def get_image_description(self, image_path, prompt, filename):
+    async def get_image_description(self, image_path, prompt):
         """Asynchronously get a description of an image using the OpenAI Vision API."""
         # Encode the image to base64
         with open(image_path, "rb") as image_file:
@@ -78,10 +81,9 @@ class OpenAIResponser:
         }
 
         params = {
-            # "model": "gpt-4-vision-preview",
-            "model": "gpt-4-turbo",
+            "model": CHATGPT_MODEL,
             "messages": [prompt_message],
-            "max_tokens": 200,
+            "max_tokens": 1000,
         }
 
         response = await self.client.chat.completions.create(**params)
@@ -119,8 +121,7 @@ class OpenAIResponser:
                 }
             ]
 
-        now = datetime.datetime.now()
-        current_date_time = now.strftime("%d/%m/%Y %H:%M:%S")
+        current_date_time = await utils.SettingsManager.get_current_date_time(username)
         role_content = self.get_role_content(role, current_date_time)
 
         # If a role is present, add the role content to the message
@@ -150,9 +151,9 @@ class OpenAIResponser:
         params = self.default_params.copy()
         params.update(
             {
-                "model": self.default_params.get("model", "gpt-4-turbo"),
-                "temperature": self.default_params.get("temperature", 0.7),
-                "max_tokens": self.default_params.get("max_tokens", 250),
+                "model": self.default_params.get("model", "gpt-4o"),
+                "temperature": self.default_params.get("temperature", 0.1),
+                "max_tokens": self.default_params.get("max_tokens", 1000),
                 "n": self.default_params.get("n", 1),
                 "top_p": 1,
                 "frequency_penalty": 0,
@@ -349,7 +350,7 @@ class OpenAIResponser:
         if role == "retriever":
             role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a vectorsearches. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == "notetaker":
-            role_content = 'You are an advanced note and task processing Assistant. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing tasks or notes are completed and/or should be updated or deleted. Only store notes if explicitly asked or things like shopping lists, reminders, the user\'s info, procedural instructions,.. DO NOT save Imperative Instructions, DO NOT save chat history, DO NOT save regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: \'action\' (add, create, delete, update, skip), \'file\' (shoppinglist, notes, etc.), \'content\' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {"action": "create", "file": "shoppinglist", "content": "cookies"}, {"action": "update", "file": "shoppinglist", "content": "cookies\napples\nbananas\npotatoes"} ]'
+            role_content = 'You are an Memory Organizer. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing tasks or notes are completed and/or should be updated or deleted. Only store notes and memories if explicitly asked (the user asks to remember or learn a task or notes) or things like shopping lists, reminders, the user\'s info, procedural instructions,.. DO NOT save Imperative Instructions, DO NOT save chat history, DO NOT save regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: \'action\' (add, create, delete, update, skip), \'file\' (shoppinglist, notes, etc.), \'content\' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {"action": "create", "file": "shoppinglist", "content": "cookies"}, {"action": "update", "file": "shoppinglist", "content": "cookies\napples\nbananas\npotatoes"} ]'
         if role == "summary_memory":
             role_content = "You are a memory summarizer. You get a list of the current notes, your task is to summarize the current notes as short as possible while maintaining all details. Only keep memories worth remembering, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in a plain text format with only the notes, nothing else."
         if role == "summarize":
@@ -367,25 +368,3 @@ class OpenAIResponser:
     def reset_stop_stream(username):
         global stopPressed
         stopPressed[username] = False
-
-
-# Example usage
-# async def main():
-#     api_key = os.getenv("OPENAI_API_KEY")
-#     default_params = {
-#         "model": "gpt-4-1106-preview",
-#         "temperature": 0.3,
-#         "max_tokens": 150,
-#     }
-#     responser = OpenAIResponser(api_key, default_params)
-
-#     messages = [{"role": "user", "content": "What's 1+1, use 10 words!"}]
-#     async for response in responser.get_response("test", messages, stream=False):
-#         print(response)
-
-#     async for chunk in responser.get_response("test", messages, stream=True):
-#         print(chunk)
-
-
-# if __name__ == "__main__":
-#     asyncio.run(main())

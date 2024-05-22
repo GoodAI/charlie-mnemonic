@@ -27,11 +27,12 @@ import logs
 import prompts
 from unidecode import unidecode
 import llmcalls
-
 from simple_utils import get_root
 from user_management.dao import UsersDAO
-
 from typing import List, Dict, Any
+from datetime import datetime
+import pytz
+from tzlocal import get_localzone
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -184,19 +185,20 @@ class AddonManager:
             "audio": {"voice_input": True, "voice_output": True},
             "avatar": {"avatar": False},
             "language": {"language": "en"},
-            "system_prompt": {"system_prompt": "Not implemented yet"},
+            "system_prompt": {"system_prompt": "stoic"},
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
+            "timezone": {"timezone": "Auto"},
             "memory": {
-                "functions": 500,
-                "ltm1": 1000,
-                "ltm2": 1000,
-                "episodic": 300,
-                "recent": 700,
-                "notes": 1000,
-                "input": 1000,
-                "output": 1000,
-                "max_tokens": 6500,
+                "functions": 640,
+                "ltm1": 1200,
+                "ltm2": 1200,
+                "episodic": 400,
+                "recent": 880,
+                "notes": 1200,
+                "input": 1280,
+                "output": 1200,
+                "max_tokens": 8000,
                 "min_tokens": 500,
             },
         }
@@ -436,6 +438,12 @@ class MessageParser:
         )
         result = prompts.image_description.format(prompt, file_name, resp)
         return result
+
+    @staticmethod
+    def add_file_paths_to_message(message, file_paths):
+        """Add file paths to the message"""
+        new_message = file_paths + "\n" + message
+        return new_message
 
     @staticmethod
     async def get_recent_messages(
@@ -813,6 +821,14 @@ class SettingsManager:
     """This class contains functions to load settings"""
 
     @staticmethod
+    def get_user_dir():
+        # get the CHARLIE_USER_DIR
+        full_path = os.getenv("CHARLIE_USER_DIR")
+        if full_path is None:
+            full_path = USERS_DIR
+        return full_path
+
+    @staticmethod
     def get_version():
         version = "0.0"
         with open(get_root("version.txt"), "r") as f:
@@ -827,7 +843,60 @@ class SettingsManager:
         settings_file = os.path.join(users_dir, username, "settings.json")
         with open(settings_file, "r") as f:
             settings = json.load(f)
+
+        # Update memory settings to the new format if needed
+        if "memory" in settings:
+            memory_settings = settings["memory"]
+            if isinstance(memory_settings.get("ltm1"), float):
+                max_tokens = memory_settings.get("max_tokens", 8000)
+                memory_settings["functions"] = int(
+                    memory_settings.get("functions", 0.05) * max_tokens
+                )
+                memory_settings["ltm1"] = int(
+                    memory_settings.get("ltm1", 0.15) * max_tokens
+                )
+                memory_settings["ltm2"] = int(
+                    memory_settings.get("ltm2", 0.15) * max_tokens
+                )
+                memory_settings["episodic"] = int(
+                    memory_settings.get("episodic", 0.05) * max_tokens
+                )
+                memory_settings["recent"] = int(
+                    memory_settings.get("recent", 0.10) * max_tokens
+                )
+                memory_settings["notes"] = int(
+                    memory_settings.get("notes", 0.15) * max_tokens
+                )
+                memory_settings["input"] = int(
+                    memory_settings.get("input", 0.15) * max_tokens
+                )
+                memory_settings["output"] = int(
+                    memory_settings.get("output", 0.25) * max_tokens
+                )
+
         return settings
+
+    @staticmethod
+    async def get_current_date_time(username):
+        settings = await SettingsManager().load_settings("users", username)
+        timezone = settings.get("timezone", {}).get("timezone", "auto")
+
+        if timezone == "auto":
+            # If the timezone is set to 'auto', use the local timezone
+            user_tz = get_localzone()
+        else:
+            # Convert the timezone from 'UTC+X' format to a valid pytz timezone name
+            if timezone.startswith("UTC"):
+                offset = timezone[3:]
+                if offset.startswith("+"):
+                    offset = offset[1:]
+                offset_hours = int(offset)
+                user_tz = pytz.FixedOffset(offset_hours * 60)
+            else:
+                user_tz = pytz.timezone(timezone)
+
+        current_date_time = datetime.now(user_tz).strftime("%d/%m/%Y %H:%M:%S")
+        return current_date_time
 
 
 def needsTabDescription(chat_id):
@@ -865,15 +934,21 @@ async def process_message(
     # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
     token_usage = 500
     # Extract individual settings with defaults if not found
-    max_token_usage = max(memory_settings.get("max_tokens", 6500), 120000)
-    tokens_active_brain = memory_settings.get("ltm1", 1000)
-    tokens_cat_brain = memory_settings.get("ltm2", 700)
-    tokens_episodic_memory = memory_settings.get("episodic", 650)
-    tokens_recent_messages = memory_settings.get("recent", 650)
-    tokens_notes = memory_settings.get("notes", 1000)
-    tokens_input = memory_settings.get("input", 1000)
-    tokens_output = memory_settings.get("output", 1000)
+    max_token_usage = max(memory_settings.get("max_tokens", 4000), 120000)
     remaining_tokens = max_token_usage - token_usage
+
+    # Calculate token allocations based on percentages
+    tokens_active_brain = int(memory_settings.get("ltm1", 0.15) * max_token_usage)
+    tokens_cat_brain = int(memory_settings.get("ltm2", 0.15) * max_token_usage)
+    tokens_episodic_memory = int(
+        memory_settings.get("episodic", 0.05) * max_token_usage
+    )
+    tokens_recent_messages = int(memory_settings.get("recent", 0.10) * max_token_usage)
+    tokens_notes = int(memory_settings.get("notes", 0.15) * max_token_usage)
+    tokens_input = int(memory_settings.get("input", 0.15) * max_token_usage)
+    tokens_output = min(
+        int(memory_settings.get("output", 0.25) * max_token_usage), 4000
+    )
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(
@@ -886,8 +961,6 @@ async def process_message(
     logger.debug(f"function_call_token_usage: {function_call_token_usage}")
     token_usage += function_call_token_usage
     remaining_tokens -= function_call_token_usage
-
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
 
     last_messages = await MessageParser.get_recent_messages(
         username, chat_id, regenerate, uuid
@@ -1172,10 +1245,21 @@ async def generate_response(
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
     )
+
+    # get the system prompt settings
+    settings = await SettingsManager.load_settings(users_dir, username)
+    settings_system_prompt = settings.get("system_prompt").get("system_prompt")
     system_prompt = prompts.system_prompt
 
+    if settings_system_prompt == "None":
+        system_prompt = prompts.system_prompt
+    elif settings_system_prompt == "stoic":
+        system_prompt = prompts.stoic_system_prompt + "\n" + prompts.system_prompt
+    else:
+        system_prompt = settings_system_prompt + "\n" + prompts.system_prompt
+
     # add time in front of system prompt
-    current_date_time = time.strftime("%d/%m/%Y %H:%M:%S")
+    current_date_time = await SettingsManager.get_current_date_time(username)
     system_prompt = current_date_time + "\n" + system_prompt
     messages = [
         {"role": "system", "content": system_prompt + "\n" + memory_message},

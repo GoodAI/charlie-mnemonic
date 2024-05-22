@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Memory Explorer - {{ category }}</title>
+        <link rel="stylesheet"
+              href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
+        <style>
+        body {
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        textarea {
+            width: 100%;
+            resize: vertical;
+        }
+        .actions {
+            white-space: nowrap;
+        }
+        .actions button {
+            margin-right: 5px;
+        }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Memory Explorer - {{ category }}</h1>
+            <div class="mb-3">
+                <input type="text"
+                       id="searchInput"
+                       class="form-control"
+                       placeholder="Search memories..."
+                       oninput="debouncedSearch()">
+            </div>
+            <div class="mb-3">
+                <label for="sortSelect">Sort by:</label>
+                <select id="sortSelect" class="form-select" onchange="sortMemories()">
+                    <option value="id">ID</option>
+                    <option value="created_at">Created At</option>
+                    <option value="distance" selected>Distance</option>
+                </select>
+                <select id="sortOrderSelect" class="form-select" onchange="sortMemories()">
+                    <option value="asc" selected>Ascending</option>
+                    <option value="desc">Descending</option>
+                </select>
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Content</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="memoryTableBody" data-category="{{ category }}">
+                    {% for memory in memories %}
+                        <tr>
+                            <td>
+                                <strong>ID:</strong> {{ memory.id | trim_leading_zeros }}
+                                <br>
+                                <strong>Created At:</strong> {{ memory.metadata.created_at | format_timestamp }}
+                                <br>
+                                <strong>Updated At:</strong> {{ memory.metadata.updated_at | format_timestamp }}
+                                <br>
+                                <strong>Chat ID:</strong> {{ memory.metadata.chat_id }}
+                                <br>
+                                <strong>UID:</strong> {{ memory.metadata.uid }}
+                                <br>
+                                <strong>Version:</strong> {{ memory.metadata.version }}
+                                <br>
+                                <strong>Role:</strong> {{ memory.metadata.username }}
+                                <br>
+                                <strong>Distance:</strong>
+                                {% if memory.distance is defined %}
+                                    {{ memory.distance | round(3) }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </td>
+                            <td>
+                                <textarea id="memory-{{ memory.id }}" rows="4" cols="50" class="form-control">{{ memory.document }}</textarea>
+                            </td>
+                            <td class="actions">
+                                <button class="btn btn-primary"
+                                        onclick="editMemory('{{ memory.id }}', '{{ category }}')">Save</button>
+                                <button class="btn btn-danger"
+                                        onclick="deleteMemory('{{ memory.id }}', '{{ category }}')">Delete</button>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+        var memories = {{ memories | tojson }};
+
+        const debouncedSearch = debounce(searchMemoriesHandler, 1000);
+
+        function debounce(func, delay) {
+            let timeoutId;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
+
+        function editMemory(memoryId, category) {
+            var content = document.getElementById('memory-' + memoryId).value;
+            fetch('/edit_memory/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'memory_id': memoryId,
+                    'category': category,
+                    'content': content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showAlert(data.message, 'success');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('An error occurred while saving the memory.', 'danger');
+            });
+        }
+
+        function deleteMemory(memoryId, category) {
+            if (confirm('Are you sure you want to delete this memory?')) {
+                fetch('/delete_memory/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        'memory_id': memoryId,
+                        'category': category
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    showAlert(data.message, 'success');
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showAlert('An error occurred while deleting the memory.', 'danger');
+                });
+            }
+        }
+
+        function showAlert(message, type) {
+            var alertContainer = document.createElement('div');
+            alertContainer.className = 'alert alert-' + type + ' alert-dismissible fade show';
+            alertContainer.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            document.body.insertBefore(alertContainer, document.body.firstChild);
+        }
+
+        function searchMemoriesHandler() {
+            var searchQuery = document.getElementById('searchInput').value;
+            var category = document.getElementById('memoryTableBody').getAttribute('data-category');
+
+            fetch('/search_memories/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'category': category,
+                    'search_query': searchQuery
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                var tableBody = document.getElementById('memoryTableBody');
+                tableBody.innerHTML = data;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('An error occurred while searching memories.', 'danger');
+            });
+        }
+
+        function sortMemories() {
+            var sortBy = document.getElementById('sortSelect').value;
+            var sortOrder = document.getElementById('sortOrderSelect').value;
+            var searchQuery = document.getElementById('searchInput').value;
+            var category = document.getElementById('memoryTableBody').getAttribute('data-category');
+
+            fetch('/sort_memories/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'category': category,
+                    'sort_by': sortBy,
+                    'sort_order': sortOrder,
+                    'search_query': searchQuery
+                })
+            })
+            .then(response => response.text())
+            .then(data => {
+                var tableBody = document.getElementById('memoryTableBody');
+                tableBody.innerHTML = data;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('An error occurred while sorting memories.', 'danger');
+            });
+        }
+
+        function renderMemories(memories) {
+            var tableBody = document.getElementById('memoryTableBody');
+            var category = tableBody.getAttribute('data-category');
+            tableBody.innerHTML = '';
+            memories.forEach(memory => {
+                var row = `
+                    <tr>
+                        <!-- ... -->
+                        <td class="actions">
+                            <button class="btn btn-primary" onclick="editMemory('${memory.id}', '${category}')">Save</button>
+                            <button class="btn btn-danger" onclick="deleteMemory('${memory.id}', '${category}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+        }
+        </script>
+    </body>
+</html>

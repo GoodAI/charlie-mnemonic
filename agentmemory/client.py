@@ -18,7 +18,6 @@ def get_client(client_type=None, username=None, *args, **kwargs):
     # if client is not None:
     #     return client
     client = None
-
     if client_type is None:
         client_type = CLIENT_TYPE
 
@@ -28,7 +27,9 @@ def get_client(client_type=None, username=None, *args, **kwargs):
                 "Postgres connection string not set in environment variables!"
             )
         client = PostgresClient(
-            POSTGRES_CONNECTION_STRING, model_name=POSTGRES_MODEL_NAME
+            POSTGRES_CONNECTION_STRING,
+            model_name=POSTGRES_MODEL_NAME,
+            model_path=os.environ["MODEL_PATH"],
         )
     else:
         user_memory_path = os.path.join("users", username)
@@ -36,7 +37,7 @@ def get_client(client_type=None, username=None, *args, **kwargs):
             settings=Settings(anonymized_telemetry=False, allow_reset=True),
             path=user_memory_path,
             *args,
-            **kwargs
+            **kwargs,
         )
 
     return client

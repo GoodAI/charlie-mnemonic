@@ -6,7 +6,8 @@ import tempfile
 import urllib.parse
 import zipfile
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
+from agentmemory.main import search_memory
 import llmcalls
 
 import logs
@@ -53,6 +54,9 @@ from memory import (
     export_memory_to_file,
     import_file_to_memory,
     get_last_message,
+    get_memories,
+    update_memory,
+    delete_memory,
 )
 from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO, AdminControlsDAO
@@ -77,8 +81,27 @@ from config import (
     USERS_DIR,
 )
 
+
+def format_timestamp(value, format="%Y-%m-%d %H:%M:%S"):
+    return datetime.fromtimestamp(value).strftime(format)
+
+
+def trim_leading_zeros(value):
+    return value.lstrip("0")
+
+
+def round_number(value, decimals=2):
+    if value is None:
+        return "N/A"
+    return round(value, decimals)
+
+
 router = APIRouter()
 templates = Jinja2Templates(directory=get_root(STATIC))
+# Register a custom filter with Jinja2 environment
+templates.env.filters["format_timestamp"] = format_timestamp
+templates.env.filters["trim_leading_zeros"] = trim_leading_zeros
+templates.env.filters["round"] = round_number
 
 connections = {}
 
@@ -107,6 +130,19 @@ async def read_root():
         return FileResponse("static/styles.css")
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Item not found")
+
+
+@router.get(
+    "/memory_explorer/{category}", response_class=HTMLResponse, tags=[LOGIN_REQUIRED]
+)
+async def get_memory_explorer(request: Request, category: str):
+    with UsersDAO() as dao:
+        username = request.state.user.username
+        memories = get_memories(category, username=username)
+        return templates.TemplateResponse(
+            "memory_explorer.html",
+            {"request": request, "category": category, "memories": memories},
+        )
 
 
 async def send_debug_message(username: str, message: str):
@@ -192,6 +228,14 @@ async def handle_get_settings(request: Request):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+    # check if the google_client_secret.json exists in the users directory
+    if os.path.exists(os.path.join(USERS_DIR, "google_client_secret.json")):
+        from gworkspace.google_auth import onEnable
+
+        auth_uri = await onEnable(username, USERS_DIR)
+        if auth_uri == "error":
+            settings["error"] = "Google client secret path not found"
+        settings["auth_uri"] = auth_uri
     return settings
 
 
@@ -282,6 +326,25 @@ async def handle_update_settings(request: Request, user: editSettings):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+
+    # check if the calendar_addon or gmail_addon is enabled
+    if (
+        "calendar_addon" in settings["addons"]
+        and settings["addons"]["calendar_addon"]
+        or "gmail_addon" in settings["addons"]
+        and settings["addons"]["gmail_addon"]
+    ):
+        from gworkspace.google_auth import onEnable
+
+        auth_uri = await onEnable(username, USERS_DIR)
+        if auth_uri == "error":
+            settings["error"] = "Google client secret path not found"
+            # TODO: redirect to the configuration page
+            settings["addons"]["calendar_addon"] = False
+            settings["addons"]["gmail_addon"] = False
+        else:
+            settings["auth_uri"] = auth_uri
+
     return settings
 
 
@@ -521,6 +584,86 @@ async def handle_message_image(
     result = await MessageParser.start_image_description(
         image_path, prompt, image_file.filename
     )
+    return await process_message(
+        prompt, username, "users", display_name, result, chat_id
+    )
+
+
+@router.post("/message_with_files/", tags=["Messaging", LOGIN_REQUIRED])
+async def handle_message_files(
+    request: Request,
+    files: List[UploadFile] = File(...),
+    prompt: str = Form(...),
+    chat_id: str = Form(...),
+):
+    file_details = ""
+    user = request.state.user
+    username = user.username
+    settings = await SettingsManager.load_settings(USERS_DIR, username)
+    if count_tokens(prompt) > settings["memory"]["input"]:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
+        # if no active tab, set chat_id to 0
+        if active_tab_data is None:
+            chat_id = "0"
+            # put the data in the database
+            chat_tabs_dao.insert_tab_data(user_id, chat_id, "new chat", chat_id, True)
+        # if there is an active tab, set chat_id to the active tab's chat_id
+        else:
+            chat_tabs_dao.update_created_at(user_id, chat_id)
+            chat_id = active_tab_data.chat_id
+    if not has_access or has_access == "false" or has_access == "False":
+        logger.info(f"user {username} does not have access")
+        raise HTTPException(
+            status_code=400,
+            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
+        )
+    if total_daily_cost >= daily_limit:
+        logger.info(f"user {username} reached daily limit")
+        raise HTTPException(
+            status_code=400,
+            detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
+        )
+    # check the total size of all files, if it's too big +200mb, return an error
+    total_size = sum(file.size for file in files)
+    if total_size > 200000000:
+        raise HTTPException(
+            status_code=400,
+            detail="Total file size is too big, please use files that are less than 20mb in total",
+        )
+    # save the files to the user's directory
+    converted_name = convert_name(username)
+    user_dir = os.path.join(USERS_DIR, converted_name, "data")
+    if not os.path.exists(user_dir):
+        os.makedirs(user_dir)
+    file_paths = []
+    for file in files:
+        file_path = os.path.join(user_dir, file.filename)
+        with open(file_path, "wb") as f:
+            f.write(file.file.read())
+        file_paths.append(file_path)
+    # add the file paths to the prompt
+    for file_path in file_paths:
+        if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+            url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
+            file_details += f'\n![image](data/{url_encoded_image} "image")'
+        else:
+            url_encoded_file = urllib.parse.quote(os.path.basename(file_path))
+            file_details += (
+                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})"
+            )
+    prompt = file_details + "<p>" + prompt + "</p>"
+    result = MessageParser.add_file_paths_to_message(prompt, file_details)
     return await process_message(
         prompt, username, "users", display_name, result, chat_id
     )
@@ -1079,3 +1222,78 @@ async def delete_recent_messages(request: Request, message: UserName):
     # remove all users recent messages
     await BrainProcessor.delete_recent_messages(message.username)
     return {"message": "Recent messages deleted successfully"}
+
+
+@router.post("/edit_memory/", tags=[LOGIN_REQUIRED])
+async def edit_memory(
+    request: Request,
+    memory_id: str = Form(...),
+    category: str = Form(...),
+    content: str = Form(...),
+):
+    username = request.state.user.username
+    update_memory(category, memory_id, text=content, username=username)
+    return {"message": "Memory updated successfully"}
+
+
+@router.post("/delete_memory/", tags=[LOGIN_REQUIRED])
+async def delete_memory_route(
+    request: Request, memory_id: str = Form(...), category: str = Form(...)
+):
+    user = request.state.user
+    username = user.username if user else None
+    delete_memory(category, id=memory_id, username=username)
+    return {"message": "Memory deleted successfully"}
+
+
+@router.post("/search_memories/", tags=[LOGIN_REQUIRED])
+async def search_memories(
+    request: Request, category: str = Form(...), search_query: str = Form(...)
+):
+    username = request.state.user.username
+    memories = search_memory(category, search_query, username=username, n_results=20)
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        memory["distance"] = memory.get("distance", 0.0)
+
+    # Sort the memories by distance in ascending order
+    memories.sort(key=lambda x: x.get("distance", 0.0))
+
+    return templates.TemplateResponse(
+        "memory_table_body.html",
+        {"request": request, "category": category, "memories": memories},
+    )
+
+
+@router.post("/sort_memories/", tags=[LOGIN_REQUIRED])
+async def sort_memories(
+    request: Request,
+    category: str = Form(...),
+    sort_by: str = Form(...),
+    sort_order: str = Form(...),
+    search_query: str = Form(...),
+):
+    username = request.state.user.username
+    memories = search_memory(category, search_query, username=username, n_results=20)
+
+    # Sort the memories based on the selected sorting option and order
+    if sort_by == "created_at":
+        memories.sort(
+            key=lambda x: x["metadata"]["created_at"], reverse=sort_order == "desc"
+        )
+    elif sort_by == "distance":
+        memories.sort(
+            key=lambda x: x.get("distance", 0.0), reverse=sort_order == "desc"
+        )
+    else:
+        memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        memory["distance"] = memory.get("distance", 0.0)
+
+    return templates.TemplateResponse(
+        "memory_table_body.html",
+        {"request": request, "category": category, "memories": memories},
+    )

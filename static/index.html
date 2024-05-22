@@ -292,6 +292,27 @@
                 </div>
             </div>
         </div>
+        <!-- Google Auth modal -->
+        <div class="modal fade" tabindex="-1" role="dialog" id="googleAuthModal">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Google Authentication</h5>
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeAuth()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Please click the link below to authenticate with Google:</p>
+                        <a id="googleAuthLink" href="#">Authenticate with Google</a>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Right side navigation -->
         <div class="bottomright-with-nw-resize-outer bgcolorstack"
              id="debugNav"
@@ -317,11 +338,9 @@
                 <div id="chat-buttons" class="chat-buttons">
                     <div id="control-buttons-container" class="control-buttons-container">
                         <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
-                        <!-- <button id="delete-tab" class="control-tab" onclick="deleteChatTab()">-</button> -->
                     </div>
                     <div id="chat-tabs-container" class="chat-tabs-container">
                         <div class="loader"></div>
-                        <!-- <button id="chat-tab-0" class="chat-tab active" onclick="setChat(0)">New chat</button> -->
                     </div>
                 </div>
             </div>
@@ -344,9 +363,9 @@
                 <td>
                     <button id="toggle-chat-tabs"
                             class="toggle-chat-tabs"
-                            onclick="closeTabs()"
+                            onclick="toggleTabs()"
                             data-tooltip="Hide Chat Tabs">
-                        <span>⯇</span>
+                        <i class="fas fa-grip-lines-vertical"></i>
                     </button>
                     <div class="chat-interface">
                         <!-- Toggle Button for Side Navigation -->
@@ -364,6 +383,12 @@
                                     <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
                                     <p id="userStats"></p>
                                 </div>
+                                <div id="files-preview" style="display: none;">
+                                    <div class="file-wrapper">
+                                        <div id="preview-files"></div>
+                                        <div class="hover-text"></div>
+                                    </div>
+                                </div>
                                 <div class="input-field">
                                     <div class="textarea-container">
                                         <div class="icon-container-left">
@@ -373,55 +398,48 @@
                                                     onclick="openNav()">
                                                 <i class="fa fa-cog cogwheel"></i>
                                             </button>
-                                            <button id="debug"
-                                                    class="debug-button"
-                                                    data-tooltip="Debug window"
-                                                    onclick="event.stopPropagation(); openDebugNav()">
+                                            <!-- <button id="debug" class="debug-button" data-tooltip="Debug window" onclick="event.stopPropagation(); openDebugNav()">
                                                 <i class="fas fa-terminal cogwheel"></i>
-                                            </button>
-                                        </div>
-                                        <textarea id="message"
-                                                  placeholder="Type a message..."
-                                                  rows="1"
-                                                  autofocus="autofocus"></textarea>
-                                        <div class="icon-container-right">
-                                            <input type="file" id="uploadImageInput" accept="image/*" hidden>
-                                            <button id="upload-image" class="upload-button" data-tooltip="Upload Image">
-                                                <i class="fa fa-paperclip cogwheel"></i>
-                                            </button>
-                                            <button id="record" class="record-button" data-tooltip="Start recording">
-                                                <i class="fa fa-microphone"></i>
-                                            </button>
-                                            <button id="send" class="send-button" data-tooltip="Send">
-                                                <i class="fa fa-paper-plane"></i>
-                                            </button>
-                                            <button id="stop"
-                                                    class="stop-button"
-                                                    data-tooltip="Stop"
-                                                    style="display: none"
-                                                    onclick="stopStream()">
-                                                <i class="fa fa-stop"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div id="image-preview" style="display: none;">
-                                        <div class="image-wrapper">
-                                            <img id="preview-image" alt="uploaded image">
-                                            <div class="hover-text">
-                                                <i class="fa fa-times-circle deletebutton"></i>
-                                                <p>Delete</p>
+                                            </button> -->
+                                            <button id="view-memory"
+                                                    class="view-memory-button"
+                                                    data-tooltip="View Memory"
+                                                    onclick="showMemoryExplorer()">
+                                                <i class="fas fa-microchip cogwheel"></i>
+                                            </div>
+                                            <textarea id="message"
+                                                      placeholder="Type a message..."
+                                                      rows="1"
+                                                      autofocus="autofocus"></textarea>
+                                            <div class="icon-container-right">
+                                                <input type="file" id="uploadFileInput" multiple hidden>
+                                                <button id="upload-file" class="upload-button" data-tooltip="Upload File">
+                                                    <i class="fa fa-paperclip cogwheel"></i>
+                                                </button>
+                                                <button id="record" class="record-button" data-tooltip="Start recording">
+                                                    <i class="fa fa-microphone"></i>
+                                                </button>
+                                                <button id="send" class="send-button" data-tooltip="Send">
+                                                    <i class="fa fa-paper-plane"></i>
+                                                </button>
+                                                <button id="stop"
+                                                        class="stop-button"
+                                                        data-tooltip="Stop"
+                                                        style="display: none"
+                                                        onclick="stopStream()">
+                                                    <i class="fa fa-stop"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </td>
-            </tr>
-        </table>
+                    </td>
+                </tr>
+            </table>
+        </body>
+        <script src="chatbot_core.js?v={{version}}"></script>
+        <script src="listeners.js?v={{version}}"></script>
     </body>
-    <script src="chatbot_core.js?v={{version}}"></script>
-    <script src="listeners.js?v={{version}}"></script>
-</body>
 </html>

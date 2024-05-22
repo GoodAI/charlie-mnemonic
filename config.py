@@ -1,13 +1,17 @@
 import os
 from typing import Dict, Optional
 
+from dotenv import load_dotenv
+
 from simple_utils import get_root
+
+load_dotenv()
 
 api_keys: Dict[str, Optional[str]] = {}
 
 default_params = {
-    "model": "gpt-4-turbo",
-    "temperature": 0.3,
+    "model": os.getenv("DEFAULT_MODEL", "gpt-4o"),
+    "temperature": 0.1,
     "max_tokens": 1000,
 }
 
@@ -31,16 +35,6 @@ def update_api_keys() -> Dict[str, Optional[str]]:
     api_keys.update(
         {
             "openai": os.getenv("OPENAI_API_KEY"),
-            "chatgpt_model": os.getenv("CHATGPT_MODEL"),
-            "memory_model": os.getenv("MEMORY_MODEL"),
-            "openai_embedding_model": os.getenv("OPENAI_EMBEDDING_MODEL"),
-            "openweather": os.getenv("OPENWEATHER_API_KEY"),
-            "google": os.getenv("GOOGLE_API_KEY"),
-            "google_cx": os.getenv("GOOGLE_CX"),
-            "youtube": os.getenv("YOUTUBE_API_KEY"),
-            "house_api_url": os.getenv("HOUSE_API_URL"),
-            "house_api_key": os.getenv("HOUSE_API_KEY"),
-            "d-id": os.getenv("D_ID_API_KEY"),
         }
     )
     return api_keys
@@ -58,6 +52,12 @@ SINGLE_USER_PASSWORD = os.environ.get("SINGLE_USER_PASSWORD", "admin")
 DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE = get_root("users/user.env")
 PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
 USERS_DIR = "users"
+
+MEMORY_MODEL = os.environ.get("MEMORY_MODEL", default_params["model"])
+CHATGPT_MODEL = os.environ.get("CHATGPT_MODEL", default_params["model"])
+
+# not used for now, embedding model used in the ChromaDB files
+OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-davinci-003")
 
 
 def origins():

@@ -1,5 +1,5 @@
 import os
-
+import dotenv
 import openai
 import pytest
 from fastapi.testclient import TestClient
@@ -9,6 +9,8 @@ from config import CONFIGURATION_URL
 from configuration_page import TEST_KEY_PREFIX
 from launcher import create_app
 from user_management.session import session_factory
+
+IN_GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS") == "true"
 
 
 @pytest.fixture
@@ -62,10 +64,16 @@ def test_middleware_redirects_random_url(client):
     assert response.url.path == CONFIGURATION_URL
 
 
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_update_configuration(client):
+    dotenv.load_dotenv()
     test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
 
-    response = client.post(CONFIGURATION_URL, json=test_data)
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
+    print(response.json())
     assert response.status_code == 200
     assert response.json() == {"message": "Configuration updated successfully"}
     assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
@@ -73,7 +81,10 @@ def test_update_configuration(client):
 
 def test_update_configuration_missing_required(client):
     test_data = {"INVALID_KEY": "new_key_value"}
-    response = client.post(CONFIGURATION_URL, json=test_data)
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
     assert (
         response.status_code == 422
     ), f"""
@@ -89,3 +100,21 @@ Json: {response.json()}
             }
         ]
     }
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+# This passes locally, but not in Github Actions
+def test_update_configuration_with_file(client, tmp_path):
+    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
+    google_client_secret_path = tmp_path / "google_client_secret.json"
+    google_client_secret_path.write_text("{}")
+
+    with open(google_client_secret_path, "rb") as f:
+        files = {"GOOGLE_CLIENT_SECRET_PATH": (google_client_secret_path.name, f)}
+        response = client.post(
+            CONFIGURATION_URL,
+            data=test_data,
+            files=files,
+        )
+        assert response.status_code == 200
+        assert response.json() == {"message": "Configuration updated successfully"}

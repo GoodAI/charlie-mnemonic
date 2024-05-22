@@ -52,7 +52,10 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
         message += '\n```';
     }
     
-    // if outside of code block, add the typing indicator
+    // Apply Markdown formatting
+    message = marked(message);
+
+    // If outside of code block, add the typing indicator and replace newline characters
     if (count % 2 === 0 && addIndicator) {
         if (!replaceNewLines) {
             message = message.replace(/\n/g, "");
@@ -60,11 +63,10 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
         else {
             message = message.replace(/\n/g, "<br>");
         }
-        message += '<div class="typing-indicator"><div class="dot"></div></div>';
+        message += '<span class="typing-indicator"><span class="dot"></span></span>';
     }
 
-    // Apply Markdown formatting
-    return `<div class="markdown">${marked(message)}</div>`;
+    return `<div class="markdown">${message}</div>`;
 }
 
 function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {
@@ -520,6 +522,73 @@ async function send_image(image_file, prompt) {
     }
 }
 
+async function send_files(files, prompt) {
+    try {
+        var message = document.getElementById('message').value;
+        // if prompt is not empty, set the message to prompt
+        if (prompt) {
+            message = prompt;
+        }
+
+        var fullmessage = '';
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (file.type.startsWith('image/')) {
+                // convert the image to base64
+                var base64data = await getBase64(file);
+                fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")<p>' + message + '</p>';
+            } else {
+                fullmessage += '[' + file.name + '](' + file.name + ')<p>' + message + '</p>';
+            }
+        }
+        fullmessage = marked(fullmessage);
+        addCustomMessage(fullmessage, 'user', true);
+
+        var messagesContainer = document.getElementById('messages');
+        if (isUserAtBottom(messagesContainer)) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            hideNewMessageIndicator();
+        } else {
+            showNewMessageIndicator();
+        }
+
+        canRecord = false;
+        canSend = false;
+        isWaiting = true;
+        isRecording = false;
+        canSendMessage();
+
+        const formData = new FormData();
+        formData.append('username', user_name);
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+        formData.append('prompt', message);
+        formData.append('chat_id', chat_id);
+
+        const response = await fetch(API_URL + '/message_with_files/', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+    } catch (error) {
+        await handleError(error);
+        console.error('Failed to upload files: ', error);
+        overlay.style.display = 'none';
+    }
+}
+
+function getBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
 function send_audio(file) {
     // Create a FormData object
     var formData = new FormData();
@@ -542,14 +611,14 @@ function send_audio(file) {
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first
-            const fileInput = document.getElementById('uploadImageInput');
+            const fileInput = document.getElementById('uploadFileInput');
             if (fileInput.files.length > 0) {
-                send_image(fileInput.files[0], data.transcription);
-                // clear the file input
-                fileInput.value = '';
-                // clear the image preview
-                document.getElementById('image-preview').innerHTML = '';
-                // clear the message input
+                send_files(fileInput.files, data.transcription);
+                document.getElementById('uploadFileInput').value = '';
+                document.getElementById('preview-files').innerHTML = '';
+                document.getElementById('files-preview').style.display = 'none';
+                document.getElementById('upload-file').style.display = 'block';
+                pastedFiles = [];
                 document.getElementById('message').value = '';
             } else {
                 console.log('Sending audio transcription to server: ' + data.transcription);
@@ -766,7 +835,7 @@ function toggleStopButton(showStop) {
     const stopButton = document.getElementById('stop');
     const sendButton = document.getElementById('send');
     const recordButton = document.getElementById('record');
-    const uploadButton = document.getElementById('upload-image');
+    const uploadButton = document.getElementById('upload-file');
 
     if (showStop) {
 

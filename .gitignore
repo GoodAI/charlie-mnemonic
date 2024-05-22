@@ -129,3 +129,4 @@ static/data/
 # Pycharm
 .idea/
 release/*.zip
+user.db

@@ -118,6 +118,18 @@ class ConfigurationData(BaseModel):
         ...,
         title="OpenAI API key",
         description="This key is used for general OpenAI API calls and is required for the agent to work.",
+        required=True,
+    )
+
+    # Google Client Secret JSON path
+    GOOGLE_CLIENT_SECRET_PATH: str = Field(
+        None,
+        title="Google Client Secret JSON path",
+        description="""The path to the Google Client Secret JSON file. Create a project in the 
+                    <a href='https://console.cloud.google.com/' target='_blank'>Google Cloud Console</a> 
+                    and download the JSON file.<br>This is needed for the Google Workspace integration, but not required.
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#guideModal">Click here for a detailed guide</a>.""",
+        required=False,
     )
 
     @staticmethod
@@ -141,7 +153,7 @@ class ConfigurationData(BaseModel):
             )
         return OrderedDict(result)
 
-    @validator("OPENAI_API_KEY", pre=True, always=True)
+    @validator("OPENAI_API_KEY", "GOOGLE_CLIENT_SECRET_PATH", pre=True, always=True)
     def check_not_empty(cls, v, field):
         if field.required and (v is None or v == ""):
             raise ValueError(f"{field.name} is required and cannot be empty")

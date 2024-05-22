@@ -19,6 +19,11 @@ if not %ERRORLEVEL% == 0 (
     exit /b %ERRORLEVEL%
 )
 
+if not exist .env (
+    echo Creating .env file
+    echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
+)
+
 echo Stopping current Charlie Mnemonic containers...
 docker-compose --project-name charlie-mnemonic-windows down
 

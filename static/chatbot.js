@@ -1692,7 +1692,7 @@ function get_settings(username) {
             }
             // Clear ping interval if the connection is closed
             if (pingInterval) {
-                clearInterval(ppingInterval);
+                clearInterval(pingInterval);
                 pingInterval = null;
             }
         };
@@ -1723,7 +1723,13 @@ function get_settings(username) {
         };
 
         socket.addEventListener('message', function (event) {
-            let msg = JSON.parse(event.data);
+            let msg;
+            try {
+                msg = JSON.parse(event.data);
+            } catch (e) {
+                console.error("Failed to parse message as JSON:", event.data);
+                return;
+            }
 
             if (msg.debug) {
                 handleDebugMessage(msg);

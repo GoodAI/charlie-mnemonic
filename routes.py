@@ -167,10 +167,12 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
         while True:
             data = await websocket.receive_text()
             if data == "ping":
-                await websocket.send_text("pong")
+                await websocket.send_text(json.dumps({"type": "pong"}))
             else:
-                # Send a response back to the client
-                await websocket.send_text(f"Received: {data}")
+                # Send a JSON response back to the client
+                await websocket.send_text(
+                    json.dumps({"type": "message", "content": f"Received: {data}"})
+                )
     except WebSocketDisconnect:
         # Handle client disconnection
         if username in connections:
@@ -657,7 +659,20 @@ async def handle_message_files(
     # add the file paths to the prompt
     for file_path in file_paths:
         if file_path.lower().endswith(
-            (".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".tiff", ".webp")
+            (
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".svg",
+                ".bmp",
+                ".tiff",
+                ".webp",
+                ".jfif",
+                ".pjpeg",
+                ".pjp",
+                ".ico",
+            )
         ):
             url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
             file_details += f'\n![image](data/{url_encoded_image} "image")'

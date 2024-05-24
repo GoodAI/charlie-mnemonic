@@ -533,14 +533,15 @@ async function send_files(files, prompt) {
         var fullmessage = '';
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.type.startsWith('image/')) {
+            if (file.type.startsWith('image/') || file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.tiff')) {
                 // convert the image to base64
                 var base64data = await getBase64(file);
-                fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")<p>' + message + '</p>';
+                fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")';
             } else {
-                fullmessage += '[' + file.name + '](' + file.name + ')<p>' + message + '</p>';
+                fullmessage += '[data/' + file.name + '](data/' + file.name + ')';
             }
         }
+        fullmessage += '<p>' + message + '</p>';
         fullmessage = marked(fullmessage);
         addCustomMessage(fullmessage, 'user', true);
 
@@ -611,9 +612,8 @@ function send_audio(file) {
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first
-            const fileInput = document.getElementById('uploadFileInput');
-            if (fileInput.files.length > 0) {
-                send_files(fileInput.files, data.transcription);
+            if (pastedFiles.length > 0) {
+                send_files(pastedFiles, data.transcription);
                 document.getElementById('uploadFileInput').value = '';
                 document.getElementById('preview-files').innerHTML = '';
                 document.getElementById('files-preview').style.display = 'none';
@@ -621,13 +621,11 @@ function send_audio(file) {
                 pastedFiles = [];
                 document.getElementById('message').value = '';
             } else {
-                console.log('Sending audio transcription to server: ' + data.transcription);
                 sendMessageToServer(data.transcription);
             }
         })
         .catch(console.error);
 }
-
 
 
 // Show the username modal

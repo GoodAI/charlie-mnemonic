@@ -1238,7 +1238,7 @@ pre {
 .file-preview span {
     display: none;
     position: absolute;
-    top: -20px;
+    top: -30px;
     left: 50%;
     transform: translateX(-50%);
     background-color: var(--tooltip-bg-color);
@@ -1247,6 +1247,7 @@ pre {
     border-radius: 4px;
     font-size: 12px;
     white-space: nowrap;
+    z-index: 1080;
 }
 
 .file-preview:hover span {

@@ -871,10 +871,6 @@ function handleDailyUsage(msg) {
 
 }
 
-function handleAuthMessage(msg) {
-    console.log('2 auth message received:', msg);
-}
-
 function handlePlanMessage(msg) {
     var content = msg.content && msg.content.content;
     var timestamp = new Date().toLocaleTimeString();
@@ -1274,7 +1270,6 @@ function handleRateLimit(msg) {
     toastContainer.appendChild(toastEl);
     myToast.show();
 }  
-
 function handleRelations(msg) {
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
@@ -1310,16 +1305,19 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
     var formattedMsgContent = '';
     for (var key in msg) {
         if (msg.hasOwnProperty(key)) {
+            // TODO: Make this prettier
+            // debug message content
+            // console.log('key:', key, 'value:', msg[key]);
             // Selectively display keys
             if (["input", "created_new_memory", "active_brain", "error", "Function", "Arguments", "Response"].includes(key)) {
-                formattedMsgContent += `<b>${key}:</b> `;
+                formattedMsgContent += `<b>${escapeHtml(key)}:</b> `;
 
                 if (key === 'active_brain' && typeof msg[key] === 'object') {
                     // Summarize the contents of active_brain
                     formattedMsgContent += 'Query Categories: ' + Object.keys(msg[key]).length + '<br/>';
                 } else {
                     // Format other keys normally
-                    formattedMsgContent += `${formatContent(msg[key])}<br/>`;
+                    formattedMsgContent += `${escapeHtml(formatContent(msg[key]))}<br/>`;
                 }
             }
         }
@@ -1350,7 +1348,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
                 <div class="bubble">
                     <div class="typewriter-container">
                         <div class="loading-icon"></div>
-                        <div class="typewriter-text">${message}</div>
+                        <div class="typewriter-text">${escapeHtml(message)}</div>
                     </div>
                 </div>
             </div>`;
@@ -1359,7 +1357,6 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         messagesContainer.appendChild(botMessageWrapper);
     }
 }
-
 
 function formatContent(value) {
     if (typeof value === 'object') {
@@ -1371,28 +1368,38 @@ function formatContent(value) {
             let formattedObjContent = '';
             for (let key in value) {
                 if (value.hasOwnProperty(key)) {
-                    formattedObjContent += `<b>${key}:</b> ${formatContent(value[key])}<br/>`;
+                    formattedObjContent += `<b>${escapeHtml(key)}:</b> ${formatContent(value[key])}<br/>`;
                 }
             }
             return formattedObjContent;
         }
     } else {
         // Format non-object values (string, number, boolean)
-        return value.toString();
+        return escapeHtml(value.toString());
     }
 }
 
 function formatSubContent(subKey, subContent) {
-    var result = `<b>${subKey}:</b> `;
+    var result = `<b>${escapeHtml(subKey)}:</b> `;
     if (Array.isArray(subContent)) {
         result += subContent.map(item => formatContent(item)).join('<br/>');
     } else if (typeof subContent === 'object') {
-        result += JSON.stringify(subContent, null, 2).replace(/\n/g, '<br/>');
+        result += escapeHtml(JSON.stringify(subContent, null, 2)).replace(/\n/g, '<br/>');
     } else {
-        result += subContent;
+        result += escapeHtml(subContent);
     }
     return result + '<br/>';
 }
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 
 async function get_chat_tabs(username) {
     try {
@@ -1595,7 +1602,6 @@ function deleteChatTab(chat_id) {
             // Select new active tab
             if (newActiveTab) {
                 var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
-                console.log('New active tab:', newActiveTabId);
                 setChat(newActiveTabId);
             } else {
                 addChatTab();
@@ -1663,118 +1669,137 @@ async function get_recent_messages(username, chat_id) {
     }
 }
 
-
 function get_settings(username) {
     var timestamp = new Date().toLocaleTimeString();
     prefix = production ? 'wss://' : 'ws://';
-    var socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
-
+    var socket;
     var reconnectInterval = null;
+    var pingInterval = null;
 
-    socket.onclose = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Disconnected';
-        connectionStatusElement.style.color = 'red';
-        // wait 2 seconds
-        setTimeout(function () {
-            // try to reconnect
-            try_reconnect(socket, username);
-        }, 2000);
-    };
+    function initializeSocket() {
+        socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
 
-    socket.onopen = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Connected';
-        connectionStatusElement.style.color = 'green';
-    };
-
-    socket.onerror = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Error';
-        connectionStatusElement.style.color = 'orange';
-    };
-
-    socket.addEventListener('message', function (event) {
-        // TODO: proper parsing for all of the next messages
-        let msg = JSON.parse(event.data);
-
-        if (msg.debug) {
-            handleDebugMessage(msg);
-        }
-        else if (msg.functionresponse) {
-            handleFunctionResponse(msg);
-        }
-        else if (msg.type) {
-            if (msg.type == 'plan') {
-                handlePlanMessage(msg);
+        socket.onclose = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Disconnected';
+            connectionStatusElement.style.color = 'red';
+            // Attempt to reconnect every 2 seconds
+            if (!reconnectInterval) {
+                reconnectInterval = setInterval(function () {
+                    initializeSocket();
+                }, 2000);
             }
-            else if (msg.type == 'note_taking') {
-                handleNoteTaking(msg.content);
+            // Clear ping interval if the connection is closed
+            if (pingInterval) {
+                clearInterval(ppingInterval);
+                pingInterval = null;
             }
-            else if (msg.type == 'relations') {
-                handleRelations(msg.content);
-            }
-            else if (msg.type == 'rate_limit') {
-                handleRateLimit(msg);
-            }
-        }
-        else if (msg.usage) {
-            handleUsage(msg);
-        }
-        else if (msg.daily_usage) {
-            handleDailyUsage(msg);
-        }
-        else if (msg.functioncall) {
-            handleFunctionCall(msg);
-        }
-        else if (msg.error) {
-            handleErrorMessage(msg);
-        }
-        else if (msg.chunk_message) {
-            handleChunkMessage(msg);
-        }
-        else if (msg.stop_message) {
-            handleStopMessage(msg);
-        }
-        else if (msg.cancel_message) {
-            console.log('cancel message received');
-            handleCancelMessage(msg);
-        }
-        else if (msg.tab_description) {
-            handleTabDescription(msg);
-        }
-        else if (msg.auth) {
-            console.log('1 auth message received: ', msg);
-            handleAuthMessage(msg);
-        }
+        };
 
-
-        if (msg.debug1 !== undefined) {
-            var debug1 = msg.debug1.replace(/\n/g, '<br>');
-            var color1 = msg.color ? msg.color : 'white';
-            var objDiv = document.getElementById('debugContent1');
-            var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-            document.getElementById('debugContent1').innerHTML += '<p style="color:' + color1 + ';">' + debug1 + '</p>';
-            if (isNearBottom) {
-                objDiv.scrollTop = objDiv.scrollHeight;
+        socket.onopen = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Connected';
+            connectionStatusElement.style.color = 'green';
+            // Clear the reconnection interval if it's running
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
             }
-        }
-        if (msg.debug2 !== undefined) {
-            var debug2 = msg.debug2.replace(/\n/g, '<br>');
-            var color2 = msg.color ? msg.color : 'white';
-            var objDiv = document.getElementById('debugContent2');
-            var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-            document.getElementById('debugContent2').innerHTML += '<p style="color:' + color2 + ';">' + debug2 + '</p>';
-            if (isNearBottom) {
-                objDiv.scrollTop = objDiv.scrollHeight;
+            // Set a ping interval to keep the connection alive
+            if (!pingInterval) {
+                pingInterval = setInterval(function () {
+                    socket.send(JSON.stringify({ type: 'ping' }));
+                }, 5000);
             }
-        }
-    });
+        };
 
-    // get the settings from the server
+        socket.onerror = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Error';
+            connectionStatusElement.style.color = 'orange';
+        };
+
+        socket.addEventListener('message', function (event) {
+            let msg = JSON.parse(event.data);
+
+            if (msg.debug) {
+                handleDebugMessage(msg);
+            }
+            else if (msg.functionresponse) {
+                handleFunctionResponse(msg);
+            }
+            else if (msg.type) {
+                if (msg.type == 'plan') {
+                    handlePlanMessage(msg);
+                }
+                else if (msg.type == 'note_taking') {
+                    handleNoteTaking(msg.content);
+                }
+                else if (msg.type == 'relations') {
+                    handleRelations(msg.content);
+                }
+                else if (msg.type == 'rate_limit') {
+                    handleRateLimit(msg);
+                }
+            }
+            else if (msg.usage) {
+                handleUsage(msg);
+            }
+            else if (msg.daily_usage) {
+                handleDailyUsage(msg);
+            }
+            else if (msg.functioncall) {
+                handleFunctionCall(msg);
+            }
+            else if (msg.error) {
+                handleErrorMessage(msg);
+            }
+            else if (msg.chunk_message) {
+                handleChunkMessage(msg);
+            }
+            else if (msg.stop_message) {
+                handleStopMessage(msg);
+            }
+            else if (msg.cancel_message) {
+                handleCancelMessage(msg);
+            }
+            else if (msg.tab_description) {
+                handleTabDescription(msg);
+            }
+            else if (msg.auth) {
+                handleAuthMessage(msg);
+            }
+
+            if (msg.debug1 !== undefined) {
+                var debug1 = msg.debug1.replace(/\n/g, '<br>');
+                var color1 = msg.color ? msg.color : 'white';
+                var objDiv = document.getElementById('debugContent1');
+                var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                document.getElementById('debugContent1').innerHTML += '<p style="color:' + color1 + ';">' + debug1 + '</p>';
+                if (isNearBottom) {
+                    objDiv.scrollTop = objDiv.scrollHeight;
+                }
+            }
+            if (msg.debug2 !== undefined) {
+                var debug2 = msg.debug2.replace(/\n/g, '<br>');
+                var color2 = msg.color ? msg.color : 'white';
+                var objDiv = document.getElementById('debugContent2');
+                var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                document.getElementById('debugContent2').innerHTML += '<p style="color:' + color2 + ';">' + debug2 + '</p>';
+                if (isNearBottom) {
+                    objDiv.scrollTop = objDiv.scrollHeight;
+                }
+            }
+        });
+    }
+
+    // Initial call to initialize the socket connection
+    initializeSocket();
+
+    // Get the settings from the server
     fetch(API_URL + '/load_settings/', {
         method: 'POST',
         headers: {
@@ -1790,8 +1815,8 @@ function get_settings(username) {
         .catch(error => {
             console.error('There has been a problem with your fetch operation:', error);
         });
+}
 
-};
 
 function showErrorModal(errorMessage) {
     var errorModal = document.getElementById('errorModal');

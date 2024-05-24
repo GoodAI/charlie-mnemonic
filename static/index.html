@@ -82,8 +82,14 @@
         // create a new marked renderer to add lightbox to images
         var renderer = new marked.Renderer();
         renderer.image = function (href, title, text) {
+            // Extract the filename from the URL
+            var filename = href.split('/').pop();
+            
+            // Use the filename as the fallback caption if title is null or undefined
+            var caption = title || filename;
+            
             // display images with 250px width and lightbox js
-            return `<a href="${href}" data-lightbox="${text}" data-title="${title}"><img src="${href}" width="250px" alt="${text}"></a>`;
+            return `<a href="${href}" data-lightbox="${text}" data-title="${caption}"><img src="${href}" width="250px" alt="${text}"></a>`;
         };
         renderer.link = function (href, title, text) {
         if (href.includes('youtube.com') || href.includes('youtu.be')) {

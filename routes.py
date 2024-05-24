@@ -175,14 +175,16 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
         # Handle client disconnection
         if username in connections:
             del connections[username]
-        logger.debug(f"User {username} disconnected")
+        logger.debug(f"User {username} disconnected due to WebSocketDisconnect")
     except ConnectionResetError:
         # Handle client disconnection
-        del connections[username]
-        logger.debug(f"User {username} disconnected")
+        if username in connections:
+            del connections[username]
+        logger.debug(f"User {username} disconnected due to ConnectionResetError")
     except Exception as e:
         # Handle any other exceptions
-        del connections[username]
+        if username in connections:
+            del connections[username]
         logger.error(f"An error occurred with user {username}: {e}")
 
 
@@ -654,7 +656,9 @@ async def handle_message_files(
         file_paths.append(file_path)
     # add the file paths to the prompt
     for file_path in file_paths:
-        if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+        if file_path.lower().endswith(
+            (".png", ".jpg", ".jpeg", ".gif", ".svg", ".bmp", ".tiff", ".webp")
+        ):
             url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
             file_details += f'\n![image](data/{url_encoded_image} "image")'
         else:

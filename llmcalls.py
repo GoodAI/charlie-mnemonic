@@ -65,23 +65,32 @@ class OpenAIResponser:
         )
         return transcription
 
-    async def get_image_description(self, image_path, prompt):
-        """Asynchronously get a description of an image using the OpenAI Vision API."""
-        # Encode the image to base64
-        with open(image_path, "rb") as image_file:
-            base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+    async def get_image_description(self, image_paths, prompt):
+        """Asynchronously get descriptions of multiple images using the OpenAI Vision API."""
+        image_contents = []
+        for image_path in image_paths:
+            with open(image_path, "rb") as image_file:
+                base64_image = base64.b64encode(image_file.read()).decode("utf-8")
+                image_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"},
+                    }
+                )
 
-        # Craft the prompt with the base64-encoded image
         prompt_message = {
             "role": "user",
             "content": [
-                prompt,
-                {"image": base64_image, "resize": 768},
-            ],
+                {
+                    "type": "text",
+                    "text": prompt,
+                }
+            ]
+            + image_contents,
         }
 
         params = {
-            "model": CHATGPT_MODEL,
+            "model": "gpt-4o",
             "messages": [prompt_message],
             "max_tokens": 1000,
         }
@@ -91,7 +100,7 @@ class OpenAIResponser:
             description = response.choices[0].message.content
             return description
         else:
-            return "Failed to get a description."
+            return "Failed to get descriptions."
 
     async def get_response(
         self,

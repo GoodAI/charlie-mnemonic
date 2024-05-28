@@ -169,6 +169,12 @@ function closeAuth() {
     $('#googleAuthModal').modal('hide');
 }
 
+function closeConf() {
+    // close googleAuthModal
+    $('#googleConfModal').modal('hide');
+
+}
+
 function openTabs() {
     const toggle = document.getElementById("toggle-chat-tabs");
     toggle.classList.remove("closed");

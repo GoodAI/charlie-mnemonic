@@ -1307,7 +1307,7 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
         if (msg.hasOwnProperty(key)) {
             // TODO: Make this prettier
             // debug message content
-            // console.log('key:', key, 'value:', msg[key]);
+            console.log('key:', key, 'value:', msg[key]);
             // Selectively display keys
             if (["input", "created_new_memory", "active_brain", "error", "Function", "Arguments", "Response"].includes(key)) {
                 formattedMsgContent += `<b>${escapeHtml(key)}:</b> `;
@@ -1750,6 +1750,9 @@ function get_settings(username) {
                 else if (msg.type == 'rate_limit') {
                     handleRateLimit(msg);
                 }
+                else if (msg.type == 'confirm_email') {
+                    handleConfirmMail(msg);
+                }
             }
             else if (msg.usage) {
                 handleUsage(msg);
@@ -1937,17 +1940,34 @@ function resetState() {
     document.getElementById('message').placeholder = 'Type a message...';
 }
 
-// async function onResponse(msg) {
-//     var timestamp = new Date().toLocaleTimeString();
-//     msg = await parseMessage(msg);
-//     removeSpinner();
-//     tempReceived += msg.content;
-//     tempFormatted = formatTempReceived(tempReceived);
-//     await handleAvatar(settings, tempReceived);
-//     await handleAudio(settings, timestamp, tempFormatted, msg);
-//     resetState();
+const msg = {
+    "action": "send_message",
+    "content": {
+        "message": "Hello",
+        "chat_id": "1234"
+    }
+};
 
-//     if (msg && msg.end && msg.end === 'true') {
-//         resetState();
-//     }
-// };
+function showConfirmationWindow(msg) {
+    // Access the content within the msg
+    const content = msg.content;
+
+    // Set the confirmation message
+    document.getElementById('confirm-message').textContent = 'Are you sure you want to send this email?';
+
+    // Format and set the email details
+    const emailDetails = `
+        To: ${content.to}<br>
+        Subject: ${content.subject}<br>
+        Body: ${content.body}<br>
+        Attachments: ${content.attachments ? content.attachments : 'None'}
+    `;
+    document.getElementById('email-details').innerHTML = emailDetails;
+
+    // Show the modal
+    $('#googleConfModal').modal('show');
+}
+
+function handleConfirmMail(msg) {
+    showConfirmationWindow(msg);
+}

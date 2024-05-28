@@ -11,11 +11,18 @@ from gworkspace.google_auth import onEnable
 
 
 description = """
-Used to read, send, delete, and retrieve emails using the Google Workspace API.
-Example input format:
+This script allows you to read, send, delete, and retrieve emails using the Google Workspace API.  Always add the confirmation step before sending the email, unless the user explicitly asks to send without confirmation.
+
+Example input formats:
+1. Read emails:
    action="read", max_results=10
-   action="send", to="recipient@example.com", subject="Test Email", body="This is a test email.", attachments=["path/to/file1.pdf", "path/to/image.jpg"]
+2. Send an email:
+   action="send", to="recipient@example.com", subject="Test Email", body="This is a test email.", attachments=["path/to/file1.pdf", "path/to/image.jpg", askconfirm=True]
+3. Save an email as a draft:
+   action="draft", to="recipient@example.com", subject="Draft Email", body="This is a draft email.", attachments=["path/to/file1.pdf", "path/to/image.jpg"]
+4. Delete an email:
    action="delete", message_id="<message-id>"
+5. Retrieve an email:
    action="retrieve", message_id="<message-id>"
 """
 
@@ -25,7 +32,7 @@ parameters = {
         "action": {
             "type": "string",
             "description": "The action to perform: 'read', 'send', 'delete', or 'retrieve'.",
-            "enum": ["read", "send", "delete", "retrieve"],
+            "enum": ["read", "send", "delete", "retrieve", "draft"],
         },
         "max_results": {
             "type": "integer",
@@ -48,6 +55,11 @@ parameters = {
             "type": "string",
             "description": "The ID of the message to delete or retrieve.",
         },
+        "askconfirm": {
+            "type": "boolean",
+            "description": "Whether to ask for confirmation before sending the email. (default is True, only set to False if the user explicitly asks to send without confirmation).",
+            "default": True,
+        },
         "attachments": {
             "type": "array",
             "items": {
@@ -67,6 +79,7 @@ def gmail_addon(
     subject=None,
     body=None,
     message_id=None,
+    askconfirm=True,
     username=None,
     attachments=None,
     users_dir="users",
@@ -122,6 +135,46 @@ def gmail_addon(
         except Exception as e:
             return f"Error reading emails: {str(e)}"
 
+    elif action == "draft":
+        try:
+            message = MIMEMultipart()
+            message["to"] = to
+            message["subject"] = subject
+
+            message.attach(MIMEText(body, "plain"))
+
+            if attachments:
+                for attachment_path in attachments:
+                    converted_path = (
+                        attachment_path.replace("/data/", "").replace("data/", "")
+                        if attachment_path.startswith("/data/")
+                        or attachment_path.startswith("data/")
+                        else attachment_path
+                    )
+                    full_path = os.path.join("users", username, "data", converted_path)
+                    with open(full_path, "rb") as attachment:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(attachment.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            "Content-Disposition",
+                            f"attachment; filename={os.path.basename(attachment_path)}",
+                        )
+                        message.attach(part)
+
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            create_message = {"message": {"raw": raw_message}}
+            draft = (
+                service.users()
+                .drafts()
+                .create(userId="me", body=create_message)
+                .execute()
+            )
+
+            return f"Email saved as draft. Draft ID: {draft['id']}"
+        except Exception as e:
+            return f"Error saving email as draft: {str(e)}"
+
     elif action == "send":
         try:
             message = MIMEMultipart()
@@ -152,15 +205,31 @@ def gmail_addon(
             create_message = {
                 "raw": base64.urlsafe_b64encode(message.as_bytes()).decode()
             }
-            send_message = (
-                service.users()
-                .messages()
-                .send(userId="me", body=create_message)
-                .execute()
-            )
-            return f"Email sent. Message ID: {send_message['id']}"
+            print(askconfirm)
+            if askconfirm or askconfirm == "True":
+                print("askconfirm is true")
+                send_confirmation = {
+                    "action": "confirm_email",
+                    "to": to,
+                    "subject": subject,
+                    "body": body,
+                    "attachments": attachments,
+                }
+
+                return send_confirmation
+            else:
+                send_message = (
+                    service.users()
+                    .messages()
+                    .send(userId="me", body=create_message)
+                    .execute()
+                )
+                return f"Email sent. Message ID: {send_message['id']}"
         except Exception as e:
             return f"Error sending email: {str(e)}"
+
+        # except Exception as e:
+        #     return f"Error sending email: {str(e)}"
 
     elif action == "delete":
         try:

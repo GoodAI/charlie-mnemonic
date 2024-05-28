@@ -92,26 +92,32 @@
             return `<a href="${href}" data-lightbox="${text}" data-title="${caption}"><img src="${href}" width="250px" alt="${text}"></a>`;
         };
         renderer.link = function (href, title, text) {
-        if (href.includes('youtube.com') || href.includes('youtu.be')) {
-            // Extract the video ID from the YouTube URL
-            var videoId = '';
-            if (href.includes('youtube.com')) {
-                videoId = href.split('v=')[1];
-                var ampersandPosition = videoId.indexOf('&');
-                if (ampersandPosition !== -1) {
-                    videoId = videoId.substring(0, ampersandPosition);
-                }
-            } else if (href.includes('youtu.be')) {
-                videoId = href.split('/').pop();
+            // Check if href is defined to avoid errors
+            if (typeof href === 'undefined') {
+                console.error('href is undefined');
+                return '';
             }
             
-            // Create an iframe for the YouTube video
-            return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
-        } else {
-            // For non-YouTube links, use the default link rendering
-            return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
-        }
-};
+            if (href.includes('youtube.com') || href.includes('youtu.be')) {
+                // Extract the video ID from the YouTube URL
+                var videoId = '';
+                if (href.includes('youtube.com')) {
+                    videoId = href.split('v=')[1];
+                    var ampersandPosition = videoId.indexOf('&');
+                    if (ampersandPosition !== -1) {
+                        videoId = videoId.substring(0, ampersandPosition);
+                    }
+                } else if (href.includes('youtu.be')) {
+                    videoId = href.split('/').pop();
+                }
+                
+                // Create an iframe for the YouTube video
+                return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
+            } else {
+                // For non-YouTube links, use the default link rendering
+                return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
+            }
+        };
 
         // set the options for marked and a highlighter and copy button
         marked.setOptions({
@@ -122,6 +128,7 @@
             },
             renderer: renderer,
         });
+
         </script>
         <script src="chatbot.js?v={{version}}"></script>
     </head>
@@ -319,6 +326,29 @@
                 </div>
             </div>
         </div>
+        <!-- Google Confirmation modal -->
+        <div class="modal fade" tabindex="-1" role="dialog" id="googleConfModal">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmation</h5>
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeConf()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="confirm-message">Are you sure you want to send this email?</p>
+                        <p id="email-details"></p>
+                        <button id="send-email" class="btn btn-primary">Send</button>
+                        <button id="cancel-email" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Right side navigation -->
         <div class="bottomright-with-nw-resize-outer bgcolorstack"
              id="debugNav"
@@ -353,8 +383,10 @@
         </div>
         <!-- Placeholder for the share modal -->
         <div id="share-modal-container"></div>
-        <div class="main_title">GoodAI Agent {{ version }}</div>
-        <div class="sub_title">Personal assistant with long-term memory</div>
+        <div class="main_title">Charlie Mnemonic from GoodAI</div>
+        <div class="sub_title"><i>Your personal assistant with long-term memory</i></div>
+        <div class="sub_title"><b>Version:</b> {{ version }} | <b>Release date:</b> 28/05/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases" target="_blank">Release Notes</a></div>
+        
         <div id="overlay">
             <div class="text">Code copied to clipboard</div>
         </div>

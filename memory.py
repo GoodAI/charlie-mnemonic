@@ -255,9 +255,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -349,6 +349,9 @@ class MemoryManager:
                 metadata={"uid": uid, "chat_id": chat_id},
                 mUsername="user",
                 regenerate=regenerate,
+            )
+            print(
+                f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"
             )
             logger.debug(
                 f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"

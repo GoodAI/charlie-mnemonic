@@ -231,6 +231,7 @@ class OpenAIResponser:
                             or tool_calls_complete
                         ):
                             if accumulated_arguments:
+                                # TODO: Fix JSON errors on some function calls (especially the python code ones)
                                 try:
                                     # print(
                                     #     f"Final accumulated arguments: {accumulated_arguments}"
@@ -249,6 +250,7 @@ class OpenAIResponser:
                                             data = json.loads(json_str)
                                             parsed_arguments.append(data)
                                     # print(f"Parsed arguments: {parsed_arguments}")
+
                                     tool_response = (
                                         await utils.MessageParser.process_function_call(
                                             accumulated_name,

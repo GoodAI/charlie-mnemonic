@@ -151,16 +151,16 @@ a {
     text-align: center;
     color: var(--text-color);
     font-family: 'Lexend', 'Mulish', sans-serif;
-    font-size: 2.5em;
+    font-size: 1.5em;
 }
 
 .sub_title {
     margin: 0 0 10px;
     text-align: center;
     color: var(--text-color);
-    font-size: 18px;
+    font-size: 12px;
     font-family: 'Lexend', 'Mulish', sans-serif;
-    font-size: 1.16em;
+    font-size: 1.0em;
 }
 
 .sub_title_2 {
@@ -168,6 +168,15 @@ a {
     text-align: center;
     color: var(--text-color);
     font-size: 20px;
+}
+
+.sub_data {
+    margin: 0 0 10px;
+    text-align: center;
+    color: var(--text-color);
+    font-size: 12px;
+    font-family: 'Lexend', 'Mulish', sans-serif;
+    font-size: 1.0em;
 }
 
 .control-buttons-container {
@@ -1170,8 +1179,13 @@ pre {
     border-radius: 50%;
 }
 
+.modal {
+    top: 30%;
+}
+
 #settingsModal {
     z-index: 1060;
+    top: 0;
 }
 
 #googleAuthModal {

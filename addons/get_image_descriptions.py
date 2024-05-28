@@ -4,7 +4,7 @@ import openai
 import config
 from llmcalls import OpenAIResponser
 
-description = "Get the descriptions of one or more images using the OpenAI Vision API"
+description = "Get the descriptions of one or more images using the OpenAI Vision API, only use this for PNG, JPEG, and GIF and WEBP images."
 parameters = {
     "type": "object",
     "properties": {

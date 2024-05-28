@@ -621,6 +621,17 @@ class MessageParser:
             },
             "chat_id": chat_id,
         }
+        print(f"Function call: {function_call_name}")
+        print(f"Arguments: {converted_function_call_arguments}")
+        if converted_function_call_arguments.get("action", "") == "send":
+            print("Sending email...")
+
+            # send message to frontend to confirm email
+            await MessageSender.send_message(
+                {"type": "confirm_email", "content": converted_function_call_arguments},
+                "blue",
+                username,
+            )
         await MessageSender.send_message(new_message, "red", username)
         try:
             # Print the available functions for debugging

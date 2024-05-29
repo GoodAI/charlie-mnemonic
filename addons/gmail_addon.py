@@ -1,3 +1,4 @@
+import json
 import os
 import base64
 from google.oauth2.credentials import Credentials
@@ -11,19 +12,23 @@ from gworkspace.google_auth import onEnable
 
 
 description = """
-This script allows you to read, send, delete, and retrieve emails using the Google Workspace API.  Always add the confirmation step before sending the email, unless the user explicitly asks to send without confirmation.
+This script allows you to list, send, delete, and retrieve emails using the Google Workspace API.
 
 Example input formats:
-1. Read emails:
-   action="read", max_results=10
+1. List emails or drafts:
+   action="list", list_type="draft/email", max_results=10
 2. Send an email:
    action="send", to="recipient@example.com", subject="Test Email", body="This is a test email.", attachments=["path/to/file1.pdf", "path/to/image.jpg", askconfirm=True]
 3. Save an email as a draft:
-   action="draft", to="recipient@example.com", subject="Draft Email", body="This is a draft email.", attachments=["path/to/file1.pdf", "path/to/image.jpg"]
-4. Delete an email:
+   action="draft", to="recipient@example.com", subject="Draft Email", body="This is a draft email.", attachments=[]
+4. Send draft email based on the given id:
+   action="send_draft", message_id="<message-id>"
+5. Delete an email:
    action="delete", message_id="<message-id>"
-5. Retrieve an email:
+6. Retrieve an email:
    action="retrieve", message_id="<message-id>"
+7. Update a draft:
+    action="update_draft", message_id="<message-id>", to="<>", subject="Test Email", body="The new message", attachments=[]
 """
 
 parameters = {
@@ -31,8 +36,16 @@ parameters = {
     "properties": {
         "action": {
             "type": "string",
-            "description": "The action to perform: 'read', 'send', 'delete', or 'retrieve'.",
-            "enum": ["read", "send", "delete", "retrieve", "draft"],
+            "description": "The action to perform: 'list', 'send', 'delete', or 'retrieve'.",
+            "enum": [
+                "list",
+                "send",
+                "delete",
+                "retrieve",
+                "draft",
+                "send_draft",
+                "update_draft",
+            ],
         },
         "max_results": {
             "type": "integer",
@@ -57,8 +70,13 @@ parameters = {
         },
         "askconfirm": {
             "type": "boolean",
-            "description": "Whether to ask for confirmation before sending the email. (default is True, only set to False if the user explicitly asks to send without confirmation).",
+            "description": "This will let the user decide to send or cancel the email. (default is True, only set to False if the user explicitly asks to send without confirmation).",
             "default": True,
+        },
+        "list_type": {
+            "type": "string",
+            "description": "The type of list to retrieve: 'draft' or 'email'.",
+            "default": "email",
         },
         "attachments": {
             "type": "array",
@@ -84,6 +102,7 @@ def gmail_addon(
     attachments=None,
     users_dir="users",
     path=None,
+    list_type="email",
 ):
     creds = None
     full_path = (
@@ -94,46 +113,105 @@ def gmail_addon(
     if not creds or not creds.valid:
         return "Error: Invalid or missing credentials. Please restart the client or run the 'onEnable' function."
     service = build("gmail", "v1", credentials=creds)
-    if action == "read":
-        try:
-            results = (
-                service.users()
-                .messages()
-                .list(userId="me", maxResults=max_results)
-                .execute()
-            )
-            messages = results.get("messages", [])
-            result = ""
-            for message in messages:
-                msg = (
+    if action == "list":
+        if list_type == "email":
+            try:
+                results = (
                     service.users()
                     .messages()
-                    .get(userId="me", id=message["id"])
+                    .list(userId="me", maxResults=max_results)
                     .execute()
                 )
-                payload = msg["payload"]
-                headers = payload["headers"]
-                subject = next(
-                    (
-                        header["value"]
-                        for header in headers
-                        if header["name"].lower() == "subject"
-                    ),
-                    "No Subject",
+                messages = results.get("messages", [])
+                result = ""
+                for message in messages:
+                    msg = (
+                        service.users()
+                        .messages()
+                        .get(userId="me", id=message["id"])
+                        .execute()
+                    )
+                    payload = msg["payload"]
+                    headers = payload["headers"]
+                    subject = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"].lower() == "subject"
+                        ),
+                        "No Subject",
+                    )
+                    sender = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"] == "From"
+                        ),
+                        "Unknown Sender",
+                    )
+                    date = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"] == "Date"
+                        ),
+                        "Unknown Date",
+                    )
+                    snippet = msg["snippet"]
+                    result += f"Message ID: {message['id']}\nSubject: {subject}\nFrom: {sender}\nDate: {date}\nSnippet: {snippet}\n\n"
+                return result
+            except Exception as e:
+                return f"Error reading emails: {str(e)}"
+        else:
+            try:
+                results = (
+                    service.users()
+                    .drafts()
+                    .list(userId="me", maxResults=max_results)
+                    .execute()
                 )
-                sender = next(
-                    (header["value"] for header in headers if header["name"] == "From"),
-                    "Unknown Sender",
-                )
-                date = next(
-                    (header["value"] for header in headers if header["name"] == "Date"),
-                    "Unknown Date",
-                )
-                snippet = msg["snippet"]
-                result += f"Message ID: {message['id']}\nSubject: {subject}\nFrom: {sender}\nDate: {date}\nSnippet: {snippet}\n\n"
-            return result
-        except Exception as e:
-            return f"Error reading emails: {str(e)}"
+
+                drafts = results.get("drafts", [])
+                result = ""
+                for message in drafts:
+                    msg = (
+                        service.users()
+                        .drafts()
+                        .get(userId="me", id=message["id"])
+                        .execute()
+                    ).get("message", {})
+
+                    payload = msg["payload"]
+                    headers = payload["headers"]
+                    subject = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"].lower() == "subject"
+                        ),
+                        "No Subject",
+                    )
+                    sender = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"] == "From"
+                        ),
+                        "Unknown Sender",
+                    )
+                    date = next(
+                        (
+                            header["value"]
+                            for header in headers
+                            if header["name"] == "Date"
+                        ),
+                        "Unknown Date",
+                    )
+                    snippet = msg["snippet"]
+                    result += f"Message ID: {message['id']}\nSubject: {subject}\nFrom: {sender}\nDate: {date}\nSnippet: {snippet}\n\n"
+                return result
+            except Exception as e:
+                return f"Error reading emails: {str(e)}"
 
     elif action == "draft":
         try:
@@ -205,15 +283,22 @@ def gmail_addon(
             create_message = {
                 "raw": base64.urlsafe_b64encode(message.as_bytes()).decode()
             }
-            print(askconfirm)
+            print(f"askconfirm: {askconfirm}")
             if askconfirm or askconfirm == "True":
-                print("askconfirm is true")
+                # send as draft and return confirmation message + draft id
+                draft = (
+                    service.users()
+                    .drafts()
+                    .create(userId="me", body={"message": create_message})
+                    .execute()
+                )
                 send_confirmation = {
                     "action": "confirm_email",
                     "to": to,
                     "subject": subject,
                     "body": body,
                     "attachments": attachments,
+                    "draft_id": draft["id"],
                 }
 
                 return send_confirmation
@@ -227,9 +312,6 @@ def gmail_addon(
                 return f"Email sent. Message ID: {send_message['id']}"
         except Exception as e:
             return f"Error sending email: {str(e)}"
-
-        # except Exception as e:
-        #     return f"Error sending email: {str(e)}"
 
     elif action == "delete":
         try:
@@ -259,6 +341,62 @@ def gmail_addon(
             return f"Subject: {subject}\nBody: {body}"
         except Exception as e:
             return f"Error retrieving email: {str(e)}"
+    elif action == "send_draft":
+        try:
+            send_message = (
+                service.users()
+                .drafts()
+                .send(userId="me", body={"id": message_id})
+                .execute()
+            )
+            return f"Email sent. Message ID: {send_message['id']}"
+        except Exception as e:
+            return f"Error sending email: {str(e)}"
+    elif action == "update_draft":
+        try:
+            message = MIMEMultipart()
+            message["to"] = to
+            message["subject"] = subject
 
+            message.attach(MIMEText(body, "plain"))
+
+            if attachments:
+                for attachment_path in attachments:
+                    converted_path = (
+                        attachment_path.replace("/data/", "").replace("data/", "")
+                        if attachment_path.startswith("/data/")
+                        or attachment_path.startswith("data/")
+                        else attachment_path
+                    )
+                    full_path = os.path.join("users", username, "data", converted_path)
+                    with open(full_path, "rb") as attachment:
+                        part = MIMEBase("application", "octet-stream")
+                        part.set_payload(attachment.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            "Content-Disposition",
+                            f"attachment; filename={os.path.basename(attachment_path)}",
+                        )
+                        message.attach(part)
+
+            raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            create_message = {"message": {"raw": raw_message}}
+            draft = (
+                service.users()
+                .drafts()
+                .update(userId="me", id=message_id, body=create_message)
+                .execute()
+            )
+
+            return f"Email updated as draft. New draft ID: {draft['id']}"
+
+        except Exception as e:
+            return f"Error updating email as draft: {str(e)}"
     else:
-        return "Invalid action. Please specify 'read', 'send', 'delete', or 'retrieve'."
+        return "Invalid action. Please specify 'list', 'send', 'delete', 'update' or 'retrieve'."
+
+
+def send_email_by_id(draft_id, username):
+    response = gmail_addon(action="send_draft", username=username, message_id=draft_id)
+    print(response)
+    return response

@@ -95,6 +95,11 @@ class editSettings(BaseModel):
     value: Union[str, int, bool, None]
 
 
+class emailMessage(BaseModel):
+    username: str
+    draft_id: str
+
+
 class AsciiColors:
     HEADER = "\033[95m"
     BLUE = "\033[94m"

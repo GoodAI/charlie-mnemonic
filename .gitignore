@@ -130,3 +130,4 @@ static/data/
 .idea/
 release/*.zip
 user.db
+tmp/*

@@ -1951,18 +1951,21 @@ const msg = {
 function showConfirmationWindow(msg) {
     // Access the content within the msg
     const content = msg.content;
+    console.log("content: ", content);
 
     // Set the confirmation message
     document.getElementById('confirm-message').textContent = 'Are you sure you want to send this email?';
 
     // Format and set the email details
     const emailDetails = `
-        To: ${content.to}<br>
-        Subject: ${content.subject}<br>
-        Body: ${content.body}<br>
-        Attachments: ${content.attachments ? content.attachments : 'None'}
+        <b>To:</b> ${content.to}<br>
+        <b>Subject:</b> ${content.subject}<br>
+        <b>Body:</b> ${content.body}<br>
+        <b>Attachments:</b> ${content.attachments ? content.attachments : 'None'}
     `;
     document.getElementById('email-details').innerHTML = emailDetails;
+    console.log("email id: ", content.draft_id);
+    document.getElementById('emailId').value = content.draft_id;
 
     // Show the modal
     $('#googleConfModal').modal('show');
@@ -1971,3 +1974,27 @@ function showConfirmationWindow(msg) {
 function handleConfirmMail(msg) {
     showConfirmationWindow(msg);
 }
+
+function sendMail(id) {
+    console.log('Sending email with id:', id);
+    fetch(API_URL + '/send_email/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 'username': user_name, 'draft_id': id }),
+        credentials: 'include'
+    })
+        .then(handleError)
+        .then(data => {
+            console.log('Email sent:', data);
+            showErrorMessage('Email sent successfully!', true);
+            $('#googleConfModal').modal('hide');
+        })
+        .catch(error => {
+            console.error('Failed to send email:', error);
+            showErrorMessage('Failed to send email: ' + error);
+        });
+}
+
+    

@@ -48,6 +48,7 @@ from classes import (
     UserGoogle,
     generateAudioMessage,
     regenerateMessage,
+    emailMessage,
 )
 from database import Database
 from memory import (
@@ -1316,3 +1317,15 @@ async def sort_memories(
         "memory_table_body.html",
         {"request": request, "category": category, "memories": memories},
     )
+
+
+# route to send a gmail email by id
+@router.post("/send_email/", tags=[LOGIN_REQUIRED])
+async def send_email(request: Request, message: emailMessage):
+    user = request.state.user
+    username = user.username
+    draft_id = message.draft_id
+    from addons.gmail_addon import send_email_by_id
+
+    response = send_email_by_id(draft_id, username)
+    return response

@@ -534,10 +534,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");
+    const sendMailButton = document.getElementById('send-email');
+    const cancelEmailButton = document.getElementById('cancel-email');
+    const hiddenIdField = document.getElementById('emailId');
 
     if (currentTheme) {
         document.body.classList.add(currentTheme);
     }
+
+    sendMailButton.addEventListener('click', function() {
+        sendMail(hiddenIdField.value);
+    });
+
+    cancelEmailButton.addEventListener('click', function() {
+        $('#googleConfModal').modal('hide');
+    });
 
     themeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-theme');

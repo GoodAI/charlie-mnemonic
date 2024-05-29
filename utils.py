@@ -623,7 +623,9 @@ class MessageParser:
         }
         print(f"Function call: {function_call_name}")
         print(f"Arguments: {converted_function_call_arguments}")
-        if converted_function_call_arguments.get("action", "") == "send":
+        if converted_function_call_arguments.get(
+            "action", ""
+        ) == "send" and converted_function_call_arguments.get("askconfirm", False):
             print("Sending email...")
 
             # send message to frontend to confirm email
@@ -655,6 +657,16 @@ class MessageParser:
                             function_response = MessageParser.handle_function_response(
                                 actual_function, converted_function_call_arguments
                             )
+                            print(f"1 function response: {function_response}")
+                            if "draft_id" in function_response:
+                                await MessageSender.send_message(
+                                    {
+                                        "type": "confirm_email",
+                                        "content": function_response,
+                                    },
+                                    "blue",
+                                    username,
+                                )
                     else:
                         print(
                             f"Function {function_call_name} not found within the module."

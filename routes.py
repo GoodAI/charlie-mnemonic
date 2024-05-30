@@ -1329,3 +1329,40 @@ async def send_email(request: Request, message: emailMessage):
 
     response = send_email_by_id(draft_id, username)
     return response
+
+
+@router.post("/search_chats/", tags=[LOGIN_REQUIRED])
+async def search_memories(
+    request: Request,
+    category: str = Form(...),
+    search_query: str = Form(...),
+    sort_by: str = Form(...),
+    sort_order: str = Form(...),
+):
+    username = request.state.user.username
+    memories = search_memory(
+        category,
+        search_query,
+        username=username,
+        n_results=20,
+        max_distance=1.6,
+        min_distance=0.0,
+    )
+
+    # Sort the memories based on the selected sorting option and order
+    if sort_by == "created_at":
+        memories.sort(
+            key=lambda x: x["metadata"]["created_at"], reverse=sort_order == "desc"
+        )
+    elif sort_by == "distance":
+        memories.sort(
+            key=lambda x: x.get("distance", 0.0), reverse=sort_order == "desc"
+        )
+    else:
+        memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        memory["distance"] = memory.get("distance", 0.0)
+
+    return JSONResponse(content={"category": category, "memories": memories})

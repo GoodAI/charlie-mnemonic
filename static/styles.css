@@ -1192,6 +1192,15 @@ pre {
     z-index: 1065;
 }
 
+#chatSearchModal {
+    z-index: 1070;
+    top: 0;
+}
+
+.searchdialog {
+    max-width: 80%;
+}
+
 .modal-backdrop {
     position: fixed;
     top: 0;

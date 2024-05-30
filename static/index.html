@@ -326,6 +326,44 @@
                 </div>
             </div>
         </div>
+        <!-- Chat Search modal -->
+        <div class="modal fade" tabindex="-1" role="dialog" id="chatSearchModal">
+            <div class="modal-dialog searchdialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Search Chats</h5>
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeChatSearch()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="text"
+                               id="searchInput"
+                               class="form-control"
+                               placeholder="Search..."
+                               oninput="debouncedChatSearch()">
+                        <table class="table table-hover memoryTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Message</th>
+                                    <th scope="col">Date Created</th>
+                                    <th scope="col">Distance</th>
+                                    <th scope="col">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="memoryTableBody" data-category="chat">
+
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Google Confirmation modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="googleConfModal">
             <div class="modal-dialog" role="document">
@@ -369,11 +407,13 @@
                 </div>
             </div>
         </div>
+        
         <!-- Side Navigation -->
         <div id="sideNav" class="sidenav">
             <div id="chat-buttons" class="chat-buttons">
                 <div id="chat-buttons" class="chat-buttons">
                     <div id="control-buttons-container" class="control-buttons-container">
+                        <button id="search-chats-input" class="control-tab" onclick="openChatSearch()">Search</button>
                         <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
                     </div>
                     <div id="chat-tabs-container" class="chat-tabs-container">
@@ -386,7 +426,7 @@
         <div id="share-modal-container"></div>
         <div class="main_title">Charlie Mnemonic from GoodAI</div>
         <div class="sub_title"><i>Your personal assistant with long-term memory</i></div>
-        <div class="sub_title"><b>Version:</b> {{ version }} | <b>Release date:</b> 28/05/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases" target="_blank">Release Notes</a></div>
+        <div class="sub_title"><b>Version:</b> {{ version }} | <b>Release date:</b> 30/05/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases" target="_blank">Release Notes</a></div>
         
         <div id="overlay">
             <div class="text">Code copied to clipboard</div>
@@ -480,5 +520,6 @@
         </body>
         <script src="chatbot_core.js?v={{version}}"></script>
         <script src="listeners.js?v={{version}}"></script>
+        <script src="chatsearch.js?v={{version}}"></script>
     </body>
 </html>

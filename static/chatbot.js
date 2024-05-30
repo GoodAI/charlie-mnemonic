@@ -1964,7 +1964,6 @@ function showConfirmationWindow(msg) {
         <b>Attachments:</b> ${content.attachments ? content.attachments : 'None'}
     `;
     document.getElementById('email-details').innerHTML = emailDetails;
-    console.log("email id: ", content.draft_id);
     document.getElementById('emailId').value = content.draft_id;
 
     // Show the modal

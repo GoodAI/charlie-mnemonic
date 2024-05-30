@@ -403,7 +403,7 @@ def search_memory(
     if min_distance is not None and min_distance > 0:
         result_list = [res for res in result_list if res["distance"] >= min_distance]
 
-    if max_distance is not None and max_distance < 1.0:
+    if max_distance is not None and max_distance < 2.0:
         result_list = [res for res in result_list if res["distance"] <= max_distance]
 
     debug_log(f"Searched memory: {search_text}", result_list)

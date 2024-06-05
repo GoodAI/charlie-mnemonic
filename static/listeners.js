@@ -593,7 +593,6 @@ function toggleTabs() {
         openTabs();
     }
 }
-
 function showTextFileModal(files) {
     let modalHtml = `
         <div class="modal" id="textFileModal">
@@ -622,6 +621,8 @@ function showTextFileModal(files) {
     let modal = document.getElementById('textFileModal');
     let textFileList = document.getElementById('textFileList');
 
+    let processedFilesCount = 0;  // Counter for processed files
+
     files.forEach((file, index) => {
         let listItem = document.createElement('li');
         listItem.innerHTML = `
@@ -631,6 +632,12 @@ function showTextFileModal(files) {
         `;
         textFileList.appendChild(listItem);
     });
+
+    let checkCloseModal = function () {
+        if (processedFilesCount >= files.length) {
+            $(modal).modal('hide');
+        }
+    };
 
     let closeModal = function () {
         $(modal).modal('hide');
@@ -658,6 +665,8 @@ function showTextFileModal(files) {
         reader.readAsText(file);
         $(this).prop('disabled', true);
         $(this).siblings('.uploadTextBtn').prop('disabled', true);
+        processedFilesCount++;
+        checkCloseModal();
     });
 
     $('.uploadTextBtn').on('click', function () {
@@ -669,5 +678,7 @@ function showTextFileModal(files) {
         document.getElementById('files-preview').style.justifyContent = 'center';
         $(this).prop('disabled', true);
         $(this).siblings('.includeTextBtn').prop('disabled', true);
+        processedFilesCount++;
+        checkCloseModal();
     });
 }

@@ -167,10 +167,9 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     try:
         while True:
             data = await websocket.receive_text()
-            if data == "ping":
+            if data == '{"type":"ping"}':
                 await websocket.send_text(json.dumps({"type": "pong"}))
             else:
-                # Send a JSON response back to the client
                 await websocket.send_text(
                     json.dumps({"type": "message", "content": f"Received: {data}"})
                 )
@@ -1344,7 +1343,7 @@ async def search_memories(
         category,
         search_query,
         username=username,
-        n_results=20,
+        n_results=100,
         max_distance=1.6,
         min_distance=0.0,
     )
@@ -1365,4 +1364,24 @@ async def search_memories(
     for memory in memories:
         memory["distance"] = memory.get("distance", 0.0)
 
-    return JSONResponse(content={"category": category, "memories": memories})
+    from utils import queryRewrite
+
+    rewritten = await queryRewrite(search_query, username)
+    print(rewritten)
+    rewritten_memories = search_memory(
+        category,
+        rewritten,
+        username=username,
+        n_results=100,
+        max_distance=1.6,
+        min_distance=0.0,
+    )
+
+    return JSONResponse(
+        content={
+            "category": category,
+            "memories": memories,
+            "rewritten": rewritten,
+            "rewritten_memories": rewritten_memories,
+        }
+    )

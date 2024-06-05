@@ -459,6 +459,7 @@ def get_memories(
     include_embeddings=True,
     novel=False,
     username=None,
+    start_from=None,
 ):
     """
     Retrieve a list of memories from a given category, sorted by ID, with optional filtering.

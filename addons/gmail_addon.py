@@ -162,7 +162,7 @@ def gmail_addon(
                 return result
             except Exception as e:
                 return f"Error reading emails: {str(e)}"
-        else:
+        if list_type == "draft":
             try:
                 results = (
                     service.users()

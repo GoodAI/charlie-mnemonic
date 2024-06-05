@@ -147,7 +147,7 @@
         <div class="toast-container position-fixed top-0 end-0 p-3"></div>
         <!-- Error Modal -->
         <div id="errorModal" class="modal fade">
-            <div class="modal-dialog modal-confirm">
+            <div class="modal-dialog modal-dialog-centered modal-confirm">
                 <div class="modal-content">
                     <div class="modal-header justify-content-center">
                         <div class="icon-box">
@@ -172,7 +172,7 @@
         </div>
         <!-- Login Modal -->
         <div class="modal" tabindex="-1" role="dialog" id="login-modal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Login</h5>
@@ -225,7 +225,7 @@
         </div>
         <!-- Register Modal -->
         <div class="modal" tabindex="-1" role="dialog" id="register-modal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Register a new account</h5>
@@ -277,7 +277,8 @@
              role="dialog"
              aria-labelledby="settingsModalLabel"
              aria-hidden="true">
-            <div class="modal-dialog settings-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered settings-dialog"
+                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
@@ -307,7 +308,7 @@
         </div>
         <!-- Google Auth modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="googleAuthModal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Google Authentication</h5>
@@ -328,7 +329,8 @@
         </div>
         <!-- Chat Search modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="chatSearchModal">
-            <div class="modal-dialog searchdialog" role="document">
+            <div class="modal-dialog modal-dialog-centered searchdialog"
+                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Search Chats</h5>
@@ -346,27 +348,49 @@
                                class="form-control"
                                placeholder="Search..."
                                oninput="debouncedChatSearch()">
-                        <table class="table table-hover memoryTable">
-                            <thead>
-                                <tr>
-                                    <th scope="col">ID</th>
-                                    <th scope="col">Message</th>
-                                    <th scope="col">Date Created</th>
-                                    <th scope="col">Distance</th>
-                                    <th scope="col">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="memoryTableBody" data-category="chat">
-
-                            </tbody>
-                        </table>
+                               <div id="rewrittenQuery"></div>
+                               <div class="memory-container">
+                                   <div id="memoriesSection" class="memory-section">
+                                       <h3>Memories</h3>
+                                       <table class="table table-hover memoryTable">
+                                           <thead>
+                                               <tr>
+                                                   <th scope="col">ID</th>
+                                                   <th scope="col">Message</th>
+                                                   <th scope="col">Date Created</th>
+                                                   <th scope="col">Distance</th>
+                                                   <th scope="col">Action</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody id="memoryTableBody" data-category="chat">
+                                           </tbody>
+                                       </table>
+                                   </div>
+                                   <div id="rewrittenMemoriesSection" class="memory-section">
+                                       <h3>With Query Rewrite</h3>
+                                       <table class="table table-hover memoryTable">
+                                           <thead>
+                                               <tr>
+                                                   <th scope="col">ID</th>
+                                                   <th scope="col">Message</th>
+                                                   <th scope="col">Date Created</th>
+                                                   <th scope="col">Distance</th>
+                                                   <th scope="col">Action</th>
+                                               </tr>
+                                           </thead>
+                                           <tbody id="rewrittenMemoryTableBody" data-category="chat">
+                                           </tbody>
+                                       </table>
+                                   </div>
+                               </div>
+                               
                     </div>
                 </div>
             </div>
         </div>
         <!-- Google Confirmation modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="googleConfModal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Confirmation</h5>
@@ -407,13 +431,14 @@
                 </div>
             </div>
         </div>
-        
         <!-- Side Navigation -->
         <div id="sideNav" class="sidenav">
             <div id="chat-buttons" class="chat-buttons">
                 <div id="chat-buttons" class="chat-buttons">
                     <div id="control-buttons-container" class="control-buttons-container">
-                        <button id="search-chats-input" class="control-tab" onclick="openChatSearch()">Search</button>
+                        <button id="search-chats-input"
+                                class="control-tab"
+                                onclick="openChatSearch()">Search</button>
                         <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
                     </div>
                     <div id="chat-tabs-container" class="chat-tabs-container">
@@ -425,9 +450,13 @@
         <!-- Placeholder for the share modal -->
         <div id="share-modal-container"></div>
         <div class="main_title">Charlie Mnemonic from GoodAI</div>
-        <div class="sub_title"><i>Your personal assistant with long-term memory</i></div>
-        <div class="sub_title"><b>Version:</b> {{ version }} | <b>Release date:</b> 30/05/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases" target="_blank">Release Notes</a></div>
-        
+        <div class="sub_title">
+            <i>Your personal assistant with long-term memory</i>
+        </div>
+        <div class="sub_title">
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 05/06/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+    target="_blank">Release Notes</a>
+        </div>
         <div id="overlay">
             <div class="text">Code copied to clipboard</div>
         </div>

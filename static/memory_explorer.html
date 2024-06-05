@@ -104,6 +104,15 @@
 
         const debouncedSearch = debounce(searchMemoriesHandler, 1000);
 
+        function debounce(func, delay) {
+            let timeoutId;
+            return function() {
+                const context = this;
+                const args = arguments;
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => func.apply(context, args), delay);
+            };
+        }
         function editMemory(memoryId, category) {
             var content = document.getElementById('memory-' + memoryId).value;
             fetch('/edit_memory/', {
@@ -159,7 +168,8 @@
         }
 
         function searchMemoriesHandler() {
-            var searchQuery = document.getElementById('searchInput').value;
+            var searchQuery = document.getElementById('searchInput').value || ' ';
+            // TODO: Display a loading spinner
             var category = document.getElementById('memoryTableBody').getAttribute('data-category');
 
             fetch('/search_memories/', {

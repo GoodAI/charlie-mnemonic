@@ -498,7 +498,7 @@ function createMemoryTabContent(tabId) {
     var resetButton = document.createElement('button');
     resetButton.textContent = 'Reset to Default';
     resetButton.onclick = function () {
-        var defaultValues = [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0];
+        var defaultValues = [0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.97, 1.0];
         slider.noUiSlider.set(defaultValues);
     };
     tabContent.appendChild(resetButton);
@@ -509,7 +509,7 @@ function createMemoryTabContent(tabId) {
     tabContent.appendChild(saveButton);
 
     noUiSlider.create(slider, {
-        start: [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0],
+        start: [0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.97, 1.0],
         connect: true,
         range: {
             'min': 0,
@@ -1730,6 +1730,10 @@ function get_settings(username) {
                 console.error("Failed to parse message as JSON:", event.data);
                 return;
             }
+
+            if (msg.type === 'pong') {
+                return;
+            } 
 
             if (msg.debug) {
                 handleDebugMessage(msg);

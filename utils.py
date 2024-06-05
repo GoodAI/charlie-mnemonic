@@ -190,15 +190,15 @@ class AddonManager:
             "verbose": {"verbose": False},
             "timezone": {"timezone": "Auto"},
             "memory": {
-                "functions": 640,
-                "ltm1": 1200,
-                "ltm2": 1200,
-                "episodic": 400,
-                "recent": 880,
-                "notes": 1200,
-                "input": 1280,
-                "output": 1200,
-                "max_tokens": 8000,
+                "functions": 6400,
+                "ltm1": 2560,
+                "ltm2": 2560,
+                "episodic": 2560,
+                "recent": 2560,
+                "notes": 2560,
+                "input": 104960,
+                "output": 3840,
+                "max_tokens": 128000,
                 "min_tokens": 500,
             },
         }
@@ -502,7 +502,7 @@ class MessageParser:
         # if arguments is a list, convert it to a dictionary
         if isinstance(arguments, list):
             # take the first element of the list for now, dirty fix
-            arguments = arguments[0]
+            arguments = arguments[0] if arguments else {}
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
@@ -876,25 +876,25 @@ class SettingsManager:
                     memory_settings.get("functions", 0.05) * max_tokens
                 )
                 memory_settings["ltm1"] = int(
-                    memory_settings.get("ltm1", 0.15) * max_tokens
+                    memory_settings.get("ltm1", 0.02) * max_tokens
                 )
                 memory_settings["ltm2"] = int(
-                    memory_settings.get("ltm2", 0.15) * max_tokens
+                    memory_settings.get("ltm2", 0.02) * max_tokens
                 )
                 memory_settings["episodic"] = int(
-                    memory_settings.get("episodic", 0.05) * max_tokens
+                    memory_settings.get("episodic", 0.02) * max_tokens
                 )
                 memory_settings["recent"] = int(
-                    memory_settings.get("recent", 0.10) * max_tokens
+                    memory_settings.get("recent", 0.02) * max_tokens
                 )
                 memory_settings["notes"] = int(
-                    memory_settings.get("notes", 0.15) * max_tokens
+                    memory_settings.get("notes", 0.02) * max_tokens
                 )
                 memory_settings["input"] = int(
-                    memory_settings.get("input", 0.15) * max_tokens
+                    memory_settings.get("input", 0.82) * max_tokens
                 )
                 memory_settings["output"] = int(
-                    memory_settings.get("output", 0.25) * max_tokens
+                    memory_settings.get("output", 0.03) * max_tokens
                 )
 
         return settings
@@ -1369,4 +1369,26 @@ async def process_function_reply(
         chat_id=chat_id,
     ):
         second_response = resp
+    return second_response
+
+
+async def queryRewrite(query, username):
+    messages = [
+        {
+            "role": "system",
+            "content": "you are a query writer, you will be given a query to rewrite",
+        },
+        {"role": "user", "content": f"{query}"},
+    ]
+    from config import fakedata
+
+    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+    async for resp in openai_response.get_response(
+        username,
+        messages,
+        stream=False,
+        function_metadata=fakedata,
+    ):
+        second_response = resp
+        print(f"second_response: {second_response}")
     return second_response

@@ -913,7 +913,7 @@ class SettingsManager:
                 offset = timezone[3:]
                 if offset.startswith("+"):
                     offset = offset[1:]
-                offset_hours = int(offset)
+                offset_hours = float(offset)
                 user_tz = pytz.FixedOffset(offset_hours * 60)
             else:
                 user_tz = pytz.timezone(timezone)

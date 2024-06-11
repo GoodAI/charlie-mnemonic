@@ -309,19 +309,21 @@ a {
     color: white;
 }
 
-table {
-    height: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-    margin-bottom: 1rem;
+.table {
+    table-layout: fixed;
+    width: 100%;
 }
 
-table tr {
-    align-items: center;
+.table th,
+.table td {
+    word-wrap: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-table tr td {
-    vertical-align: top;
+.table th:nth-child(2),
+.table td:nth-child(2) {
+    white-space: normal;
 }
 
 .markdown table {

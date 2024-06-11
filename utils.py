@@ -918,7 +918,7 @@ class SettingsManager:
             else:
                 user_tz = pytz.timezone(timezone)
 
-        current_date_time = datetime.now(user_tz).strftime("%d/%m/%Y %H:%M:%S")
+        current_date_time = datetime.now(user_tz).isoformat()
         return current_date_time
 
 

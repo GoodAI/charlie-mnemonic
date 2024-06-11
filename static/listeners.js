@@ -236,6 +236,7 @@ function addDeleteIcon(preview, file, index) {
 document.getElementById('uploadFileInput').addEventListener('change', function () {
     if (this.files.length > 0) {
         handleFiles(this.files);
+        resetFileInput();
     }
 });
 

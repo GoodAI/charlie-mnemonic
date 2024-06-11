@@ -974,3 +974,8 @@ function setupDropdownMenus() {
         });
     });
 }
+
+function resetFileInput() {
+    const fileInput = document.getElementById('uploadFileInput');
+    fileInput.value = '';
+}

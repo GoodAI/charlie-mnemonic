@@ -596,7 +596,7 @@ function toggleTabs() {
 function showTextFileModal(files) {
     let modalHtml = `
         <div class="modal fade" id="textFileModal">
-            <div class="modal-dialog modal-dialog-centered settings-dialog">
+            <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Text Files</h5>

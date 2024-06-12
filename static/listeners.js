@@ -163,7 +163,7 @@ function createFilePreview(file, index) {
     let preview = document.createElement('div');
     preview.className = 'file-preview';
 
-    if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/')  && file.type !== 'image/tiff') {
         let reader = new FileReader();
         reader.onload = function (event) {
             let img = new Image();
@@ -183,7 +183,10 @@ function createFilePreview(file, index) {
             img.src = event.target.result;
         };
         reader.readAsDataURL(file);
-    } else if (file.type.startsWith('video/')) {
+    } else if (file.type.startsWith('image/tiff')) {
+        preview.innerHTML = `<i class="fas fa-file-image"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    }else if (file.type.startsWith('video/')) {
         preview.innerHTML = `<i class="fas fa-file-video"></i><span>${file.name}</span>`;
         addDeleteIcon(preview, file, index);
     } else if (file.type.startsWith('text/')) {

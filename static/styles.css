@@ -708,6 +708,17 @@ a {
     align-self: flex-end;
 }
 
+.message.success .bubble {
+    background-color: #20c728;
+    color: white;
+    border-radius: 6px;
+    padding: 10px 15px;
+    display: inline-block;
+    max-width: 80%;
+    word-wrap: break-word;
+    align-self: flex-end;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

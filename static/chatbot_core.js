@@ -212,7 +212,7 @@ async function sendMessageToServer(message) {
 
     } catch (error) {
         console.error('Failed to send message: ', error);
-        showErrorMessage('Failed to send message: ' + error);
+        showMessage('Failed to send message: ' + error, "error", false);
     }
 }
 
@@ -239,7 +239,7 @@ async function regenerateResponse(div) {
 
     } catch (error) {
         console.error('Failed to regenerate response: ', error);
-        showErrorMessage('Failed to regenerate response: ' + error);
+        showMessage('Failed to regenerate response: ' + error, "error", false);
     }
 }
 
@@ -608,7 +608,7 @@ function send_audio(file) {
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
-                showErrorMessage('Too low volume or no voice detected!', true);
+                showMessage('Too low volume or no voice detected!', "warning", true);
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first

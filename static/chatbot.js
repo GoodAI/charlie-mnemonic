@@ -771,7 +771,7 @@ function removePlayButtonsAndAudioFromMessages() {
 }
 
 
-function showErrorMessage(message, instant) {
+function showMessage(message, type, instant) {
     var timestamp = new Date().toLocaleTimeString();
     var content = message;
     var tempchild = document.getElementById('messages').lastChild;
@@ -791,7 +791,7 @@ function showErrorMessage(message, instant) {
     var chatMessage = document.createElement('div');
     if (instant) {
         chatMessage.innerHTML = `
-            <div class="message warning">
+            <div class="message ${type}">
                 <span class="timestamp">${timestamp}</span>
                 <div class="bubble">
                     ${message}
@@ -799,21 +799,32 @@ function showErrorMessage(message, instant) {
             </div>
         `;
     } else {
-        chatMessage.innerHTML = `
-            <div class="message error">
-                <span class="timestamp">${timestamp}</span>
-                <div class="bubble">
-                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                        <div class="title">Error:<div class="arrow"></div></div>
+        if (type === 'error') {
+            chatMessage.innerHTML = `
+                <div class="message error">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Error:<div class="arrow"></div></div>
+                            ${message}
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            chatMessage.innerHTML = `
+                <div class="message ${type}">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
                         ${message}
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
     document.getElementById('messages').appendChild(chatMessage);
 
-    // enable the send  and record button again
+    // enable the send and record button again
     canSend = true;
     canRecord = true;
     isWaiting = false;
@@ -823,6 +834,7 @@ function showErrorMessage(message, instant) {
     // Auto-scroll to the bottom of the chat
     document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
 };
+
 
 function try_reconnect(socket, username) {
     // try to reconnect to the socket
@@ -1050,7 +1062,11 @@ async function handleCancelMessage(msg) {
 function addBottomButtons(div) {
     var buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'bottom-buttons-container';
-
+    // check if the settings exist
+    if (!settings) {
+        return;
+    }
+    console.log(settings);
     // Check the settings to see if we need to add the audio play button
     if (settings.audio.voice_output) {
         var playButtonWrapper = document.createElement('div');
@@ -1305,19 +1321,18 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
     var formattedMsgContent = '';
     for (var key in msg) {
         if (msg.hasOwnProperty(key)) {
-            // TODO: Make this prettier
-            // debug message content
             console.log('key:', key, 'value:', msg[key]);
-            // Selectively display keys
-            if (["input", "created_new_memory", "active_brain", "error", "Function", "Arguments", "Response"].includes(key)) {
+            if (["created_new_memory", "active_brain", "error", "Function", "Arguments", "Response", "timestamp"].includes(key)) {
                 formattedMsgContent += `<b>${escapeHtml(key)}:</b> `;
-
                 if (key === 'active_brain' && typeof msg[key] === 'object') {
                     // Summarize the contents of active_brain
                     formattedMsgContent += 'Query Categories: ' + Object.keys(msg[key]).length + '<br/>';
+                } else if (key === 'Arguments') {
+                    // Escape only the arguments
+                    formattedMsgContent += `${escapeHtml(JSON.stringify(msg[key], null, 2)).replace(/\n/g, '<br/>')}<br/>`;
                 } else {
                     // Format other keys normally
-                    formattedMsgContent += `${escapeHtml(formatContent(msg[key]))}<br/>`;
+                    formattedMsgContent += `${formatContent(msg[key])}<br/>`;
                 }
             }
         }
@@ -1429,7 +1444,7 @@ async function get_chat_tabs(username) {
 
     } catch (error) {
         console.error('Failed to send message: ', error);
-        showErrorMessage('Failed to send message: ' + error);
+        showMessage('Failed to send message: ' + error, "error", false);
     }
 }
 
@@ -1665,7 +1680,7 @@ async function get_recent_messages(username, chat_id) {
 
     } catch (error) {
         console.error('Failed to get messages: ', error);
-        showErrorMessage('Failed to get messages: ' + error);
+        showMessage('Failed to get messages: ' + error, "error", false);
     }
 }
 
@@ -1862,16 +1877,16 @@ async function handleError(response) {
                 errorMessage = '';
                 throw new Error('401: Unauthorized');
             case 500:
-                showErrorMessage('500: Server Error');
+                showMessage('500: Server Error', "error", false);
                 throw new Error('500: Server Error');
             case 503:
-                showErrorMessage('503: Service Unavailable');
+                showMessage('503: Service Unavailable', "error", false);
                 throw new Error('503: Service Unavailable');
             case 504:
-                showErrorMessage('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
+                showMessage('504: Gateway Timeout: The server is taking too long to respond. Please try again later.', "error", false);
                 throw new Error('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
             default:
-                showErrorMessage('An error occurred. Please try again later. (Error ' + response.status + ')');
+                showMessage('An error occurred. Please try again later. (Error ' + response.status + ')', "error", false);
                 throw new Error('Network response was not ok: ' + response.status);
         }
     }
@@ -1991,12 +2006,12 @@ function sendMail(id) {
         .then(handleError)
         .then(data => {
             console.log('Email sent:', data);
-            showErrorMessage('Email sent successfully!', true);
+            showMessage('Email sent successfully!', "success", true);
             $('#googleConfModal').modal('hide');
         })
         .catch(error => {
             console.error('Failed to send email:', error);
-            showErrorMessage('Failed to send email: ' + error);
+            showMessage('Failed to send email: ' + error, "error", true);
         });
 }
 

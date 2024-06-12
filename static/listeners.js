@@ -658,7 +658,7 @@ function showTextFileModal(files) {
         let file = files[index];
         let reader = new FileReader();
         reader.onload = function (event) {
-            let inputText = `${file.name}\n\n${event.target.result}`;
+            let inputText = `${file.name}\n\n${event.target.result}\n\n`;
             document.getElementById('message').value += inputText;
             // Trigger the input event on the message textarea
             message.dispatchEvent(new Event('input'));

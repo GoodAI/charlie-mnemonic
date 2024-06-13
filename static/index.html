@@ -277,8 +277,7 @@
              role="dialog"
              aria-labelledby="settingsModalLabel"
              aria-hidden="true">
-            <div class="modal-dialog settings-dialog"
-                 role="document">
+            <div class="modal-dialog settings-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
@@ -329,16 +328,25 @@
         </div>
         <!-- Chat Search modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="chatSearchModal">
-            <div class="modal-dialog modal-dialog-centered searchdialog" role="document">
+            <div class="modal-dialog modal-dialog-centered searchdialog"
+                 role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Search Chats</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="closeChatSearch()">
+                        <button type="button"
+                                class="close"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeChatSearch()">
                             <span aria-hidden="true">&times;</span>
                         </button>
                     </div>
                     <div class="modal-body">
-                        <input type="text" id="searchInput" class="form-control" placeholder="Search..." oninput="debouncedChatSearch()">
+                        <input type="text"
+                               id="searchInput"
+                               class="form-control"
+                               placeholder="Search..."
+                               oninput="debouncedChatSearch()">
                         <div id="rewrittenQuery"></div>
                         <div class="memory-container">
                             <div id="memoriesSection" class="memory-section">
@@ -360,7 +368,8 @@
                                             <th scope="col">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="memoryTableBody" data-category="chat"></tbody>
+                                    <tbody id="memoryTableBody" data-category="chat">
+                                    </tbody>
                                 </table>
                             </div>
                             <div id="rewrittenMemoriesSection" class="memory-section">
@@ -382,7 +391,8 @@
                                             <th scope="col">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="rewrittenMemoryTableBody" data-category="chat"></tbody>
+                                    <tbody id="rewrittenMemoryTableBody" data-category="chat">
+                                    </tbody>
                                 </table>
                             </div>
                         </div>
@@ -390,7 +400,6 @@
                 </div>
             </div>
         </div>
-        
         <!-- Google Confirmation modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="googleConfModal">
             <div class="modal-dialog modal-dialog-centered" role="document">

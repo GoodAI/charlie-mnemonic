@@ -533,15 +533,21 @@ async function send_files(files, prompt) {
         var fullmessage = '';
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.type.startsWith('image/') && file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') || file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp')) {
+            if (file.type.startsWith('image/') && 
+                file.type !== 'image/tiff' && !file.name.endsWith('.tif') &&
+                (file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || 
+                 file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || 
+                 file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') || 
+                 file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
                 // convert the image to base64
                 var base64data = await getBase64(file);
-                fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")';
+                fullmessage += `![${file.name}](${base64data} "${file.name}") <br>`;
             } else {
-                fullmessage += '[data/' + file.name + '](data/' + file.name + ')';
+                fullmessage += `[data/${file.name}](data/${file.name}) <br>`;
+                // print debug info
             }
         }
-        fullmessage += '<p>' + message + '</p>';
+        fullmessage += `<p>${message}</p>`;
         fullmessage = marked(fullmessage);
         addCustomMessage(fullmessage, 'user', true);
 
@@ -580,6 +586,7 @@ async function send_files(files, prompt) {
         overlay.style.display = 'none';
     }
 }
+
 
 function getBase64(file) {
     return new Promise((resolve, reject) => {

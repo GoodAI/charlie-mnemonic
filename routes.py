@@ -666,7 +666,6 @@ async def handle_message_files(
                 ".gif",
                 ".svg",
                 ".bmp",
-                ".tiff",
                 ".webp",
                 ".jfif",
                 ".pjpeg",
@@ -675,11 +674,11 @@ async def handle_message_files(
             )
         ):
             url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
-            file_details += f'\n![image](data/{url_encoded_image} "image")'
+            file_details += f'\n![image](data/{url_encoded_image} "image")\n'
         else:
             url_encoded_file = urllib.parse.quote(os.path.basename(file_path))
             file_details += (
-                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})"
+                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})\n"
             )
     prompt = file_details + "<p>" + prompt + "</p>"
     result = MessageParser.add_file_paths_to_message(prompt, file_details)

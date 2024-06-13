@@ -533,7 +533,7 @@ async function send_files(files, prompt) {
         var fullmessage = '';
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.type.startsWith('image/') || file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.tiff') || file.name.endsWith('.jfif') || file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp')) {
+            if (file.type.startsWith('image/') && file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') || file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp')) {
                 // convert the image to base64
                 var base64data = await getBase64(file);
                 fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")';

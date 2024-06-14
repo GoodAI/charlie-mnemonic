@@ -34,7 +34,7 @@ Now that everything is set up, you can run the script using:
 ## Info
 User data are in:
 
-- User home directory in {HOME}/.local/share/charlie-mnemonic/users
+- User home directory in `{HOME}/.local/share/charlie-mnemonic/users`
 - Database are saved in Docker volume named `postgres-data`
 - More information about persistence can be found in [Persistence](PERSISTENCE.md) document.
 

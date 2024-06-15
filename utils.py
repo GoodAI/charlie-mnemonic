@@ -188,7 +188,7 @@ class AddonManager:
             "system_prompt": {"system_prompt": "stoic"},
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
-            "timezone": {"timezone": "Auto"},
+            "timezone": {"timezone": "auto"},
             "memory": {
                 "functions": 640,
                 "ltm1": 1200,

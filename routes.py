@@ -390,11 +390,11 @@ async def handle_message(request: Request, message: userMessage):
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             user.username, True
         )
-        display_name = dao.get_display_name(user.username)
+
+        user = dao.get_user(user.username)
         daily_limit = admin_controls_dao.get_daily_limit()
-        has_access = dao.get_user_access(user.username)
-        user_id = dao.get_user_id(user.username)
-        tab_data = chat_tabs_dao.get_tab_data(user_id)
+        has_access = user.has_access
+        user_id = user.id
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
         if message.chat_id is None and active_tab_data is None:

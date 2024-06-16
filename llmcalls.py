@@ -47,9 +47,9 @@ class OpenAIResponser:
         audio_path = os.path.join(audio_dir, f"{uuid.uuid4()}.mp3")
 
         async with self.client.audio.speech.with_streaming_response.create(
-            model="tts-1",
-            voice="shimmer",
-            input=text,
+                model="tts-1",
+                voice="shimmer",
+                input=text,
         ) as response:
             await response.stream_to_file(audio_path)
             return audio_path
@@ -93,240 +93,131 @@ class OpenAIResponser:
         else:
             return "Failed to get a description."
 
-    async def get_response(
-        self,
-        username,
-        message,
-        stream=False,
-        function_metadata=None,
-        function_call="auto",
-        chat_id=None,
-        role=None,
-        uid=None,
-    ):
+    async def get_response(self, username, message, stream=False, function_metadata=None,
+                           function_call="auto", chat_id=None, role=None, uid=None):
         """Get a response from the OpenAI API."""
-        # debug print
-        # print(
-        #    f"username: {username}, message: {message}, stream: {stream}, function_metadata: {function_metadata}, function_call: {function_call}, chat_id: {chat_id}, role: {role}"
-        # )
+
+        # Default function metadata if none provided
         if function_metadata is None:
-            function_metadata = [
-                {
-                    "name": "none",
-                    "description": "you have no available functions",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                    },
+            function_metadata = [{
+                "name": "none",
+                "description": "you have no available functions",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
                 }
-            ]
+            }]
 
         current_date_time = await utils.SettingsManager.get_current_date_time(username)
         role_content = self.get_role_content(role, current_date_time)
 
-        # If a role is present, add the role content to the message
-        if role is not None:
-            messages = [
-                {"role": "system", "content": role_content},
-                {"role": "user", "content": message},
-            ]
-        else:
-            messages = message
+        # Prepare messages with or without role content
+        messages = [{"role": "system", "content": role_content},
+                    {"role": "user", "content": message}] if role else message
 
-        # # print the messages in different colors
-        # for message in messages:
-        #     if message["role"] == "user":
-        #         print(
-        #             f"\033[1;32m{message['content']}\033[0m"
-        #         )  # Green color for user messages
-        #     elif message["role"] == "system":
-        #         print(
-        #             f"\033[1;33m{message['content']}\033[0m"
-        #         )  # Yellow color for system messages
-        #     elif message["role"] == "assistant":
-        #         print(
-        #             f"\033[1;34m{message['content']}\033[0m"
-        #         )  # Blue color for assistant messages
-
+        # Update parameters for the API call
         params = self.default_params.copy()
-        params.update(
-            {
-                "model": self.default_params.get("model", "gpt-4o"),
-                "temperature": self.default_params.get("temperature", 0.1),
-                "max_tokens": self.default_params.get("max_tokens", 1000),
-                "n": self.default_params.get("n", 1),
-                "top_p": 1,
-                "frequency_penalty": 0,
-                "presence_penalty": 0,
-                "messages": messages,
-                "stream": stream,
-                "tools": function_metadata,
-                "tool_choice": function_call,
-            }
-        )
+        params.update({
+            "model": self.default_params.get("model", "gpt-4o"),
+            "temperature": self.default_params.get("temperature", 0.1),
+            "max_tokens": self.default_params.get("max_tokens", 1000),
+            "n": self.default_params.get("n", 1),
+            "top_p": 1,
+            "frequency_penalty": 0,
+            "presence_penalty": 0,
+            "messages": messages,
+            "stream": stream,
+            "tools": function_metadata,
+            "tool_choice": function_call,
+        })
 
         timeout = 180.0
         now = time.time()
+
         try:
             async with aiohttp.ClientSession() as session:
                 self.client.session = session
-                response = await asyncio.wait_for(
-                    self.client.chat.completions.create(**params),
-                    timeout=timeout,
-                )
+                response = await asyncio.wait_for(self.client.chat.completions.create(**params), timeout=timeout)
+
                 if stream:
-                    func_call = {
-                        "name": None,
-                        "arguments": "",
-                    }
-                    collected_messages = []
-                    tool_calls = []
-                    tool_calls_complete = False
-                    accumulated_name = ""
-                    accumulated_arguments = ""
-                    async for chunk in response:
-                        # print(
-                        #     f"Current chunk finish_reason: {chunk.choices[0].finish_reason}"
-                        # )
-                        delta = chunk.choices[0].delta
-                        # check if the user pressed stop
-                        global stopPressed
-                        stopStream = False
-                        if username in stopPressed:
-                            stopStream = stopPressed[username]
-                        if stopStream:
-                            stopPressed[username] = False
-                            stopStream = False
-                            await utils.MessageSender.send_message(
-                                {"cancel_message": True, "chat_id": chat_id},
-                                "blue",
-                                username,
-                            )
-                            break
-                        # print("chunk", chunk)
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
-                        )
-                        if content:
-                            collected_messages.append(content)
-                            yield await utils.MessageSender.send_message(
-                                {"chunk_message": content, "chat_id": chat_id},
-                                "blue",
-                                username,
-                            )
-                        if (
-                            chunk.choices[0].finish_reason == "stop"
-                            or chunk.choices[0].finish_reason == "tool_calls"
-                            or tool_calls_complete
-                        ):
-                            if accumulated_arguments:
-                                try:
-                                    # print(
-                                    #     f"Final accumulated arguments: {accumulated_arguments}"
-                                    # )
-                                    try:
-                                        parsed_arguments = json.loads(
-                                            accumulated_arguments
-                                        )
-                                    except json.JSONDecodeError as e:
-                                        # GPT tends to concatenate multiple JSON objects together so we need to split them
-                                        json_objects = re.findall(
-                                            r"\{.*?\}", accumulated_arguments
-                                        )
-                                        parsed_arguments = []
-                                        for json_str in json_objects:
-                                            data = json.loads(json_str)
-                                            parsed_arguments.append(data)
-                                    # print(f"Parsed arguments: {parsed_arguments}")
-                                    tool_response = (
-                                        await utils.MessageParser.process_function_call(
-                                            accumulated_name,
-                                            parsed_arguments,
-                                            self.addons,
-                                            function_metadata,
-                                            message,
-                                            message,
-                                            username,
-                                            None,
-                                            chat_id=chat_id,
-                                        )
-                                    )
-                                    yield tool_response
-                                    break
-                                except json.JSONDecodeError as e:
-                                    yield f"Error parsing JSON arguments: {e}"
-                                    print(f"JSON parsing error: {e}")
-                                    break
-                            await utils.MessageSender.send_message(
-                                {"stop_message": True, "chat_id": chat_id},
-                                "blue",
-                                username,
-                            )
-                            break
-                        # Check and accumulate content
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
-                        )
-                        if delta.tool_calls:
-                            for toolcall_chunk in delta.tool_calls:
-                                # print(
-                                #     f"toolcall_chunk: {toolcall_chunk}"
-                                # )
-
-                                # Only set the name if it's not None and accumulated_name is not already set
-                                if (
-                                    toolcall_chunk.function.name
-                                    and not accumulated_name
-                                ):
-                                    accumulated_name = toolcall_chunk.function.name
-                                    # print(
-                                    #     f"Function name set to: {accumulated_name}"
-                                    # )
-
-                                # Accumulate arguments
-                                accumulated_arguments += (
-                                    toolcall_chunk.function.arguments
-                                )
-                                # print(
-                                #     f"Accumulated arguments: {accumulated_arguments}"
-                                # )
-
-                            # Use finish_reason to determine if tool calls are complete
-                            if chunk.choices[0].finish_reason == "tool_calls":
-                                tool_calls_complete = True
-                                break
-
-                        # define the content of the message
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
-                        )
-                        if not content:
-                            continue
-                        response = "".join(collected_messages)
-                        yield response
-                # if no stream, return the full message
+                    await self.handle_stream_response(response, username, chat_id, message, function_metadata)
                 else:
                     yield response.choices[0].message.content
+
                 elapsed = time.time() - now
-                await utils.MessageSender.update_token_usage(
-                    response, username, False, elapsed=elapsed
-                )
+                await utils.MessageSender.update_token_usage(response, username, False, elapsed=elapsed)
+
         except asyncio.TimeoutError:
             yield "The request timed out. Please try again."
         except Exception as e:
             yield f"An error occurred: {e}"
             print(f"An error occurred: {e}")
-            await utils.MessageSender.send_message(
-                {"error": f"An error occurred: {e}", "chat_id": chat_id},
-                "blue",
-                username,
-            )
+            await utils.MessageSender.send_message({"error": f"An error occurred: {e}", "chat_id": chat_id}, "blue",
+                                                   username)
+
+    async def handle_stream_response(self, response, username, chat_id, original_message, function_metadata):
+        collected_messages = []
+        tool_calls_complete = False
+        accumulated_name = ""
+        accumulated_arguments = ""
+
+        async for chunk in response:
+            delta = chunk.choices[0].delta
+            global stopPressed
+            stopStream = False
+
+            if username in stopPressed:
+                stopStream = stopPressed[username]
+
+            if stopStream:
+                stopPressed[username] = False
+                stopStream = False
+                await utils.MessageSender.send_message({"cancel_message": True, "chat_id": chat_id}, "blue", username)
+                break
+
+            content = chunk.choices[0].delta.content or ""
+            if content:
+                collected_messages.append(content)
+                yield await utils.MessageSender.send_message({"chunk_message": content, "chat_id": chat_id}, "blue",
+                                                             username)
+
+            if chunk.choices[0].finish_reason in ["stop", "tool_calls"] or tool_calls_complete:
+                if accumulated_arguments:
+                    try:
+                        parsed_arguments = self.parse_accumulated_arguments(accumulated_arguments)
+                        tool_response = await utils.MessageParser.process_function_call(
+                            accumulated_name, parsed_arguments, self.addons, function_metadata, original_message,
+                            original_message, username, None, chat_id=chat_id
+                        )
+                        yield tool_response
+                        break
+                    except json.JSONDecodeError as e:
+                        yield f"Error parsing JSON arguments: {e}"
+                        print(f"JSON parsing error: {e}")
+                        break
+
+                await utils.MessageSender.send_message({"stop_message": True, "chat_id": chat_id}, "blue", username)
+                break
+
+            if delta.tool_calls:
+                for toolcall_chunk in delta.tool_calls:
+                    if toolcall_chunk.function.name and not accumulated_name:
+                        accumulated_name = toolcall_chunk.function.name
+                    accumulated_arguments += toolcall_chunk.function.arguments
+
+                if chunk.choices[0].finish_reason == "tool_calls":
+                    tool_calls_complete = True
+                    break
+
+        response = "".join(collected_messages)
+        yield response
+
+    def parse_accumulated_arguments(self, accumulated_arguments):
+        try:
+            return json.loads(accumulated_arguments)
+        except json.JSONDecodeError:
+            json_objects = re.findall(r"\{.*?\}", accumulated_arguments)
+            return [json.loads(json_str) for json_str in json_objects]
 
     def get_role_content(self, role, current_date_time):
         """Return the content for the role."""

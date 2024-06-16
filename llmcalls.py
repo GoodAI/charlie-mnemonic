@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import datetime
 import json
 import os
 from pathlib import Path
@@ -12,6 +11,7 @@ from dotenv import load_dotenv
 import aiohttp
 import utils
 from config import CHATGPT_MODEL
+import importlib
 
 load_dotenv()
 
@@ -34,7 +34,7 @@ class OpenAIResponser:
         for filename in os.listdir("addons"):
             if filename.endswith(".py") and filename != "__init__.py":
                 addon_name = filename.replace(".py", "")
-                addon = __import__(f"addons.{addon_name}", fromlist=[""])
+                addon = importlib.import_module(f"addons.{addon_name}")
                 addons[addon_name] = addon
         # print(f"Loaded addons: {addons}")
         return addons

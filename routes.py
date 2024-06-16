@@ -329,10 +329,10 @@ async def handle_update_settings(request: Request, user: editSettings):
 
     # check if the calendar_addon or gmail_addon is enabled
     if (
-        "calendar_addon" in settings["addons"]
-        and settings["addons"]["calendar_addon"]
-        or "gmail_addon" in settings["addons"]
-        and settings["addons"]["gmail_addon"]
+            "calendar_addon" in settings["addons"]
+            and settings["addons"]["calendar_addon"]
+            or "gmail_addon" in settings["addons"]
+            and settings["addons"]["gmail_addon"]
     ):
         from gworkspace.google_auth import onEnable
 
@@ -386,7 +386,6 @@ async def handle_message(request: Request, message: userMessage):
         display_name,
     ) = (0, 0, 0, 0, 0, "")
     with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
-        total_tokens_used, total_cost = db.get_token_usage(user.username)
         total_daily_tokens_used, total_daily_cost = db.get_token_usage(
             user.username, True
         )
@@ -394,6 +393,20 @@ async def handle_message(request: Request, message: userMessage):
         user = dao.get_user(user.username)
         daily_limit = admin_controls_dao.get_daily_limit()
         has_access = user.has_access
+
+        if not has_access or has_access == "false" or has_access == "False":
+            logger.info(f"user {user.username} does not have access")
+            raise HTTPException(
+                status_code=400,
+                detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
+            )
+        if total_daily_cost >= daily_limit:
+            logger.info(f"user {user.username} reached daily limit")
+            raise HTTPException(
+                status_code=400,
+                detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
+            )
+
         user_id = user.id
         active_tab_data = chat_tabs_dao.get_active_tab_data(user_id)
         # if no active tab, set chat_id to 0
@@ -408,18 +421,7 @@ async def handle_message(request: Request, message: userMessage):
         else:
             chat_tabs_dao.update_created_at(user_id, message.chat_id)
             message.chat_id = active_tab_data.chat_id
-    if not has_access or has_access == "false" or has_access == "False":
-        logger.info(f"user {user.username} does not have access")
-        raise HTTPException(
-            status_code=400,
-            detail="You do not have access yet, ask permission from the administrator or wait for your trial to start",
-        )
-    if total_daily_cost >= daily_limit:
-        logger.info(f"user {user.username} reached daily limit")
-        raise HTTPException(
-            status_code=400,
-            detail="You reached your daily limit. Please wait until tomorrow to continue using the service.",
-        )
+
     return await process_message(
         message.prompt,
         user.username,
@@ -521,10 +523,10 @@ async def stop_streaming(request: Request, user: UserName):
 
 @router.post("/message_with_image/", tags=["Messaging", LOGIN_REQUIRED])
 async def handle_message_image(
-    request: Request,
-    image_file: UploadFile,
-    prompt: str = Form(...),
-    chat_id: str = Form(...),
+        request: Request,
+        image_file: UploadFile,
+        prompt: str = Form(...),
+        chat_id: str = Form(...),
 ):
     user = request.state.user
     username = user.username
@@ -591,10 +593,10 @@ async def handle_message_image(
 
 @router.post("/message_with_files/", tags=["Messaging", LOGIN_REQUIRED])
 async def handle_message_files(
-    request: Request,
-    files: List[UploadFile] = File(...),
-    prompt: str = Form(...),
-    chat_id: str = Form(...),
+        request: Request,
+        files: List[UploadFile] = File(...),
+        prompt: str = Form(...),
+        chat_id: str = Form(...),
 ):
     file_details = ""
     user = request.state.user
@@ -949,7 +951,7 @@ async def handle_upload_data(request: Request, data_file: UploadFile = File(...)
 
         # Check for 'memory.json', and 'settings.json'
         if "memory.json" not in os.listdir(
-            os.path.join(USERS_DIR, username)
+                os.path.join(USERS_DIR, username)
         ) or "settings.json" not in os.listdir(os.path.join(USERS_DIR, username)):
             raise HTTPException(
                 status_code=400, detail="Zip file is missing required files"
@@ -1082,9 +1084,9 @@ async def handle_notoken_generate_audio(request: Request, message: noTokenMessag
     tags=[LOGIN_REQUIRED, ADMIN_REQUIRED],
 )
 async def get_statistics(
-    request: Request,
-    page: int,
-    items_per_page: int = 5,
+        request: Request,
+        page: int,
+        items_per_page: int = 5,
 ):
     with Database() as db, UsersDAO() as users, AdminControlsDAO() as admin_controls:
         global_stats = json.loads(db.get_global_statistics())
@@ -1226,10 +1228,10 @@ async def delete_recent_messages(request: Request, message: UserName):
 
 @router.post("/edit_memory/", tags=[LOGIN_REQUIRED])
 async def edit_memory(
-    request: Request,
-    memory_id: str = Form(...),
-    category: str = Form(...),
-    content: str = Form(...),
+        request: Request,
+        memory_id: str = Form(...),
+        category: str = Form(...),
+        content: str = Form(...),
 ):
     username = request.state.user.username
     update_memory(category, memory_id, text=content, username=username)
@@ -1238,7 +1240,7 @@ async def edit_memory(
 
 @router.post("/delete_memory/", tags=[LOGIN_REQUIRED])
 async def delete_memory_route(
-    request: Request, memory_id: str = Form(...), category: str = Form(...)
+        request: Request, memory_id: str = Form(...), category: str = Form(...)
 ):
     user = request.state.user
     username = user.username if user else None
@@ -1248,7 +1250,7 @@ async def delete_memory_route(
 
 @router.post("/search_memories/", tags=[LOGIN_REQUIRED])
 async def search_memories(
-    request: Request, category: str = Form(...), search_query: str = Form(...)
+        request: Request, category: str = Form(...), search_query: str = Form(...)
 ):
     username = request.state.user.username
     memories = search_memory(category, search_query, username=username, n_results=20)
@@ -1268,11 +1270,11 @@ async def search_memories(
 
 @router.post("/sort_memories/", tags=[LOGIN_REQUIRED])
 async def sort_memories(
-    request: Request,
-    category: str = Form(...),
-    sort_by: str = Form(...),
-    sort_order: str = Form(...),
-    search_query: str = Form(...),
+        request: Request,
+        category: str = Form(...),
+        sort_by: str = Form(...),
+        sort_order: str = Form(...),
+        search_query: str = Form(...),
 ):
     username = request.state.user.username
     memories = search_memory(category, search_query, username=username, n_results=20)

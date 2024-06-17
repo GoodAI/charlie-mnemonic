@@ -64,7 +64,7 @@ function createTabNav(tabs) {
             e.preventDefault();
             switchTab(index + 1);
         };
-        
+
         var listItem = document.createElement('li');
         listItem.className = 'nav-item';
         listItem.appendChild(tabLink);
@@ -98,12 +98,12 @@ function createAddonsTabContent(addons, tabId) {
     // todo: don't hardcode the addon descriptions
     var addon_descriptions = [
         {
-          name: 'get_current_weather',
-          description: 'Get the current weather in a location'
+            name: 'get_current_weather',
+            description: 'Get the current weather in a location'
         },
         {
-          name: 'get_search_results',
-          description: 'Get 5 search results from google or youtube'
+            name: 'get_search_results',
+            description: 'Get 5 search results from google or youtube'
         },
         {
             name: 'run_python_code',
@@ -133,8 +133,8 @@ function createAddonsTabContent(addons, tabId) {
             name: 'google_search',
             description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
         }
-        
-      ];
+
+    ];
 
     for (let addon in addons) {
         if (addons.hasOwnProperty(addon)) {
@@ -433,7 +433,7 @@ function createUserDataTabContent(tabId) {
     uploadDataBtn.textContent = 'Upload Data';
     tabContent.appendChild(uploadDataBtn);
 
-    
+
     saveDataBtn.addEventListener('click', save_user_data);
     deleteDataBtn.addEventListener('click', delete_user_data);
     uploadDataBtn.addEventListener('click', function () {
@@ -518,11 +518,11 @@ function createMemoryTabContent(tabId) {
         step: 0.01,
     });
 
-    var updateDisplayedValues = function() {
+    var updateDisplayedValues = function () {
         var maxTokens = parseInt(maxTokensDropdown.value);
         var values = slider.noUiSlider.get();
         var values = values.map(Number);
-        categoryValues = values.map(function(value, index, array) {
+        categoryValues = values.map(function (value, index, array) {
             return index === 0 ? value * 100 : (value - array[index - 1]) * 100;
         });
         var percentages = categoryValues.map(value => value / 100);
@@ -941,12 +941,12 @@ function handleFunctionCall(msg) {
             // Ensure arguments are stringified if it's an object
             var argsStr = typeof msg.message.arguments === 'string' ? msg.message.arguments : JSON.stringify(msg.message.arguments);
             var args = parseComplexJson(argsStr);
-    
+
             var callDetails = {
                 "Function": addon,
                 "Arguments": args
             };
-    
+
             updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
         } catch (error) {
             console.error('Error parsing JSON:', error);
@@ -1019,7 +1019,7 @@ function handleTabDescription(msg) {
     var dots = document.createElement('div');
     dots.className = 'chat-tab-dots';
     dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-    dots.onclick = function(event) {
+    dots.onclick = function (event) {
         event.stopPropagation();
         showDropdown(this, tabId);
     };
@@ -1077,7 +1077,7 @@ function addBottomButtons(div) {
         var playButton = document.createElement('i');
         playButton.className = 'fas fa-play play-button';
         playButton.title = 'Play';
-        playButton.onclick = function() {
+        playButton.onclick = function () {
             playButtonHandler(playButton);
         };
 
@@ -1095,7 +1095,7 @@ function addBottomButtons(div) {
     var copyButton = document.createElement('i');
     copyButton.className = 'fas fa-copy copy-button';
     copyButton.title = 'Copy';
-    copyButton.onclick = function() {
+    copyButton.onclick = function () {
         copyToClipboard(div);
     };
 
@@ -1174,7 +1174,7 @@ async function handleStopMessage(msg) {
     //         var audioElement = document.createElement('audio');
     //         audioElement.controls = true;
     //         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            
+
     //         var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
     //         this.closest('.bubble').appendChild(audioElement);
     //         if (anchorTag) {
@@ -1183,7 +1183,7 @@ async function handleStopMessage(msg) {
     //     });
     //     applyTooltips('[data-tooltip]');
     // }
-    
+
     tempFullChunk = '';
     applyTooltips('[data-tooltip]');
     resetState();
@@ -1285,7 +1285,7 @@ function handleRateLimit(msg) {
     const myToast = new bootstrap.Toast(toastEl, { delay: 10000 });
     toastContainer.appendChild(toastEl);
     myToast.show();
-}  
+}
 function handleRelations(msg) {
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
@@ -1440,7 +1440,7 @@ async function get_chat_tabs(username) {
         }
 
         populateChatTabs(tabs_data);
-        
+
 
     } catch (error) {
         console.error('Failed to send message: ', error);
@@ -1472,14 +1472,14 @@ async function setChat(id) {
 // The purpose of this function is to conform to the standard UUID format (8-4-4-4-12), 
 // where the 13th character (represented by ‘y’) is always 8, 9, A, or B.
 const uuid = () => {
-	return `CLANGxxx-xxxx-xxxx-yxxx-${Date.now().toString(16)}`.replace(
-		/[xy]/g,
-		function(c) {
-			var r = (Math.random() * 16) | 0,
-				v = c == "x" ? r : (r & 0x3) | 0x8;
-			return v.toString(16);
-		}
-	);
+    return `CLANGxxx-xxxx-xxxx-yxxx-${Date.now().toString(16)}`.replace(
+        /[xy]/g,
+        function (c) {
+            var r = (Math.random() * 16) | 0,
+                v = c == "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        }
+    );
 };
 
 function addChatTab(id) {
@@ -1497,7 +1497,7 @@ function addChatTab(id) {
     var dots = document.createElement('div');
     dots.className = 'chat-tab-dots';
     dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-    dots.onclick = function(event) {
+    dots.onclick = function (event) {
         event.stopPropagation();
         showDropdown(this, id);
     };
@@ -1506,7 +1506,7 @@ function addChatTab(id) {
     newTab.appendChild(dots);
 
     // Set the onclick function for the new tab
-    newTab.onclick = function() {
+    newTab.onclick = function () {
         setChat(id);
     };
 
@@ -1519,33 +1519,33 @@ function addChatTab(id) {
 
 function shareChat(chat_id) {
     var chatContent = document.getElementById('messages').innerHTML;
-    
+
     // Create the modal elements
     var backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     var modalContent = document.createElement('div');
     modalContent.className = 'share-modal-content';
-    
+
     // Set the inner HTML of the modal content
     modalContent.innerHTML = `<h3>This function is a WIP, your shared conversation would look like this (only active tab is currently displayed):</h3>${chatContent}`;
-    
+
     // Append the modal content to the backdrop and then the backdrop to the modal container
     backdrop.appendChild(modalContent);
     document.getElementById('share-modal-container').appendChild(backdrop);
-    
+
     // Show the modal
     backdrop.style.display = 'block';
-    
+
     // Close the modal when clicking on the backdrop
-    backdrop.addEventListener('click', function(event) {
-      if (event.target === backdrop) {
-        backdrop.style.display = 'none';
-        backdrop.remove();
-      }
+    backdrop.addEventListener('click', function (event) {
+        if (event.target === backdrop) {
+            backdrop.style.display = 'none';
+            backdrop.remove();
+        }
     });
-  }
-  
-  
+}
+
+
 
 function editTabDescription(chat_id) {
     var tabButton = document.getElementById('chat-tab-' + chat_id);
@@ -1579,7 +1579,7 @@ function editTabDescription(chat_id) {
                 var dots = document.createElement('div');
                 dots.className = 'chat-tab-dots';
                 dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-                dots.onclick = function(event) {
+                dots.onclick = function (event) {
                     event.stopPropagation();
                     showDropdown(this, chat_id);
                 };
@@ -1599,7 +1599,7 @@ function deleteChatTab(chat_id) {
     }
 
     var newActiveTab = targetTab.nextElementSibling || targetTab.previousElementSibling;
-    
+
     // Remove the target tab
     chatTabs.removeChild(targetTab);
 
@@ -1659,7 +1659,7 @@ async function get_recent_messages(username, chat_id) {
                 currentMessage += '\n' + text;
             } else {
                 if (currentUUID !== null) {
-                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
+                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID });
                 }
                 currentUUID = uuid;
                 currentMessage = text;
@@ -1670,7 +1670,7 @@ async function get_recent_messages(username, chat_id) {
 
         // Add the last message if it exists
         if (currentUUID !== null) {
-            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
+            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID });
         }
 
         // Process and display the messages
@@ -1748,7 +1748,7 @@ function get_settings(username) {
 
             if (msg.type === 'pong') {
                 return;
-            } 
+            }
 
             if (msg.debug) {
                 handleDebugMessage(msg);
@@ -2015,4 +2015,3 @@ function sendMail(id) {
         });
 }
 
-    

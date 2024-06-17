@@ -15,31 +15,31 @@ function searchChatHandler() {
             'sort_order': 'asc'
         })
     })
-    .then(response => response.text())
-    .then(data => {
-        data = JSON.parse(data);
-        
-        var memoryTableBody = document.getElementById('memoryTableBody');
-        var rewrittenMemoryTableBody = document.getElementById('rewrittenMemoryTableBody');
-        var memoriesSection = document.getElementById('memoriesSection');
-        var rewrittenMemoriesSection = document.getElementById('rewrittenMemoriesSection');
-        
-        memoryTableBody.innerHTML = '';
-        rewrittenMemoryTableBody.innerHTML = '';
-        memoriesSection.style.display = 'none';
-        rewrittenMemoriesSection.style.display = 'none';
+        .then(response => response.text())
+        .then(data => {
+            data = JSON.parse(data);
 
-        if (data.memories.length === 0 && data.rewritten_memories.length === 0) {
-            showAlert('No memories found.', 'info');
-        } else {
-            if (data.memories.length > 0) {
-                memoriesSection.style.display = 'block';
-                data.memories.forEach(memory => {
-                    var row = memoryTableBody.insertRow();
-                    var shortId = memory.id.replace(/^0+/, '') || '0';
-                    var formattedDate = formatDate(memory.metadata.created_at);
+            var memoryTableBody = document.getElementById('memoryTableBody');
+            var rewrittenMemoryTableBody = document.getElementById('rewrittenMemoryTableBody');
+            var memoriesSection = document.getElementById('memoriesSection');
+            var rewrittenMemoriesSection = document.getElementById('rewrittenMemoriesSection');
 
-                    row.innerHTML = `
+            memoryTableBody.innerHTML = '';
+            rewrittenMemoryTableBody.innerHTML = '';
+            memoriesSection.style.display = 'none';
+            rewrittenMemoriesSection.style.display = 'none';
+
+            if (data.memories.length === 0 && data.rewritten_memories.length === 0) {
+                showAlert('No memories found.', 'info');
+            } else {
+                if (data.memories.length > 0) {
+                    memoriesSection.style.display = 'block';
+                    data.memories.forEach(memory => {
+                        var row = memoryTableBody.insertRow();
+                        var shortId = memory.id.replace(/^0+/, '') || '0';
+                        var formattedDate = formatDate(memory.metadata.created_at);
+
+                        row.innerHTML = `
                         <td>${shortId}</td>
                         <td>${memory.document}</td>
                         <td>${formattedDate}</td>
@@ -48,16 +48,16 @@ function searchChatHandler() {
                             <button class="btn btn-primary" onclick="openMemory('${memory.metadata.uid}', '${memory.metadata.chat_id}')">Open</button>
                         </td>
                     `;
-                });
-            }
-            if (data.rewritten_memories.length > 0) {
-                rewrittenMemoriesSection.style.display = 'block';
-                data.rewritten_memories.forEach(alt_memory => {
-                    var row = rewrittenMemoryTableBody.insertRow();
-                    var shortId = alt_memory.id.replace(/^0+/, '') || '0';
-                    var formattedDate = formatDate(alt_memory.metadata.created_at);
+                    });
+                }
+                if (data.rewritten_memories.length > 0) {
+                    rewrittenMemoriesSection.style.display = 'block';
+                    data.rewritten_memories.forEach(alt_memory => {
+                        var row = rewrittenMemoryTableBody.insertRow();
+                        var shortId = alt_memory.id.replace(/^0+/, '') || '0';
+                        var formattedDate = formatDate(alt_memory.metadata.created_at);
 
-                    row.innerHTML = `
+                        row.innerHTML = `
                         <td>${shortId}</td>
                         <td>${alt_memory.document}</td>
                         <td>${formattedDate}</td>
@@ -66,15 +66,15 @@ function searchChatHandler() {
                             <button class="btn btn-primary" onclick="openMemory('${alt_memory.metadata.uid}', '${alt_memory.metadata.chat_id}')">Open</button>
                         </td>
                     `;
-                });
+                    });
+                }
+                document.getElementById('rewrittenQuery').innerHTML = data.rewritten;
             }
-            document.getElementById('rewrittenQuery').innerHTML = data.rewritten;
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        showAlert('An error occurred while searching memories.', 'danger');
-    });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('An error occurred while searching memories.', 'danger');
+        });
 }
 
 function formatDate(timestamp) {
@@ -108,7 +108,7 @@ function openMemory(memoryId, chatId) {
     $('#chatSearchModal').modal('hide');
 
     // Wait for the chat tab to be active, then scroll to the message
-    setTimeout(function() {
+    setTimeout(function () {
         scrollToMessage(memoryId);
     }, 500);
 }
@@ -116,7 +116,7 @@ function openMemory(memoryId, chatId) {
 function scrollToMessage(memoryId) {
     // Find the message bubble with the given data-uuid
     var messageBubble = document.querySelector('.bubble[data-uuid="' + memoryId + '"]');
-    
+
     // Check if the message bubble exists
     if (messageBubble) {
         // Scroll the messages container to the message bubble's position

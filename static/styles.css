@@ -181,10 +181,24 @@ a {
 
 .control-buttons-container {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
     justify-content: space-between;
+    padding: 10px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
+
+#chat-tabs-container-wrapper {
+    flex-grow: 1;
+    overflow-y: auto;
+    max-height: calc(100vh - 80px);
+}
+
+.chat-tabs-container {
+    width: 100%;
+}
+
 
 .chat-interface {
     position: relative;
@@ -873,13 +887,13 @@ pre {
 .sidenav {
     width: 13vw;
     position: fixed;
-    top: 18vh;
+    top: calc(50px + 10vh);
     left: -13vw;
-    overflow-x: auto;
+    overflow-y: hidden;
     transition: left 0.3s;
     color: #c9c8c8;
     z-index: 5;
-    bottom: 13vh;
+    bottom: 5vh;
 }
 
 .sidenav.open {
@@ -1193,25 +1207,28 @@ pre {
 }
 
 .vertical-alignment-helper {
-    display:table;
+    display: table;
     height: 100%;
     width: 100%;
-    pointer-events:none;
+    pointer-events: none;
 }
+
 .vertical-align-center {
     /* To center vertically */
     display: table-cell;
     vertical-align: middle;
-    pointer-events:none;
+    pointer-events: none;
 }
+
 .modal-content {
     /* Bootstrap sets the size of the modal in the modal-dialog class, we need to inherit it */
-    width:inherit;
- max-width:inherit; /* For Bootstrap 4 - to avoid the modal window stretching full width */
-    height:inherit;
+    width: inherit;
+    max-width: inherit;
+    /* For Bootstrap 4 - to avoid the modal window stretching full width */
+    height: inherit;
     /* To center horizontally */
     margin: 0 auto;
-    pointer-events:all;
+    pointer-events: all;
 }
 
 #settingsModal {

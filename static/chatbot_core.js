@@ -43,7 +43,7 @@ function addUserMessage(message) {
 function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = false) {
     // Replace multiple backticks with triple backticks
     message = message.replace(/(`\s*`\s*`)/g, '```');
-    
+
     // Count the number of triple backticks
     var count = (message.match(/```/g) || []).length;
 
@@ -51,7 +51,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     if (count % 2 !== 0) {
         message += '\n```';
     }
-    
+
     // Apply Markdown formatting
     message = marked(message);
 
@@ -87,10 +87,10 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
         lastMessage.classList.remove('last-message');
     }
     var uuidAttribute = uuid ? ' data-uuid="' + uuid + '"' : '';
-    
+
     var chatMessage = document.createElement('div');
     chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"' + uuidAttribute + '>' + messageReplaced + '</div></div>';
-    
+
     if (addButtons && user === 'bot') {
         // add bottom buttons to the bubble
         var buttons = document.createElement('div');
@@ -230,7 +230,7 @@ async function regenerateResponse(div) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 'uuid': uuid, 'username': user_name, 'chat_id': chat_id}),
+            body: JSON.stringify({ 'uuid': uuid, 'username': user_name, 'chat_id': chat_id }),
             credentials: 'include'
         });
 
@@ -249,7 +249,7 @@ async function request_audio(button) {
     var clonedBubbleContainer = bubbleContainer.cloneNode(true);
 
     var codeBlocks = clonedBubbleContainer.querySelectorAll('code[class^="language-"]');
-    codeBlocks.forEach(function(block) {
+    codeBlocks.forEach(function (block) {
         block.parentNode.removeChild(block);
     });
 
@@ -355,7 +355,7 @@ async function delete_user_data() {
 }
 
 async function upload_user_data(file) {
-    
+
     const overlay = document.getElementById('overlay_msg');
     const overlayMessage = document.getElementById('overlay-message');
     overlayMessage.textContent = "Uploading Data...";
@@ -373,9 +373,8 @@ async function upload_user_data(file) {
         if (response.ok) {
             const data = await response.json();
             overlayMessage.textContent = data.message;
-        } 
-        else
-        {
+        }
+        else {
             await handleError(response);
         }
         // Hide the overlay after a delay to let the user see the message
@@ -533,12 +532,12 @@ async function send_files(files, prompt) {
         var fullmessage = '';
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.type.startsWith('image/') && 
+            if (file.type.startsWith('image/') &&
                 file.type !== 'image/tiff' && !file.name.endsWith('.tif') &&
-                (file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') || 
-                 file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') || 
-                 file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') || 
-                 file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
+                (file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') ||
+                    file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') ||
+                    file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') ||
+                    file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
                 // convert the image to base64
                 var base64data = await getBase64(file);
                 fullmessage += `![${file.name}](${base64data} "${file.name}") <br>`;
@@ -913,9 +912,9 @@ function populateChatTabs(tabs_data) {
         if (tabs_data[i].chat_name.split(' ').length > 5) {
             newTab.innerText += '...';
         }
-        
+
         // Set the onclick function to the setChat function with the chat id as parameter
-        newTab.onclick = function() {
+        newTab.onclick = function () {
             setChat(tabs_data[i].chat_id);
         };
 
@@ -926,7 +925,7 @@ function populateChatTabs(tabs_data) {
         var dots = document.createElement('div');
         dots.className = 'chat-tab-dots';
         dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-        dots.onclick = function(event) {
+        dots.onclick = function (event) {
             event.stopPropagation();
             showDropdown(this, tabs_data[i].chat_id);
         };
@@ -935,9 +934,9 @@ function populateChatTabs(tabs_data) {
 
         // Append the new tab to the chat tabs container
         chatTabs.appendChild(newTab);
-        
+
     }
-    
+
     setupDropdownMenus();
 }
 
@@ -965,7 +964,7 @@ function showDropdown(dotElement, chatId) {
 
 function closeAllDropdowns() {
     var dropdowns = document.querySelectorAll('.dropdown-menu');
-    dropdowns.forEach(function(dropdown) {
+    dropdowns.forEach(function (dropdown) {
         dropdown.remove();
     });
 }
@@ -974,9 +973,9 @@ function closeAllDropdowns() {
 window.onclick = closeAllDropdowns;
 
 function setupDropdownMenus() {
-    window.addEventListener('click', function() {
+    window.addEventListener('click', function () {
         var dropdowns = document.querySelectorAll('.dropdown-menu');
-        dropdowns.forEach(function(dropdown) {
+        dropdowns.forEach(function (dropdown) {
             dropdown.style.display = 'none';
         });
     });

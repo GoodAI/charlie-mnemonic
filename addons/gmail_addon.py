@@ -18,7 +18,7 @@ Example input formats:
 1. List emails or drafts:
    action="list", list_type="draft/email", max_results=10
 2. Send an email:
-   action="send", to="recipient@example.com", subject="Test Email", body="This is a test email.", attachments=["path/to/file1.pdf", "path/to/image.jpg", askconfirm=True]
+   action="send", to="recipient@example.com", subject="Test Email", body="This is a test email.", attachments=["path/to/file1.pdf", "path/to/image.jpg"]
 3. Save an email as a draft:
    action="draft", to="recipient@example.com", subject="Draft Email", body="This is a draft email.", attachments=[]
 4. Send draft email based on the given id:
@@ -68,11 +68,11 @@ parameters = {
             "type": "string",
             "description": "The ID of the message to delete or retrieve.",
         },
-        "askconfirm": {
-            "type": "boolean",
-            "description": "This will let the user decide to send or cancel the email. (default is True, only set to False if the user explicitly asks to send without confirmation).",
-            "default": True,
-        },
+        # "askconfirm": {
+        #     "type": "boolean",
+        #     "description": "This will let the user decide to send or cancel the email. (default is True, only set to False if the user explicitly asks to send without confirmation).",
+        #     "default": True,
+        # },
         "list_type": {
             "type": "string",
             "description": "The type of list to retrieve: 'draft' or 'email'.",
@@ -284,7 +284,9 @@ def gmail_addon(
                 "raw": base64.urlsafe_b64encode(message.as_bytes()).decode()
             }
             print(f"askconfirm: {askconfirm}")
-            if askconfirm or askconfirm == "True":
+            if (
+                askconfirm or askconfirm == "True"
+            ):  # llm sometimes puts this as string ¯\_(ツ)_/¯
                 # send as draft and return confirmation message + draft id
                 draft = (
                     service.users()

@@ -84,10 +84,10 @@
         renderer.image = function (href, title, text) {
             // Extract the filename from the URL
             var filename = href.split('/').pop();
-            
+
             // Use the filename as the fallback caption if title is null or undefined
             var caption = title || filename;
-            
+
             // display images with 250px width and lightbox js
             return `<a href="${href}" data-lightbox="${text}" data-title="${caption}"><img src="${href}" width="250px" alt="${text}"></a>`;
         };
@@ -97,7 +97,7 @@
                 console.error('href is undefined');
                 return '';
             }
-            
+
             if (href.includes('youtube.com') || href.includes('youtu.be')) {
                 // Extract the video ID from the YouTube URL
                 var videoId = '';
@@ -110,7 +110,7 @@
                 } else if (href.includes('youtu.be')) {
                     videoId = href.split('/').pop();
                 }
-                
+
                 // Create an iframe for the YouTube video
                 return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
             } else {
@@ -347,7 +347,6 @@
                                class="form-control"
                                placeholder="Search..."
                                oninput="debouncedChatSearch()">
-                        <div id="rewrittenQuery"></div>
                         <div class="memory-container">
                             <div id="memoriesSection" class="memory-section">
                                 <h3>Memories</h3>
@@ -374,6 +373,7 @@
                             </div>
                             <div id="rewrittenMemoriesSection" class="memory-section">
                                 <h3>With Query Rewrite</h3>
+                                <div id="rewrittenQuery"></div>
                                 <table class="table table-hover memoryTable">
                                     <colgroup>
                                         <col style="width: 10%">
@@ -446,16 +446,16 @@
         <!-- Side Navigation -->
         <div id="sideNav" class="sidenav">
             <div id="chat-buttons" class="chat-buttons">
-                <div id="chat-buttons" class="chat-buttons">
-                    <div id="control-buttons-container" class="control-buttons-container">
-                        <button id="search-chats-input"
-                                class="control-tab"
-                                onclick="openChatSearch()">Search</button>
-                        <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
-                    </div>
-                    <div id="chat-tabs-container" class="chat-tabs-container">
-                        <div class="loader"></div>
-                    </div>
+                <div id="control-buttons-container" class="control-buttons-container">
+                    <button id="search-chats-input"
+                            class="control-tab"
+                            onclick="openChatSearch()">Search</button>
+                    <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
+                </div>
+            </div>
+            <div id="chat-tabs-container-wrapper">
+                <div id="chat-tabs-container" class="chat-tabs-container">
+                    <div class="loader"></div>
                 </div>
             </div>
         </div>
@@ -466,7 +466,7 @@
             <i>Your personal assistant with long-term memory</i>
         </div>
         <div class="sub_title">
-            <b>Version:</b> {{ version }} | <b>Release date:</b> 13/06/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 17/06/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
     target="_blank">Release Notes</a>
         </div>
         <div id="overlay">
@@ -558,9 +558,8 @@
                     </td>
                 </tr>
             </table>
+            <script src="chatbot_core.js?v={{version}}"></script>
+            <script src="listeners.js?v={{version}}"></script>
+            <script src="chatsearch.js?v={{version}}"></script>
         </body>
-        <script src="chatbot_core.js?v={{version}}"></script>
-        <script src="listeners.js?v={{version}}"></script>
-        <script src="chatsearch.js?v={{version}}"></script>
-    </body>
-</html>
+    </html>

@@ -202,7 +202,7 @@ function closeTabs() {
     document.getElementById("sideNav").classList.remove("open");
     const container = document.getElementById("chat-container");
     container.classList.remove("open");
-    
+
     localStorage.setItem("tabsState", "closed");
 
     setTimeout(() => {
@@ -215,7 +215,7 @@ function closeTabs() {
 function updateCounterDiv(message_length, tokens_used, max_message_tokens, cost) {
     const countDiv = document.getElementById("tokenCount");
     let tokensColor = tokens_used > max_message_tokens ? "<span style='color: red;'>" : "<span>";
-    
+
     countDiv.innerHTML = `Characters: ${message_length}, tokens: ${tokensColor}${tokens_used}</span>/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
 }
 
@@ -234,7 +234,7 @@ function getUuidFromMessage(messageElement) {
 
 function debounce(func, delay) {
     let timeoutId;
-    return function() {
+    return function () {
         const context = this;
         const args = arguments;
         clearTimeout(timeoutId);

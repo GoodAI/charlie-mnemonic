@@ -8,6 +8,7 @@ from fastapi import (
 )
 from fastapi.templating import Jinja2Templates
 
+from database import Database
 import logs
 from agentmemory import wipe_all_memories, stop_database
 from chat_tabs.dao import ChatTabsDAO
@@ -95,6 +96,16 @@ async def handle_delete_data_keep_settings(request: Request):
     # remove chat tabs from the database
     with ChatTabsDAO() as chat_tabs_dao:
         chat_tabs_dao.delete_tab_data(request.state.user.id)
+    if user.username == "admin":
+        with Database() as db:
+            try:
+                result = db.purge_user_by_username(user.username)
+                if result:
+                    print(f"Successfully purged data for user: {user.username}")
+                else:
+                    print(f"User {user.username} not found.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
     return {"message": "User data deleted successfully"}
 
 
@@ -128,6 +139,16 @@ async def handle_delete_data(request: Request):
     await BrainProcessor.delete_recent_messages(user.username)
     with ChatTabsDAO() as db:
         db.delete_tab_data(user.id)
+    if user.username == "admin":
+        with Database() as db:
+            try:
+                result = db.purge_user_by_username(user.username)
+                if result:
+                    print(f"Successfully purged data for user: {user.username}")
+                else:
+                    print(f"User {user.username} not found.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
     shutil.rmtree(os.path.join(USERS_DIR, user.username), ignore_errors=True)
     return {"message": "User data deleted successfully"}
 

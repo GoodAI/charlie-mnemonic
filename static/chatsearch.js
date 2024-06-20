@@ -3,6 +3,10 @@ function searchChatHandler() {
     console.log('searching chats');
     var searchQuery = document.getElementById('searchInput').value;
 
+    if (searchQuery.trim() === '') {
+        return;
+    }
+
     fetch('/search_chats/', {
         method: 'POST',
         headers: {

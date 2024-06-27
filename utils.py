@@ -645,8 +645,10 @@ class MessageParser:
                                 actual_function, converted_function_call_arguments
                             )
                             confirm_email_responses = [
-                                response for response in function_response
-                                if "action" in response and response["action"] == "confirm_email"
+                                response
+                                for response in function_response
+                                if "action" in response
+                                and response["action"] == "confirm_email"
                             ]
 
                             if confirm_email_responses:
@@ -660,7 +662,9 @@ class MessageParser:
                                 )
                                 # add a message to the response
                                 function_response.append(
-                                    {"note": "\nThe email has been prepared for the user. Ask the user to send or confirm the email themselves."}
+                                    {
+                                        "note": "\nThe email has been prepared for the user. Ask the user to send or confirm the email themselves."
+                                    }
                                 )
                     else:
                         print(

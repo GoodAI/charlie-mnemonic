@@ -151,7 +151,7 @@ def gmail_addon(
     if not creds or not creds.valid:
         return "Error: Invalid or missing credentials. Please restart the client or run the 'onEnable' function."
     service = build("gmail", "v1", credentials=creds)
-    
+
     if action == "list":
         if list_type == "email":
             try:
@@ -275,7 +275,9 @@ def gmail_addon(
                             or attachment_path.startswith("data/")
                             else attachment_path
                         )
-                        full_path = os.path.join("users", username, "data", converted_path)
+                        full_path = os.path.join(
+                            "users", username, "data", converted_path
+                        )
                         with open(full_path, "rb") as attachment:
                             part = MIMEBase("application", "octet-stream")
                             part.set_payload(attachment.read())
@@ -323,7 +325,9 @@ def gmail_addon(
                             or attachment_path.startswith("data/")
                             else attachment_path
                         )
-                        full_path = os.path.join("users", username, "data", converted_path)
+                        full_path = os.path.join(
+                            "users", username, "data", converted_path
+                        )
                         with open(full_path, "rb") as attachment:
                             part = MIMEBase("application", "octet-stream")
                             part.set_payload(attachment.read())
@@ -397,36 +401,53 @@ def gmail_addon(
             return f"Subject: {subject}\nBody: {body}"
         except Exception as e:
             return f"Error retrieving email: {str(e)}"
-    
+
     elif action == "send_draft":
         try:
             if isinstance(message_id, str):
                 message_id = [message_id]
             results = []
             for draft_id in message_id:
-                draft_message = service.users().drafts().get(userId="me", id=draft_id).execute()
+                draft_message = (
+                    service.users().drafts().get(userId="me", id=draft_id).execute()
+                )
                 message = draft_message["message"]
                 headers = message["payload"]["headers"]
-                
-                to = next(header["value"] for header in headers if header["name"].lower() == "to")
-                subject = next(header["value"] for header in headers if header["name"].lower() == "subject")
-                
+
+                to = next(
+                    header["value"]
+                    for header in headers
+                    if header["name"].lower() == "to"
+                )
+                subject = next(
+                    header["value"]
+                    for header in headers
+                    if header["name"].lower() == "subject"
+                )
+
                 # Initialize body and attachments
                 body = ""
                 attachments = []
-                
+
                 # Check if the message payload has 'parts' or 'body'
                 if "parts" in message["payload"]:
                     for part in message["payload"]["parts"]:
                         if part["mimeType"] == "text/plain" and "data" in part["body"]:
-                            body = base64.urlsafe_b64decode(part["body"]["data"]).decode()
+                            body = base64.urlsafe_b64decode(
+                                part["body"]["data"]
+                            ).decode()
                         elif "filename" in part and part["filename"]:
                             attachments.append(part["filename"])
-                elif "body" in message["payload"] and "data" in message["payload"]["body"]:
-                    body = base64.urlsafe_b64decode(message["payload"]["body"]["data"]).decode()
+                elif (
+                    "body" in message["payload"]
+                    and "data" in message["payload"]["body"]
+                ):
+                    body = base64.urlsafe_b64decode(
+                        message["payload"]["body"]["data"]
+                    ).decode()
                 else:
                     return "Error: No 'data' field found in the message payload."
-                
+
                 send_confirmation = {
                     "action": "confirm_email",
                     "to": to,
@@ -464,7 +485,9 @@ def gmail_addon(
                             or attachment_path.startswith("data/")
                             else attachment_path
                         )
-                        full_path = os.path.join("users", username, "data", converted_path)
+                        full_path = os.path.join(
+                            "users", username, "data", converted_path
+                        )
                         with open(full_path, "rb") as attachment:
                             part = MIMEBase("application", "octet-stream")
                             part.set_payload(attachment.read())
@@ -492,6 +515,7 @@ def gmail_addon(
     else:
         return "Invalid action. Please specify 'list', 'send', 'delete', 'update' or 'retrieve'."
 
+
 def create_mime_message_with_attachments(to, subject, body, attachments):
     message = MIMEMultipart()
     message["to"] = to
@@ -511,7 +535,10 @@ def create_mime_message_with_attachments(to, subject, body, attachments):
 
     return {"raw": base64.urlsafe_b64encode(message.as_bytes()).decode()}
 
-def send_email_by_id(message_id, username, message_type="draft", users_dir="users", path=None):
+
+def send_email_by_id(
+    message_id, username, message_type="draft", users_dir="users", path=None
+):
     """
     Sends an email or draft by ID without asking for confirmation.
 
@@ -538,7 +565,9 @@ def send_email_by_id(message_id, username, message_type="draft", users_dir="user
 
     try:
         if message_type == "email":
-            message = service.users().messages().get(userId="me", id=message_id).execute()
+            message = (
+                service.users().messages().get(userId="me", id=message_id).execute()
+            )
         elif message_type == "draft":
             draft = service.users().drafts().get(userId="me", id=message_id).execute()
             message = draft["message"]
@@ -547,8 +576,12 @@ def send_email_by_id(message_id, username, message_type="draft", users_dir="user
             return "Invalid message type. Please specify 'email' or 'draft'."
 
         headers = message.get("payload", {}).get("headers", [])
-        to = next(header["value"] for header in headers if header["name"].lower() == "to")
-        subject = next(header["value"] for header in headers if header["name"].lower() == "subject")
+        to = next(
+            header["value"] for header in headers if header["name"].lower() == "to"
+        )
+        subject = next(
+            header["value"] for header in headers if header["name"].lower() == "subject"
+        )
         body = ""
         attachments = []
 
@@ -564,8 +597,14 @@ def send_email_by_id(message_id, username, message_type="draft", users_dir="user
                     body = decode_email_body(part)
                 elif "filename" in part and part["filename"]:
                     attachment_data = part["body"].get("attachmentId")
-                    attachment = service.users().messages().attachments().get(userId="me", messageId=message_id, id=attachment_data).execute()
-                    file_data = base64.urlsafe_b64decode(attachment['data'])
+                    attachment = (
+                        service.users()
+                        .messages()
+                        .attachments()
+                        .get(userId="me", messageId=message_id, id=attachment_data)
+                        .execute()
+                    )
+                    file_data = base64.urlsafe_b64decode(attachment["data"])
                     file_path = os.path.join("/tmp", part["filename"])
                     with open(file_path, "wb") as f:
                         f.write(file_data)
@@ -577,7 +616,9 @@ def send_email_by_id(message_id, username, message_type="draft", users_dir="user
             print("No email body found")
             return "Error: No email body found."
 
-        mime_message = create_mime_message_with_attachments(to, subject, body, attachments)
+        mime_message = create_mime_message_with_attachments(
+            to, subject, body, attachments
+        )
 
         send_message = (
             service.users().messages().send(userId="me", body=mime_message).execute()

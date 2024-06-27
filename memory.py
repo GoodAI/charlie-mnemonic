@@ -739,8 +739,17 @@ class MemoryManager:
 
             result.append(line)
         return result
-    
-    async def note_taking(self, content, message, user_dir, username, show=True, verbose=False, tokens_notes=1000):
+
+    async def note_taking(
+        self,
+        content,
+        message,
+        user_dir,
+        username,
+        show=True,
+        verbose=False,
+        tokens_notes=1000,
+    ):
         max_tokens = tokens_notes
         process_dict = {
             "actions": [],
@@ -777,7 +786,9 @@ class MemoryManager:
                     max_tokens_per_file = max_tokens / len(dir_list)
                     with open(current_file, "r") as f:
                         file_content = f.read()
-                        openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
+                        openai_response = llmcalls.OpenAIResponser(
+                            config.api_keys["openai"], config.default_params
+                        )
                         async for response in openai_response.get_response(
                             username,
                             file_content,
@@ -787,7 +798,9 @@ class MemoryManager:
                             if response:
                                 summary = response
                             else:
-                                logger.error("Error: summary does not contain the required elements")
+                                logger.error(
+                                    "Error: summary does not contain the required elements"
+                                )
                         with open(current_file, "w") as f:
                             new_content = summary
                             f.write(new_content)
@@ -803,7 +816,9 @@ class MemoryManager:
 
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
-                openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
+                openai_response = llmcalls.OpenAIResponser(
+                    config.api_keys["openai"], config.default_params
+                )
                 async for response in openai_response.get_response(
                     username,
                     message,
@@ -813,7 +828,9 @@ class MemoryManager:
                     if response:
                         message = response
                     else:
-                        logger.error("Error: message does not contain the required elements")
+                        logger.error(
+                            "Error: message does not contain the required elements"
+                        )
 
             final_message = f"Current Time: {timestamp}\nCurrent Notes:\n{files_content_string}\n\nRelated messages:\n{content}\n\nLast Message:{message}\n"
             process_dict["final_message"] = final_message
@@ -822,7 +839,9 @@ class MemoryManager:
             while retry_count < 5:
                 try:
                     note_taking_query = {}
-                    openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
+                    openai_response = llmcalls.OpenAIResponser(
+                        config.api_keys["openai"], config.default_params
+                    )
                     async for resp in openai_response.get_response(
                         username,
                         final_message,
@@ -832,9 +851,13 @@ class MemoryManager:
                         if resp:
                             note_taking_query = resp
                         else:
-                            logger.error("Error: note_taking_query does not contain the required elements")
+                            logger.error(
+                                "Error: note_taking_query does not contain the required elements"
+                            )
                     process_dict["note_taking_query"] = json.dumps(note_taking_query)
-                    logger.debug(f"Received note_taking_query: {process_dict['note_taking_query']}")
+                    logger.debug(
+                        f"Received note_taking_query: {process_dict['note_taking_query']}"
+                    )
                     actions = self.process_note_taking_query(note_taking_query)
                     if actions:
                         process_dict["actions"] = actions
@@ -843,7 +866,9 @@ class MemoryManager:
                         logger.error("No valid actions found in note_taking_query")
                         retry_count += 1
                 except json.decoder.JSONDecodeError as e:
-                    logger.error(f"JSON decoding error: {e} - Retrying... ({retry_count}/5)")
+                    logger.error(
+                        f"JSON decoding error: {e} - Retrying... ({retry_count}/5)"
+                    )
                     retry_count += 1
             else:
                 logger.error("Error in JSON decoding, exceeded retry limit.")
@@ -894,16 +919,19 @@ class MemoryManager:
             )
         return await self.note_taking(content, message, user_dir, username, show=True)
 
-
     def process_note_taking_query(self, query):
         actions = []
         logger.debug(f"Processing note_taking_query: {query}")
 
         # Remove surrounding triple backticks and "json" tag if present
-        query_string = query.strip('```json').strip('```').strip()
+        query_string = query.strip("```json").strip("```").strip()
 
         # Replace newline characters within the content with \\n
-        query_string = re.sub(r'(?<="content": ")(.|\n)*?(?=")', lambda m: m.group().replace('\n', '\\n'), query_string)
+        query_string = re.sub(
+            r'(?<="content": ")(.|\n)*?(?=")',
+            lambda m: m.group().replace("\n", "\\n"),
+            query_string,
+        )
 
         try:
             query_json = json.loads(query_string)
@@ -926,7 +954,9 @@ class MemoryManager:
                     file = ""
                     content = ""
                 else:
-                    logger.error(f"Error: action list does not contain the required elements: {str(action_dict)}")
+                    logger.error(
+                        f"Error: action list does not contain the required elements: {str(action_dict)}"
+                    )
                     continue
                 actions.append((action, file, content))
         elif isinstance(query_json, dict):
@@ -943,7 +973,9 @@ class MemoryManager:
                 file = ""
                 content = ""
             else:
-                logger.error(f"Error: action does not contain the required elements: {str(query_json)}")
+                logger.error(
+                    f"Error: action does not contain the required elements: {str(query_json)}"
+                )
                 return actions
             actions.append((action, file, content))
 

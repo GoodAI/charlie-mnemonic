@@ -2,6 +2,9 @@ var currentActiveTab = 1;
 var categoryValues;
 
 var tempFullChunk = '';
+
+var showDebug = false;
+
 // populate the settings menu
 function populateSettingsMenu(settings) {
     var settingsMenu = document.getElementById("SidenavAddons");
@@ -1066,7 +1069,9 @@ function addBottomButtons(div) {
     if (!settings) {
         return;
     }
-    console.log(settings);
+    if (showDebug === true) {
+        console.log(settings);
+    }
     // Check the settings to see if we need to add the audio play button
     if (settings.audio.voice_output) {
         var playButtonWrapper = document.createElement('div');
@@ -1321,7 +1326,9 @@ function updateOrCreateDebugBubble(message, timestamp, msg) {
     var formattedMsgContent = '';
     for (var key in msg) {
         if (msg.hasOwnProperty(key)) {
-            console.log('key:', key, 'value:', msg[key]);
+            if (showDebug == true) {
+                console.log('key:', key, 'value:', msg[key]);
+            }
             if (["created_new_memory", "active_brain", "error", "Function", "Arguments", "Response", "timestamp"].includes(key)) {
                 formattedMsgContent += `<b>${escapeHtml(key)}:</b> `;
                 if (key === 'active_brain' && typeof msg[key] === 'object') {
@@ -1773,6 +1780,9 @@ function get_settings(username) {
                     handleConfirmMail(msg);
                 }
             }
+            else if (msg.action == 'confirm_email') {
+                handleConfirmMail(msg);
+            }
             else if (msg.usage) {
                 handleUsage(msg);
             }
@@ -1800,6 +1810,7 @@ function get_settings(username) {
             else if (msg.auth) {
                 handleAuthMessage(msg);
             }
+
 
             if (msg.debug1 !== undefined) {
                 var debug1 = msg.debug1.replace(/\n/g, '<br>');
@@ -1966,52 +1977,121 @@ const msg = {
         "chat_id": "1234"
     }
 };
+// Function to handle the confirmation email
+function handleConfirmMail(msg) {
+    showConfirmationWindow(msg.content);
+}
 
-function showConfirmationWindow(msg) {
-    // Access the content within the msg
-    const content = msg.content;
-    console.log("content: ", content);
+let currentEmailIndex = 0;
+let emails = [];
+
+// Function to show the confirmation window
+function showConfirmationWindow(msgArray) {
+    // Store the array of emails
+    emails = msgArray;
+
+    // Reset the current email index
+    currentEmailIndex = 0;
+
+    // Show the first email
+    showEmail(currentEmailIndex);
+
+    // Show the modal
+    $('#googleConfModal').modal('show');
+}
+
+// Function to display an email based on index
+function showEmail(index) {
+    if (index < 0 || index >= emails.length) {
+        return;
+    }
+
+    const msg = emails[index];
 
     // Set the confirmation message
     document.getElementById('confirm-message').textContent = 'Are you sure you want to send this email?';
 
     // Format and set the email details
     const emailDetails = `
-        <b>To:</b> ${content.to}<br>
-        <b>Subject:</b> ${content.subject}<br>
-        <b>Body:</b> ${content.body}<br>
-        <b>Attachments:</b> ${content.attachments ? content.attachments : 'None'}
+        <b>To:</b> ${msg.to}<br>
+        <b>Subject:</b> ${msg.subject}<br>
+        <b>Body:</b> ${msg.body.replace(/\r?\n/g, '<br>')}<br>
+        <b>Attachments:</b> ${msg.attachments && msg.attachments.length > 0 ? msg.attachments.join(', ') : 'None'}
     `;
     document.getElementById('email-details').innerHTML = emailDetails;
-    document.getElementById('emailId').value = content.draft_id;
+    document.getElementById('emailId').value = msg.draft_id;
 
-    // Show the modal
-    $('#googleConfModal').modal('show');
+    // Enable/disable navigation buttons
+    document.getElementById('prev-email').disabled = index === 0;
+    document.getElementById('next-email').disabled = index === emails.length - 1;
 }
 
-function handleConfirmMail(msg) {
-    showConfirmationWindow(msg);
+// Function to show the previous email
+function showPreviousEmail() {
+    if (currentEmailIndex > 0) {
+        currentEmailIndex--;
+        showEmail(currentEmailIndex);
+    }
+}
+
+// Function to show the next email
+function showNextEmail() {
+    if (currentEmailIndex < emails.length - 1) {
+        currentEmailIndex++;
+        showEmail(currentEmailIndex);
+    }
+}
+
+// Function to send the current email
+async function sendCurrentEmail() {
+    if (currentEmailIndex < 0 || currentEmailIndex >= emails.length) {
+        return;
+    }
+
+    const msg = emails[currentEmailIndex];
+    if (showDebug === true) {
+        console.log('Sending email:', msg);
+    }
+    await sendMail(msg.draft_id);
+
+    // Remove the sent email from the list
+    emails.splice(currentEmailIndex, 1);
+
+    // Adjust the current index if necessary
+    if (currentEmailIndex >= emails.length) {
+        currentEmailIndex = emails.length - 1;
+    }
+
+    // Show the next email or close the modal if no emails are left
+    if (emails.length > 0) {
+        showEmail(currentEmailIndex);
+    } else {
+        $('#googleConfModal').modal('hide');
+    }
 }
 
 function sendMail(id) {
-    console.log('Sending email with id:', id);
-    fetch(API_URL + '/send_email/', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 'username': user_name, 'draft_id': id }),
-        credentials: 'include'
-    })
-        .then(handleError)
-        .then(data => {
-            console.log('Email sent:', data);
-            showMessage('Email sent successfully!', "success", true);
-            $('#googleConfModal').modal('hide');
+    return new Promise((resolve, reject) => {
+        fetch(API_URL + '/send_email/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'username': user_name, 'draft_id': id }),
+            credentials: 'include'
         })
-        .catch(error => {
-            console.error('Failed to send email:', error);
-            showMessage('Failed to send email: ' + error, "error", true);
-        });
+            .then(handleError)
+            .then(data => {
+                if (showDebug === true) {
+                    console.log('Email sent:', data);
+                }
+                showMessage('Email sent successfully!', "success", true);
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Failed to send email:', error);
+                showMessage('Failed to send email: ' + error, "error", true);
+                reject(error);
+            });
+    });
 }
-

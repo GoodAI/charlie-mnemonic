@@ -739,17 +739,8 @@ class MemoryManager:
 
             result.append(line)
         return result
-
-    async def note_taking(
-        self,
-        content,
-        message,
-        user_dir,
-        username,
-        show=True,
-        verbose=False,
-        tokens_notes=1000,
-    ):
+    
+    async def note_taking(self, content, message, user_dir, username, show=True, verbose=False, tokens_notes=1000):
         max_tokens = tokens_notes
         process_dict = {
             "actions": [],
@@ -770,40 +761,37 @@ class MemoryManager:
         dir_list = os.listdir(filedir)
         files_content_string = ""
         for file in dir_list:
-            with open(f"{filedir}/{file}", "r") as f:
-                files_content_string += f"{file}:\n{f.read()}\n\n"
+            current_file = os.path.join(filedir, file)
+            if os.path.isfile(current_file):  # Check if it's a file
+                with open(current_file, "r") as f:
+                    files_content_string += f"{file}:\n{f.read()}\n\n"
 
         process_dict["files_content_string"] = files_content_string
 
         token_count = utils.MessageParser.num_tokens_from_string(files_content_string)
         if token_count > max_tokens:
             new_files_content_string = ""
-            # take each file, ask gpt to summarize it, and overwrite the original file with the summary
             for file in dir_list:
-                # calculate tokens based on max tokens divided by the number of files
-                max_tokens_per_file = max_tokens / len(dir_list)
-                current_file = f"{filedir}/{file}"
-                with open(current_file, "r") as f:
-                    file_content = f.read()
-                    openai_response = llmcalls.OpenAIResponser(
-                        config.api_keys["openai"], config.default_params
-                    )
-                    async for response in openai_response.get_response(
-                        username,
-                        file_content,
-                        function_metadata=config.fakedata,
-                        role="summary_memory",
-                    ):
-                        if response:
-                            summary = response
-                        else:
-                            logger.error(
-                                "Error: summary does not contain the required elements"
-                            )
-                    with open(current_file, "w") as f:
-                        new_content = summary
-                        f.write(new_content)
-                        new_files_content_string += f"{file}:\n{new_content}\n\n"
+                current_file = os.path.join(filedir, file)
+                if os.path.isfile(current_file):  # Check if it's a file
+                    max_tokens_per_file = max_tokens / len(dir_list)
+                    with open(current_file, "r") as f:
+                        file_content = f.read()
+                        openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
+                        async for response in openai_response.get_response(
+                            username,
+                            file_content,
+                            function_metadata=config.fakedata,
+                            role="summary_memory",
+                        ):
+                            if response:
+                                summary = response
+                            else:
+                                logger.error("Error: summary does not contain the required elements")
+                        with open(current_file, "w") as f:
+                            new_content = summary
+                            f.write(new_content)
+                            new_files_content_string += f"{file}:\n{new_content}\n\n"
             files_content_string = new_files_content_string
 
         if show:
@@ -813,12 +801,9 @@ class MemoryManager:
             timestamp = await utils.SettingsManager.get_current_date_time(username)
             process_dict["timestamp"] = timestamp
 
-            # count tokens of the message
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
-                openai_response = llmcalls.OpenAIResponser(
-                    config.api_keys["openai"], config.default_params
-                )
+                openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
                 async for response in openai_response.get_response(
                     username,
                     message,
@@ -828,9 +813,7 @@ class MemoryManager:
                     if response:
                         message = response
                     else:
-                        logger.error(
-                            "Error: message does not contain the required elements"
-                        )
+                        logger.error("Error: message does not contain the required elements")
 
             final_message = f"Current Time: {timestamp}\nCurrent Notes:\n{files_content_string}\n\nRelated messages:\n{content}\n\nLast Message:{message}\n"
             process_dict["final_message"] = final_message
@@ -838,20 +821,8 @@ class MemoryManager:
             retry_count = 0
             while retry_count < 5:
                 try:
-                    # todo: inform gpt about the remaining tokens available, if it exceeds the limit, summarize the existing list and purge unneeded items
-                    # self.openai_manager.set_username(username)
-                    # note_taking_query = await self.openai_manager.ask_openai(
-                    #     final_message,
-                    #     "notetaker",
-                    #     self.model_used,
-                    #     1000,
-                    #     0.1,
-                    #     username=username,
-                    # )
                     note_taking_query = {}
-                    openai_response = llmcalls.OpenAIResponser(
-                        config.api_keys["openai"], config.default_params
-                    )
+                    openai_response = llmcalls.OpenAIResponser(config.api_keys["openai"], config.default_params)
                     async for resp in openai_response.get_response(
                         username,
                         final_message,
@@ -861,52 +832,56 @@ class MemoryManager:
                         if resp:
                             note_taking_query = resp
                         else:
-                            logger.error(
-                                "Error: note_taking_query does not contain the required elements"
-                            )
+                            logger.error("Error: note_taking_query does not contain the required elements")
                     process_dict["note_taking_query"] = json.dumps(note_taking_query)
+                    logger.debug(f"Received note_taking_query: {process_dict['note_taking_query']}")
                     actions = self.process_note_taking_query(note_taking_query)
-                    break  # If no error, break the loop
-                except json.decoder.JSONDecodeError:
-                    logger.error("Error in JSON decoding, retrying...")
+                    if actions:
+                        process_dict["actions"] = actions
+                        break
+                    else:
+                        logger.error("No valid actions found in note_taking_query")
+                        retry_count += 1
+                except json.decoder.JSONDecodeError as e:
+                    logger.error(f"JSON decoding error: {e} - Retrying... ({retry_count}/5)")
                     retry_count += 1
             else:
                 logger.error("Error in JSON decoding, exceeded retry limit.")
-            process_dict["actions"] = actions
 
             for action, file, content in actions:
                 filepath = os.path.join(filedir, file)
 
-                # Check if the directory exists, if not, create it
                 if not os.path.isdir(filedir):
                     os.makedirs(filedir, exist_ok=True)
 
                 if action == "create":
-                    with open(f"{filedir}/{file}", "w") as f:
+                    with open(filepath, "w") as f:
                         f.write(content)
                 elif action == "add":
-                    with open(f"{filedir}/{file}", "a") as f:
+                    with open(filepath, "a") as f:
                         if f.tell() != 0 and not content.startswith("\n"):
                             f.write("\n")
                         f.write(content)
                 elif action == "read":
-                    if not os.path.exists(f"{filedir}/{file}"):
+                    if not os.path.exists(filepath):
                         process_dict["error"] = "Error: File does not exist"
                         return process_dict
-                    with open(f"{filedir}/{file}", "r") as f:
+                    with open(filepath, "r") as f:
                         return f.read()
                 elif action == "delete":
                     if not content:
-                        os.remove(f"{filedir}/{file}")
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
                     else:
-                        with open(f"{filedir}/{file}", "r") as f:
-                            lines = f.readlines()
-                        with open(f"{filedir}/{file}", "w") as f:
-                            for line in lines:
-                                if line.strip("\n") != content:
-                                    f.write(line)
+                        if os.path.exists(filepath):
+                            with open(filepath, "r") as f:
+                                lines = f.readlines()
+                            with open(filepath, "w") as f:
+                                for line in lines:
+                                    if line.strip("\n") != content:
+                                        f.write(line)
                 elif action == "update":
-                    with open(f"{filedir}/{file}", "w") as f:
+                    with open(filepath, "w") as f:
                         f.write(content)
                 elif action == "skip":
                     pass
@@ -919,22 +894,22 @@ class MemoryManager:
             )
         return await self.note_taking(content, message, user_dir, username, show=True)
 
+
     def process_note_taking_query(self, query):
-        # extract the actions from the query
         actions = []
-        query_string = query.replace("```json", "").replace("```", "").strip()
+        logger.debug(f"Processing note_taking_query: {query}")
+
+        # Remove surrounding triple backticks and "json" tag if present
+        query_string = query.strip('```json').strip('```').strip()
+
+        # Replace newline characters within the content with \\n
+        query_string = re.sub(r'(?<="content": ")(.|\n)*?(?=")', lambda m: m.group().replace('\n', '\\n'), query_string)
+
         try:
             query_json = json.loads(query_string)
-        except json.JSONDecodeError:
-            if not query_string.startswith("["):
-                query_string = "[" + query_string
-            if not query_string.endswith("]"):
-                query_string = query_string + "]"
-            try:
-                query_json = json.loads(query_string)
-            except:
-                logger.error("Error: query is not valid json: " + query_string)
-                return actions
+        except json.JSONDecodeError as e:
+            logger.error(f"Error: query is not valid json: {query_string} - {e}")
+            return actions
 
         if isinstance(query_json, list):
             for action_dict in query_json:
@@ -951,10 +926,7 @@ class MemoryManager:
                     file = ""
                     content = ""
                 else:
-                    logger.error(
-                        "Error: action list does not contain the required elements: "
-                        + str(action_dict)
-                    )
+                    logger.error(f"Error: action list does not contain the required elements: {str(action_dict)}")
                     continue
                 actions.append((action, file, content))
         elif isinstance(query_json, dict):
@@ -971,11 +943,9 @@ class MemoryManager:
                 file = ""
                 content = ""
             else:
-                logger.error(
-                    "Error: action does not contain the required elements: "
-                    + str(query_json)
-                )
-                return
+                logger.error(f"Error: action does not contain the required elements: {str(query_json)}")
+                return actions
             actions.append((action, file, content))
 
+        logger.debug(f"Processed actions: {actions}")
         return actions

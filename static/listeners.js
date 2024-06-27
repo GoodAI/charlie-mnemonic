@@ -538,7 +538,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");
-    const sendMailButton = document.getElementById('send-email');
     const cancelEmailButton = document.getElementById('cancel-email');
     const hiddenIdField = document.getElementById('emailId');
 
@@ -546,8 +545,11 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.classList.add(currentTheme);
     }
 
-    sendMailButton.addEventListener('click', function() {
-        sendMail(hiddenIdField.value);
+    document.getElementById('send-email').addEventListener('click', sendCurrentEmail);
+
+    
+    document.getElementById('cancel-email').addEventListener('click', function() {
+        $('#googleConfModal').modal('hide');
     });
 
     cancelEmailButton.addEventListener('click', function() {

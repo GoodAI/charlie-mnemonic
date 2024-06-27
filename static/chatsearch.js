@@ -1,9 +1,19 @@
 const debouncedChatSearch = debounce(searchChatHandler, 1000);
+
 function searchChatHandler() {
-    console.log('searching chats');
     var searchQuery = document.getElementById('searchInput').value;
 
+    var memoryTableBody = document.getElementById('memoryTableBody');
+    var rewrittenMemoryTableBody = document.getElementById('rewrittenMemoryTableBody');
+    var memoriesSection = document.getElementById('memoriesSection');
+    var rewrittenMemoriesSection = document.getElementById('rewrittenMemoriesSection');
+    var rewrittenQuery = document.getElementById('rewrittenQuery');
+
     if (searchQuery.trim() === '') {
+        // Clear the search results but keep the table headers visible
+        memoryTableBody.innerHTML = '';
+        rewrittenMemoryTableBody.innerHTML = '';
+        rewrittenQuery.innerHTML = '';
         return;
     }
 
@@ -19,31 +29,25 @@ function searchChatHandler() {
             'sort_order': 'asc'
         })
     })
-        .then(response => response.text())
-        .then(data => {
-            data = JSON.parse(data);
+    .then(response => response.text())
+    .then(data => {
+        data = JSON.parse(data);
 
-            var memoryTableBody = document.getElementById('memoryTableBody');
-            var rewrittenMemoryTableBody = document.getElementById('rewrittenMemoryTableBody');
-            var memoriesSection = document.getElementById('memoriesSection');
-            var rewrittenMemoriesSection = document.getElementById('rewrittenMemoriesSection');
+        memoryTableBody.innerHTML = '';
+        rewrittenMemoryTableBody.innerHTML = '';
+        rewrittenQuery.innerHTML = '';
 
-            memoryTableBody.innerHTML = '';
-            rewrittenMemoryTableBody.innerHTML = '';
-            memoriesSection.style.display = 'none';
-            rewrittenMemoriesSection.style.display = 'none';
+        if (data.memories.length === 0 && data.rewritten_memories.length === 0) {
+            showAlert('No memories found.', 'info');
+        } else {
+            if (data.memories.length > 0) {
+                memoriesSection.style.display = 'block';
+                data.memories.forEach(memory => {
+                    var row = memoryTableBody.insertRow();
+                    var shortId = memory.id.replace(/^0+/, '') || '0';
+                    var formattedDate = formatDate(memory.metadata.created_at);
 
-            if (data.memories.length === 0 && data.rewritten_memories.length === 0) {
-                showAlert('No memories found.', 'info');
-            } else {
-                if (data.memories.length > 0) {
-                    memoriesSection.style.display = 'block';
-                    data.memories.forEach(memory => {
-                        var row = memoryTableBody.insertRow();
-                        var shortId = memory.id.replace(/^0+/, '') || '0';
-                        var formattedDate = formatDate(memory.metadata.created_at);
-
-                        row.innerHTML = `
+                    row.innerHTML = `
                         <td>${shortId}</td>
                         <td>${memory.document}</td>
                         <td>${formattedDate}</td>
@@ -52,16 +56,16 @@ function searchChatHandler() {
                             <button class="btn btn-primary" onclick="openMemory('${memory.metadata.uid}', '${memory.metadata.chat_id}')">Open</button>
                         </td>
                     `;
-                    });
-                }
-                if (data.rewritten_memories.length > 0) {
-                    rewrittenMemoriesSection.style.display = 'block';
-                    data.rewritten_memories.forEach(alt_memory => {
-                        var row = rewrittenMemoryTableBody.insertRow();
-                        var shortId = alt_memory.id.replace(/^0+/, '') || '0';
-                        var formattedDate = formatDate(alt_memory.metadata.created_at);
+                });
+            }
+            if (data.rewritten_memories.length > 0) {
+                rewrittenMemoriesSection.style.display = 'block';
+                data.rewritten_memories.forEach(alt_memory => {
+                    var row = rewrittenMemoryTableBody.insertRow();
+                    var shortId = alt_memory.id.replace(/^0+/, '') || '0';
+                    var formattedDate = formatDate(alt_memory.metadata.created_at);
 
-                        row.innerHTML = `
+                    row.innerHTML = `
                         <td>${shortId}</td>
                         <td>${alt_memory.document}</td>
                         <td>${formattedDate}</td>
@@ -70,15 +74,15 @@ function searchChatHandler() {
                             <button class="btn btn-primary" onclick="openMemory('${alt_memory.metadata.uid}', '${alt_memory.metadata.chat_id}')">Open</button>
                         </td>
                     `;
-                    });
-                }
-                document.getElementById('rewrittenQuery').innerHTML = data.rewritten;
+                });
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('An error occurred while searching memories.', 'danger');
-        });
+            rewrittenQuery.innerHTML = data.rewritten;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('An error occurred while searching memories.', 'danger');
+    });
 }
 
 function formatDate(timestamp) {
@@ -93,7 +97,6 @@ function formatDate(timestamp) {
     return `${day}/${month}/${year} - ${hours}:${minutes}:${seconds}`;
 }
 
-
 function openChatSearch() {
     // open a search modal for chats
     $('#chatSearchModal').modal('show');
@@ -106,8 +109,6 @@ function closeChatSearch() {
 
 function openMemory(memoryId, chatId) {
     // Open the chat tab with the memory
-    console.log('opening memory', memoryId);
-    console.log('opening chat', chatId);
     setChat(chatId);
     $('#chatSearchModal').modal('hide');
 

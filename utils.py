@@ -404,7 +404,7 @@ class BrainProcessor:
 
     @staticmethod
     async def delete_recent_messages(user):
-        print(f"Deleting recent messages for {user} !!!WIP!!!")
+        print(f"Deleting recent messages for {user}")
 
 
 class MessageParser:
@@ -621,19 +621,6 @@ class MessageParser:
             },
             "chat_id": chat_id,
         }
-        print(f"Function call: {function_call_name}")
-        print(f"Arguments: {converted_function_call_arguments}")
-        if converted_function_call_arguments.get(
-            "action", ""
-        ) == "send" and converted_function_call_arguments.get("askconfirm", False):
-            print("Sending email...")
-
-            # send message to frontend to confirm email
-            await MessageSender.send_message(
-                {"type": "confirm_email", "content": converted_function_call_arguments},
-                "blue",
-                username,
-            )
         await MessageSender.send_message(new_message, "red", username)
         try:
             # Print the available functions for debugging
@@ -657,15 +644,23 @@ class MessageParser:
                             function_response = MessageParser.handle_function_response(
                                 actual_function, converted_function_call_arguments
                             )
-                            print(f"1 function response: {function_response}")
-                            if "draft_id" in function_response:
+                            confirm_email_responses = [
+                                response for response in function_response
+                                if "action" in response and response["action"] == "confirm_email"
+                            ]
+
+                            if confirm_email_responses:
                                 await MessageSender.send_message(
                                     {
                                         "type": "confirm_email",
-                                        "content": function_response,
+                                        "content": confirm_email_responses,
                                     },
                                     "blue",
                                     username,
+                                )
+                                # add a message to the response
+                                function_response.append(
+                                    {"note": "\nThe email has been prepared for the user. Ask the user to send or confirm the email themselves."}
                                 )
                     else:
                         print(
@@ -1390,5 +1385,4 @@ async def queryRewrite(query, username):
         function_metadata=fakedata,
     ):
         second_response = resp
-        print(f"second_response: {second_response}")
     return second_response

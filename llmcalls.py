@@ -171,6 +171,7 @@ class OpenAIResponser:
                 "stream": stream,
                 "tools": function_metadata,
                 "tool_choice": function_call,
+                "parallel_tool_calls": False,
             }
         )
 
@@ -361,7 +362,15 @@ class OpenAIResponser:
         if role == "retriever":
             role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a vectorsearches. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == "notetaker":
-            role_content = 'You are an Memory Organizer. You get a list of the current notes, a small chathistory and a last message. Your task is to determine if the last message should be added or if existing tasks or notes are completed and/or should be updated or deleted. Only store notes and memories if explicitly asked (the user asks to remember or learn a task or notes) or things like shopping lists, reminders, the user\'s info, procedural instructions,.. DO NOT save Imperative Instructions, DO NOT save chat history, DO NOT save regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in an escaped json format with the following keys: \'action\' (add, create, delete, update, skip), \'file\' (shoppinglist, notes, etc.), \'content\' (the message to be added, updated, deleted, etc.), comma separated, when updating a list repeat the whole updates list or the rest gets removed. Example: [ {"action": "create", "file": "shoppinglist", "content": "cookies"}, {"action": "update", "file": "shoppinglist", "content": "cookies\napples\nbananas\npotatoes"} ]'
+            role_content = '''
+You are a Memory Organizer. You will receive a list of the current notes, a small chat history, and a last message. Your task is to determine if the last message should be added, or if existing tasks or notes are completed and should be updated or deleted. Only store notes and memories if explicitly asked (e.g., the user asks to remember or learn a task or notes) or for things like shopping lists, reminders, user info, procedural instructions. DO NOT save imperative instructions, chat history, or regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in a JSON format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.). When updating a list, repeat the whole updated list; otherwise, the rest gets removed. 
+
+Example:
+[
+    {"action": "create", "file": "shoppinglist", "content": "cookies"},
+    {"action": "update", "file": "shoppinglist", "content": "cookies\napples\nbananas\npotatoes"}
+]
+'''
         if role == "summary_memory":
             role_content = "You are a memory summarizer. You get a list of the current notes, your task is to summarize the current notes as short as possible while maintaining all details. Only keep memories worth remembering, like shopping lists, reminders, procedural instructions,.. DO NOT store Imperative Instructions! Use timestamps only if needed. Reply in a plain text format with only the notes, nothing else."
         if role == "summarize":

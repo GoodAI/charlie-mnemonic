@@ -245,7 +245,7 @@ async def oauth2callback(request: Request):
 
 
 from google_auth_oauthlib.flow import InstalledAppFlow
-from gworkspace.google_auth import SCOPES
+from gworkspace.google_auth import SCOPES, get_redirect_uri
 
 
 def authenticate_user(auth_code, username):
@@ -255,7 +255,7 @@ def authenticate_user(auth_code, username):
     flow = InstalledAppFlow.from_client_secrets_file(
         CREDENTIALS_PATH,
         SCOPES,
-        redirect_uri="http://localhost:8002/oauth2callback?username=" + username,
+        redirect_uri=get_redirect_uri() + username,
     )
     flow.fetch_token(code=auth_code)
     credentials = flow.credentials

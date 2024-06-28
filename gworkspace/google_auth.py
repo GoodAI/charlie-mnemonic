@@ -3,6 +3,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 import google.auth.exceptions
+from config import origins, PRODUCTION
 
 
 SCOPES = [
@@ -44,8 +45,7 @@ async def onEnable(username, users_dir):
                     flow = InstalledAppFlow.from_client_secrets_file(
                         CREDENTIALS_PATH,
                         SCOPES,
-                        redirect_uri="http://localhost:8002/oauth2callback?username="
-                        + username,
+                        redirect_uri=get_redirect_uri() + username,
                     )
                     auth_uri, _ = flow.authorization_url(include_granted_scopes="true")
                     return auth_uri
@@ -58,3 +58,11 @@ async def onEnable(username, users_dir):
         token_file.write(creds.to_json())
 
     return None
+
+
+def get_redirect_uri():
+    origin_url = origins()
+    if PRODUCTION:
+        return "https://" + origin_url + "/oauth2callback?username="
+    else:
+        return "http://localhost:8002/oauth2callback?username="

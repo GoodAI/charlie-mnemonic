@@ -41,13 +41,22 @@ async def get_image_descriptions(image_requests, username=None):
         prompt = request["prompt"]
         username = username
 
-        if username:
+        charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
+        full_path = os.path.join(charlie_mnemonic_user_dir, username, "data")
+
+        # detect if we are in a docker container or not
+        if os.path.exists("/.dockerenv"):
             full_image_paths = [
-                os.path.join("/app", "users", username, image_path)
+                os.path.join(
+                    "/app", "users", username, "data", os.path.basename(image_path)
+                )
                 for image_path in image_paths
             ]
         else:
-            full_image_paths = image_paths
+            full_image_paths = [
+                os.path.join(full_path, os.path.basename(image_path))
+                for image_path in image_paths
+            ]
 
         try:
             openai_response = OpenAIResponser(config.api_keys["openai"])

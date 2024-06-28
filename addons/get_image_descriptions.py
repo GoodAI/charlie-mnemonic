@@ -1,8 +1,10 @@
 import base64
 import os
 import openai
+import unidecode
 import config
 from llmcalls import OpenAIResponser
+from utils import convert_username
 
 description = "Get the descriptions of one or more images using the OpenAI Vision API, only use this for PNG, JPEG, and GIF and WEBP images."
 parameters = {
@@ -39,8 +41,7 @@ async def get_image_descriptions(image_requests, username=None):
     for request in image_requests:
         image_paths = request["image_paths"]
         prompt = request["prompt"]
-        username = username
-
+        username = convert_username(username)
         charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
         full_path = os.path.join(charlie_mnemonic_user_dir, username, "data")
 

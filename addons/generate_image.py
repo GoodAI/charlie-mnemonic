@@ -2,6 +2,7 @@ import openai
 import config
 import os
 import requests
+from utils import convert_username
 
 description = "Generate an image based on a text prompt and save it to disk"
 parameters = {
@@ -40,6 +41,7 @@ def generate_image(prompt, size="1024x1024", quality="standard", n=1, username=N
     except Exception as e:
         return str(e)
 
+    username = convert_username(username)
     # Get the user's data directory path
     charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
     user_data_dir = os.path.join(charlie_mnemonic_user_dir, username, "data")

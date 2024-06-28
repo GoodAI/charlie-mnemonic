@@ -203,13 +203,7 @@ class AddonManager:
             },
         }
 
-        name = unidecode(username)
-        # replace spaces and @ with underscores
-        name = name.replace(" ", "_")
-        name = name.replace("@", "_")
-        name = name.replace(".", "_")
-        # lowercase the name
-        data_username = name.lower()
+        data_username = convert_username(username)
 
         function_dict = {}
         function_metadata = []
@@ -1390,3 +1384,15 @@ async def queryRewrite(query, username):
     ):
         second_response = resp
     return second_response
+
+
+def convert_username(username):
+    # Convert non-ASCII characters to ASCII
+    name = unidecode(username)
+    # replace spaces and @ with underscores
+    name = name.replace(" ", "_")
+    name = name.replace("@", "_")
+    name = name.replace(".", "_")
+    # lowercase the name
+    username = name.lower()
+    return username

@@ -1,6 +1,7 @@
 import json
 import os
 import base64
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -9,6 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 from gworkspace.google_auth import onEnable
+from utils import convert_username
 
 
 description = """
@@ -142,15 +144,33 @@ def gmail_addon(
     drafts=None,
     draft_ids=None,
 ):
+    username = convert_username(username)
     creds = None
     full_path = (
         os.path.join(users_dir, username, "token.json") if path is None else path
     )
+
     if os.path.exists(full_path):
-        creds = Credentials.from_authorized_user_file(full_path, None)
+        creds = Credentials.from_authorized_user_file(
+            full_path, ["https://www.googleapis.com/auth/gmail.modify"]
+        )
+
     if not creds or not creds.valid:
-        return "Error: Invalid or missing credentials. Please restart the client or run the 'onEnable' function."
-    service = build("gmail", "v1", credentials=creds)
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                # Save the refreshed credentials
+                with open(full_path, "w") as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                return f"Error refreshing credentials: {str(e)}. Please run the 'onEnable' function."
+        else:
+            return "Credentials are missing or invalid. Please run the 'onEnable' function."
+
+    try:
+        service = build("gmail", "v1", credentials=creds)
+    except Exception as e:
+        return f"Error building Gmail service: {str(e)}"
 
     if action == "list":
         if list_type == "email":

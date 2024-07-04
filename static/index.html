@@ -94,8 +94,8 @@
         renderer.link = function (href, title, text) {
             // Check if href is defined to avoid errors
             if (typeof href === 'undefined') {
-                console.error('href is undefined');
-                return '';
+                console.warn('href is undefined for link with text:', text);
+                return text; // Return just the text if href is undefined
             }
 
             if (href.includes('youtube.com') || href.includes('youtu.be')) {
@@ -103,16 +103,22 @@
                 var videoId = '';
                 if (href.includes('youtube.com')) {
                     videoId = href.split('v=')[1];
-                    var ampersandPosition = videoId.indexOf('&');
-                    if (ampersandPosition !== -1) {
-                        videoId = videoId.substring(0, ampersandPosition);
+                    if (videoId) {
+                        var ampersandPosition = videoId.indexOf('&');
+                        if (ampersandPosition !== -1) {
+                            videoId = videoId.substring(0, ampersandPosition);
+                        }
                     }
                 } else if (href.includes('youtu.be')) {
                     videoId = href.split('/').pop();
                 }
 
-                // Create an iframe for the YouTube video
-                return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
+                // Create an iframe for the YouTube video only if videoId is not empty
+                if (videoId) {
+                    return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
+                } else {
+                    return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
+                }
             } else {
                 // For non-YouTube links, use the default link rendering
                 return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;

@@ -239,7 +239,6 @@ async def handle_get_settings(request: Request):
         result = await onEnable(username, USERS_DIR)
         if isinstance(result, dict) and "auth_uri" in result:
             settings["auth_uri"] = result["auth_uri"]
-            settings["state"] = result["state"]
         elif isinstance(result, dict) and "error" in result:
             settings["error"] = result["error"]
 

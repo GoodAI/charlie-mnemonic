@@ -23,7 +23,7 @@ async def onEnable(username, users_dir):
     creds = None
     username = convert_username(username)
     charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
-    full_path = os.path.join(charlie_mnemonic_user_dir, username, "data", "token.json")
+    full_path = os.path.join(charlie_mnemonic_user_dir, username, "token.json")
 
     if os.path.exists(full_path):
         try:
@@ -61,11 +61,10 @@ async def onEnable(username, users_dir):
                     auth_uri, _ = flow.authorization_url(
                         include_granted_scopes="true",
                         state=state,
-                        # Add these parameters
                         access_type="offline",
                         prompt="consent",
                     )
-                    return {"auth_uri": auth_uri, "state": state}
+                    return {"auth_uri": auth_uri}
                 except ValueError as e:
                     return {"error": str(e)}
             else:

@@ -690,10 +690,8 @@ function setSettings(newSettings) {
     }
     // check if there is a google auth uri in the settings
     if (settings.auth_uri) {
-        const authUrl = new URL(settings.auth_uri);
-        authUrl.searchParams.append('state', settings.state);
         // if there is, show the google auth modal
-        showGoogleAuthModal(authUrl);
+        showGoogleAuthModal(settings.auth_uri);
     }
     applyTooltips('[data-tooltip]');
 };

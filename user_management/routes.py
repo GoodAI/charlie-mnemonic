@@ -233,29 +233,26 @@ from gworkspace.google_auth import SCOPES, get_redirect_uri
 @router.get("/oauth2callback")
 async def oauth2callback(request: Request):
     code = request.query_params.get("code")
-    state = request.query_params.get("state")
-    print(f"Received state: {state}")  # Debug print
     if not code:
         return {"error": "Authorization code not found"}
-    if not state:
-        return {"error": "State parameter not found"}
 
-    # Get the username from the state
-    username = get_username_from_state(state)
-    print(f"Retrieved username: {username}")  # Debug print
-    if not username:
-        return {"error": "Invalid state parameter"}
+    flow = InstalledAppFlow.from_client_secrets_file(
+        os.getenv("GOOGLE_CLIENT_SECRET_PATH"),
+        SCOPES,
+        redirect_uri=get_redirect_uri(),
+    )
+    flow.fetch_token(code=code)
+    creds = flow.credentials
 
-    # Process the code to obtain tokens
-    credentials = authenticate_user(code)
-
-    # Save credentials to the user's directory
-    full_path = os.path.join("users", username, "data", "token.json")
+    # Save the credentials
+    print(f"State: {request.query_params.get('state')}")  # Debug print
+    username = get_username_from_state(request.query_params.get("state"))
+    print(f"Username: {username}")  # Debug print
+    full_path = os.path.join("users", username, "token.json")
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
-    with open(full_path, "w") as f:
-        f.write(credentials.to_json())
+    with open(full_path, "w") as token:
+        token.write(creds.to_json())
 
-    # Redirect user to the main page
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 

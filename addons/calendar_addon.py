@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from datetime import datetime
 from gworkspace.google_auth import onEnable
+from utils import convert_username
 
 description = """
 Used to create, read, update, and delete events using the Google Calendar API. You can create new events with Google Meet links, list events to get the event IDs and details and then use the ID to update existing events, and/or delete events.
@@ -100,6 +101,7 @@ def calendar_addon(
     include_working_locations=False,
     create_meet_link=True,
 ):
+    username = convert_username(username)
     creds = None
     full_path = (
         os.path.join(users_dir, username, "token.json") if path is None else path

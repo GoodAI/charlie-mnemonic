@@ -4,7 +4,9 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 import google.auth.exceptions
 from config import origins, PRODUCTION
-
+from utils import convert_username
+import secrets
+import json
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar",
@@ -19,9 +21,16 @@ os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 async def onEnable(username, users_dir):
     creds = None
-    full_path = os.path.join(users_dir, username, "token.json")
+    username = convert_username(username)
+    charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
+    full_path = os.path.join(charlie_mnemonic_user_dir, username, "data", "token.json")
+
     if os.path.exists(full_path):
-        creds = Credentials.from_authorized_user_file(full_path, SCOPES)
+        try:
+            creds = Credentials.from_authorized_user_file(full_path, SCOPES)
+        except ValueError as e:
+            print(f"Error reading credentials from {full_path}: {e}")
+            creds = None
 
     if creds and creds.valid:
         missing_scopes = set(SCOPES) - set(creds.scopes)
@@ -45,24 +54,74 @@ async def onEnable(username, users_dir):
                     flow = InstalledAppFlow.from_client_secrets_file(
                         CREDENTIALS_PATH,
                         SCOPES,
-                        redirect_uri=get_redirect_uri() + username,
+                        redirect_uri=get_redirect_uri(),
                     )
-                    auth_uri, _ = flow.authorization_url(include_granted_scopes="true")
-                    return auth_uri
+                    state = secrets.token_urlsafe(16)
+                    store_state(state, username)
+                    auth_uri, _ = flow.authorization_url(
+                        include_granted_scopes="true",
+                        state=state,
+                        # Add these parameters
+                        access_type="offline",
+                        prompt="consent",
+                    )
+                    return {"auth_uri": auth_uri, "state": state}
                 except ValueError as e:
                     return {"error": str(e)}
             else:
                 return {"error": "Google client secret path not found"}
 
-    with open(full_path, "w") as token_file:
-        token_file.write(creds.to_json())
-
     return None
+
+
+def get_state_file_path():
+    return os.path.join(os.getcwd(), "users", "state_store.json")
+
+
+def store_state(state, username):
+    file_path = get_state_file_path()
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    # If the file doesn't exist, create it with an empty JSON object
+    if not os.path.exists(file_path):
+        with open(file_path, "w") as f:
+            json.dump({}, f)
+
+    # Now open the file in read-write mode
+    with open(file_path, "r+") as f:
+        try:
+            data = json.load(f)
+        except json.JSONDecodeError:
+            data = {}
+        data[state] = username
+        f.seek(0)
+        json.dump(data, f)
+        f.truncate()
+
+
+def get_username_from_state(state):
+    file_path = get_state_file_path()
+    print(f"State file path: {file_path}")  # Debug print
+    if not os.path.exists(file_path):
+        print("State file does not exist")  # Debug print
+        return None
+    with open(file_path, "r") as f:
+        try:
+            data = json.load(f)
+            username = data.get(state)
+            print(f"State data: {data}")  # Debug print
+            print(f"Retrieved username for state {state}: {username}")  # Debug print
+            return username
+        except json.JSONDecodeError:
+            print("Failed to decode JSON in state file")  # Debug print
+            return None
 
 
 def get_redirect_uri():
     origin_url = origins()
     if PRODUCTION:
-        return "https://" + origin_url + "/oauth2callback?username="
+        return f"https://{origin_url}/oauth2callback?"
     else:
-        return "http://localhost:8002/oauth2callback?username="
+        return f"http://localhost:8002/oauth2callback?"

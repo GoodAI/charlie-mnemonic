@@ -8,6 +8,7 @@ set URL=http://localhost:8002
 set HOME=%USERPROFILE%
 set CHARLIE_USER_DIR=%HOME%\AppData\Roaming\charlie-mnemonic\users
 set UPDATE=false
+set REPO_URL=https://github.com/GoodAI/charlie-mnemonic
 
 echo Variables set
 
@@ -29,9 +30,39 @@ echo Current Directory: %CD%
 echo Home Directory: %HOME%
 echo Charlie User Directory: %CHARLIE_USER_DIR%
 
+:: Check if this is a git repository
+git rev-parse --is-inside-work-tree >nul 2>nul
+if not "!ERRORLEVEL!"=="0" (
+    echo "This directory is not a Git repository. Initializing Git repository..."
+    git init
+    if "!ERRORLEVEL!"=="0" (
+        echo "Initialized empty Git repository."
+        echo "Setting remote origin to !REPO_URL!..."
+        git remote add origin !REPO_URL!
+        if "!ERRORLEVEL!"=="0" (
+            echo "Remote origin set to !REPO_URL!."
+            git fetch origin
+            if not "!ERRORLEVEL!"=="0" (
+                echo "Failed to fetch from remote repository."
+                exit /b 1
+            )
+        ) else (
+            echo "Failed to set remote origin."
+            exit /b 1
+        )
+    ) else (
+        echo "Failed to initialize Git repository."
+        exit /b 1
+    )
+)
+
 if "%UPDATE%"=="true" (
     echo Fetching remote branches...
     git fetch origin
+    if not "!ERRORLEVEL!"=="0" (
+        echo "Failed to fetch from remote repository."
+        exit /b 1
+    )
     echo Available branches:
     git branch -r
 
@@ -42,6 +73,7 @@ if "%UPDATE%"=="true" (
     if not "!BRANCH!"=="" (
         echo Checking if branch is a local branch...
         for /f "tokens=2 delims=/" %%a in ("!BRANCH!") do set LOCAL_BRANCH=%%a
+
         git rev-parse --verify --quiet refs/heads/!LOCAL_BRANCH!
         if "!ERRORLEVEL!"=="0" (
             echo "!LOCAL_BRANCH!" is a local branch
@@ -63,9 +95,18 @@ if "%UPDATE%"=="true" (
             git rev-parse --verify --quiet refs/remotes/origin/!LOCAL_BRANCH!
             if "!ERRORLEVEL!"=="0" (
                 echo "!LOCAL_BRANCH!" is a remote branch. Creating and switching to a local tracking branch...
+                :: Stash untracked files to avoid conflicts
+                git add -A
+                git stash push -m "Temporary stash before switching branch" --include-untracked
                 git checkout -b !LOCAL_BRANCH! origin/!LOCAL_BRANCH!
                 if not !ERRORLEVEL!==0 (
                     echo Failed to switch to branch !LOCAL_BRANCH!
+                    exit /b !ERRORLEVEL!
+                )
+                :: Apply the stash
+                git stash pop
+                if not !ERRORLEVEL!==0 (
+                    echo "Failed to apply the stash."
                     exit /b !ERRORLEVEL!
                 )
             ) else (

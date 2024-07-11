@@ -9,8 +9,9 @@
     --bot-bubble-color: #ddd;
     --bot-bubble-text-color: #333;
     --modal-bg-color: #fff;
-    --button-bg-color: #7459fe;
-    --button-hover-bg-color: #9480ff;
+    --button-bg-color: #1c3f77;
+    --button-text-color: #ddd;
+    --button-hover-bg-color: #2353a0;
     --tooltip-bg-color: #5084d8;
     --nav-bg-color: #111;
     --nav-text-color: #c9c8c8;
@@ -31,6 +32,7 @@
     --chat-tab-menu-hover-bg: #a6c1ee;
     --scrollbar-thumb-color: #a6c1ee;
     --scrollbar-track-color: #c3cfe2;
+    --hover-text-block: #c3cfe2;
 }
 
 /* Dark Theme Variables */
@@ -44,7 +46,8 @@
     --bot-bubble-color: #595656;
     --bot-bubble-text-color: #ddd;
     --modal-bg-color: #222;
-    --button-bg-color: #333;
+    --button-bg-color: #ddd;
+    --button-text-color: #333;
     --button-hover-bg-color: #444;
     --tooltip-bg-color: #333;
     --nav-bg-color: #222;
@@ -66,6 +69,7 @@
     --chat-tab-menu-hover-bg: #444;
     --scrollbar-thumb-color: #292929;
     --scrollbar-track-color: #474747;
+    --hover-text-block: #444;
 }
 
 /* Scrollbar Styles */
@@ -212,7 +216,7 @@ a {
 
 #toggle-chat-tabs {
     position: absolute;
-    left: 13vw;
+    left: 0vw;
     top: 50%;
     transform: translateY(-50%);
     background: none;
@@ -1075,6 +1079,16 @@ pre {
     text-decoration: none;
 }
 
+.btn.btn-default {
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin: 5px;
+
+}
+
 
 .bottomright-with-nw-resize-outer {
     /* Here's the trick: rotate the entire element so the resize handle is in the other corner. */
@@ -1230,6 +1244,21 @@ pre {
     /* To center horizontally */
     margin: 0 auto;
     pointer-events: all;
+}
+
+.textFileModal .modal-content {
+    background-color: var(--bot-bubble-color);
+    color: var(--bot-bubble-text-color);
+}
+
+.searchdialog .modal-content {
+    background-color: var(--bot-bubble-color);
+    color: var(--bot-bubble-text-color);
+}
+
+.settings-dialog .modal-content {
+    background-color: var(--bot-bubble-color);
+    color: var(--bot-bubble-text-color);
 }
 
 #settingsModal {
@@ -1421,29 +1450,29 @@ pre {
 
 #SidenavAddons .tab-content {
     display: none;
-    color: #333;
+    color: var(--bot-bubble-text-color);
     text-decoration: none;
     margin-bottom: 10px;
 }
 
 #SidenavAddons .tab-content a {
     display: block;
-    color: #333;
+    color: var(--bot-bubble-text-color);
     text-decoration: none;
     margin-bottom: 10px;
 }
 
 #SidenavAddons .tab-content a:hover {
     display: block;
-    color: #333;
+    color: var(--bot-bubble-text-color);
     text-decoration: none;
     margin-bottom: 10px;
-    background-color: #e7e7e7;
+    background-color: var(--hover-text-block);
 }
 
 #SidenavAddons .tab-content.active {
     display: block;
-    color: #333;
+    color: var(--bot-bubble-text-color);
     text-decoration: none;
     margin-bottom: 20px;
 }
@@ -1453,7 +1482,7 @@ pre {
 }
 
 .nav-item {
-    margin-bottom: 5px;
+    margin-bottom: 7px;
     margin-top: 10px;
 }
 
@@ -1479,6 +1508,7 @@ pre {
 .settings-dialog {
     max-width: 800px;
     width: 80vw;
+
 }
 
 #slider {
@@ -1722,7 +1752,11 @@ pre {
 
 .play-button {
     cursor: pointer;
-    color: var(--icon-color);
+    color: var(--link-color);
+}
+
+.play-button:hover {
+    color: var(--link-hover-color);
 }
 
 
@@ -1812,4 +1846,28 @@ pre {
 .bottom-buttons-container>div {
     display: inline-block;
     margin-right: 10px;
+}
+
+#textFileList {
+    list-style-type: none;
+    padding: 0;
+}
+
+.file-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.file-name {
+    flex: 1;
+}
+
+.button-group {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
 }

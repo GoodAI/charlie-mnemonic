@@ -288,14 +288,18 @@ document.getElementById('message').addEventListener('keydown', function (e) {
 });
 
 // function to handle the logout button click
-document.getElementById('logout-button').addEventListener('click', async function (event) {
-    event.preventDefault();
-    try {
-        await logout();
-    } catch (error) {
-        console.error('Logout failed: ', error);
-    }
-});
+const logoutButton = document.getElementById('logout-button');
+
+if (logoutButton) {
+    logoutButton.addEventListener('click', async function (event) {
+        event.preventDefault();
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Logout failed: ', error);
+        }
+    });
+}
 
 document.getElementById('record').addEventListener('click', function () {
     // Initialize the default CSS box shadow
@@ -560,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.classList.toggle('dark-theme');
         localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark-theme' : '');
     });
-    // Hacky way, this still shows the animation when the page loads
+
     if (tabsState === "open") {
         openTabs();
     } else if (tabsState === "closed") {
@@ -599,21 +603,22 @@ function toggleTabs() {
         openTabs();
     }
 }
+
 function showTextFileModal(files) {
     let modalHtml = `
-        <div class="modal fade" id="textFileModal">
+        <div class="modal fade textFileModal" id="textFileModal">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Text Files</h5>
-                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <button type="button" class="close btn btn-default" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body">
                         <p>Choose an option for each text file:</p>
                         <ul id="textFileList"></ul>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="close btn btn-default" data-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -631,10 +636,13 @@ function showTextFileModal(files) {
 
     files.forEach((file, index) => {
         let listItem = document.createElement('li');
+        listItem.className = 'file-list-item';
         listItem.innerHTML = `
-            <span>${file.name}</span>
-            <button class="includeTextBtn" data-index="${index}">Include in Input</button>
-            <button class="uploadTextBtn" data-index="${index}">Upload as File</button>
+            <div class="file-name">${file.name}</div>
+            <div class="button-group">
+                <button class="includeTextBtn btn btn-primary" data-index="${index}">Include as Text</button>
+                <button class="uploadTextBtn btn btn-secondary" data-index="${index}">Upload as File</button>
+            </div>
         `;
         textFileList.appendChild(listItem);
     });

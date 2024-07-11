@@ -288,7 +288,7 @@
                     <div class="modal-header">
                         <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeNav()">
@@ -296,9 +296,12 @@
                         </button>
                     </div>
                     <div class="modal-body">
-                        <button id="logout-button">Logout</button>
-                        <br>
-                        <button id="theme-toggle">Toggle Theme</button>
+                        {% if production %}
+                            <!-- only show logout if production is true -->
+                            <button id="logout-button" class="btn btn-default">Logout</button>
+                            <br>
+                        {% endif %}
+                        <button id="theme-toggle" class="btn btn-default">Toggle Theme</button>
                         <br>
                         <div id="SidenavAddons"></div>
                     </div>
@@ -318,7 +321,7 @@
                     <div class="modal-header">
                         <h5 class="modal-title">Google Authentication</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeAuth()">
@@ -340,7 +343,7 @@
                     <div class="modal-header">
                         <h5 class="modal-title">Search Chats</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeChatSearch()">
@@ -413,7 +416,7 @@
                     <div class="modal-header">
                         <h5 class="modal-title">Confirmation</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeConf()">
@@ -478,7 +481,7 @@
             <i>Your personal assistant with long-term memory</i>
         </div>
         <div class="sub_title">
-            <b>Version:</b> {{ version }} | <b>Release date:</b> 26/06/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 10/07/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
     target="_blank">Release Notes</a>
         </div>
         <div id="overlay">

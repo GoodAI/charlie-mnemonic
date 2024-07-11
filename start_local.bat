@@ -40,19 +40,38 @@ if "%UPDATE%"=="true" (
     echo Branch entered: !BRANCH!
 
     if not "!BRANCH!"=="" (
-        echo Checking if branch is a remote branch...
-        git rev-parse --verify "!BRANCH!" >nul 2>nul
+        echo Checking if branch is a local branch...
+        for /f "tokens=2 delims=/" %%a in ("!BRANCH!") do set LOCAL_BRANCH=%%a
+        git rev-parse --verify --quiet refs/heads/!LOCAL_BRANCH!
         if "!ERRORLEVEL!"=="0" (
-            echo "!BRANCH!" is a valid branch
-            echo Creating and switching to a local tracking branch...
-            git checkout -b local_branch !BRANCH!
-            if not !ERRORLEVEL!==0 (
-                echo Failed to switch to branch !BRANCH!
-                exit /b !ERRORLEVEL!
+            echo "!LOCAL_BRANCH!" is a local branch
+            for /f "tokens=*" %%a in ('git symbolic-ref --short -q HEAD') do set CURRENT_BRANCH=%%a
+            if "!CURRENT_BRANCH!"=="!LOCAL_BRANCH!" (
+                echo Already on branch !LOCAL_BRANCH!. Pulling latest changes...
+                git pull origin !LOCAL_BRANCH!
+            ) else (
+                echo Switching to branch !LOCAL_BRANCH!
+                git checkout !LOCAL_BRANCH!
+                if not !ERRORLEVEL!==0 (
+                    echo Failed to switch to branch !LOCAL_BRANCH!
+                    exit /b !ERRORLEVEL!
+                )
+                echo Pulling latest changes...
+                git pull origin !LOCAL_BRANCH!
             )
         ) else (
-            echo "!BRANCH!" is not a valid branch
-            exit /b 1
+            git rev-parse --verify --quiet refs/remotes/origin/!LOCAL_BRANCH!
+            if "!ERRORLEVEL!"=="0" (
+                echo "!LOCAL_BRANCH!" is a remote branch. Creating and switching to a local tracking branch...
+                git checkout -b !LOCAL_BRANCH! origin/!LOCAL_BRANCH!
+                if not !ERRORLEVEL!==0 (
+                    echo Failed to switch to branch !LOCAL_BRANCH!
+                    exit /b !ERRORLEVEL!
+                )
+            ) else (
+                echo "!BRANCH!" is not a valid branch
+                exit /b 1
+            )
         )
     ) else (
         echo Updating current branch...

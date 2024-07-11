@@ -1,14 +1,20 @@
 @echo off
 setlocal enabledelayedexpansion
 
+echo Script started
+echo Command line: %0 %*
+
 set URL=http://localhost:8002
 set HOME=%USERPROFILE%
 set CHARLIE_USER_DIR=%HOME%\AppData\Roaming\charlie-mnemonic\users
 set UPDATE=false
 set BRANCH=
 
+echo Variables set
+
 :parse_args
 if "%~1"=="" goto end_parse_args
+echo Parsing argument: %1
 if /i "%~1"=="--update" set UPDATE=true
 if /i "%~1"=="--update" shift & goto parse_args
 if "%~1:~0,2%"=="--" (
@@ -20,9 +26,14 @@ shift
 goto parse_args
 :end_parse_args
 
+echo Argument parsing complete
+echo UPDATE=%UPDATE%
+echo BRANCH=%BRANCH%
+
 echo Current Directory: %CD%
 echo Home Directory: %HOME%
 echo Charlie User Directory: %CHARLIE_USER_DIR%
+
 
 if "%UPDATE%"=="true" (
     if "%BRANCH%"=="" (
@@ -66,7 +77,6 @@ docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env
 echo Stopping any existing Docker containers
 docker-compose down
 
-rem Check the error level of the docker-compose down command
 if not %ERRORLEVEL% == 0 (
     echo Docker Compose down command failed with error level %ERRORLEVEL%.
     exit /b %ERRORLEVEL%
@@ -76,13 +86,13 @@ echo Starting Charlie Mnemonic using Docker Compose...
 echo First run takes a while
 docker-compose up --build -d
 
-rem Check the error level of the docker-compose up command
 if not %ERRORLEVEL% == 0 (
     echo Docker Compose up command failed with error level %ERRORLEVEL%.
     exit /b %ERRORLEVEL%
 )
 
-:CheckLoop
+echo Entering check loop
+:check_loop
 echo Checking if Charlie Mnemonic started
 powershell -Command "(Invoke-WebRequest -Uri %URL% -UseBasicParsing -TimeoutSec 2).StatusCode" 1>nul 2>nul
 if %errorlevel%==0 (
@@ -94,7 +104,8 @@ if %errorlevel%==0 (
 ) else (
     echo Not available yet. Retrying in 10 seconds...
     timeout /t 10 /nobreak >nul
-    goto CheckLoop
+    goto check_loop
 )
 
+echo Script completed
 endlocal

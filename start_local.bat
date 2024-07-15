@@ -70,57 +70,41 @@ if "%UPDATE%"=="true" (
     set /p BRANCH="Enter the full name of the branch you want to switch to (or press Enter to update the current branch): "
     echo Branch entered: !BRANCH!
 
+    :: Stash any changes
+    echo Stashing any local changes...
+    git stash push -m "Temporary stash before updating" --include-untracked
+
     if not "!BRANCH!"=="" (
         echo Checking if branch is a local branch...
         for /f "tokens=2 delims=/" %%a in ("!BRANCH!") do set LOCAL_BRANCH=%%a
 
-        git rev-parse --verify --quiet refs/heads/!LOCAL_BRANCH!
+        git rev-parse --verify --quiet refs/heads/!LOCAL_BRANCH! >nul
         if "!ERRORLEVEL!"=="0" (
             echo "!LOCAL_BRANCH!" is a local branch
-            for /f "tokens=*" %%a in ('git symbolic-ref --short -q HEAD') do set CURRENT_BRANCH=%%a
-            if "!CURRENT_BRANCH!"=="!LOCAL_BRANCH!" (
-                echo Already on branch !LOCAL_BRANCH!. Pulling latest changes...
-                git pull origin !LOCAL_BRANCH!
-            ) else (
-                echo Switching to branch !LOCAL_BRANCH!
-                git checkout !LOCAL_BRANCH!
-                if not !ERRORLEVEL!==0 (
-                    echo Failed to switch to branch !LOCAL_BRANCH!
-                    exit /b !ERRORLEVEL!
-                )
-                echo Pulling latest changes...
-                git pull origin !LOCAL_BRANCH!
-            )
+            echo Switching to branch !LOCAL_BRANCH!
+            git checkout !LOCAL_BRANCH!
         ) else (
-            git rev-parse --verify --quiet refs/remotes/origin/!LOCAL_BRANCH!
+            git rev-parse --verify --quiet refs/remotes/origin/!LOCAL_BRANCH! >nul
             if "!ERRORLEVEL!"=="0" (
                 echo "!LOCAL_BRANCH!" is a remote branch. Creating and switching to a local tracking branch...
-                :: Stash untracked files to avoid conflicts
-                git add -A
-                git stash push -m "Temporary stash before switching branch" --include-untracked
                 git checkout -b !LOCAL_BRANCH! origin/!LOCAL_BRANCH!
-                if not !ERRORLEVEL!==0 (
-                    echo Failed to switch to branch !LOCAL_BRANCH!
-                    exit /b !ERRORLEVEL!
-                )
-                :: Apply the stash
-                git stash pop
-                if not !ERRORLEVEL!==0 (
-                    echo "Failed to apply the stash."
-                    exit /b !ERRORLEVEL!
-                )
             ) else (
                 echo "!BRANCH!" is not a valid branch
+                git stash pop
                 exit /b 1
             )
         )
-    ) else (
-        echo Updating current branch...
-        git pull origin
-        if not !ERRORLEVEL!==0 (
-            echo Failed to update the current branch
-            exit /b !ERRORLEVEL!
-        )
+    )
+
+    echo Pulling latest changes...
+    git pull origin !LOCAL_BRANCH!
+
+    :: Try to apply stashed changes
+    echo Attempting to apply stashed changes...
+    git stash pop
+    if not !ERRORLEVEL!==0 (
+        echo "Note: There were conflicts when applying your local changes."
+        echo "Your changes are preserved in the stash. You may need to manually resolve conflicts."
     )
 )
 

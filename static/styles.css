@@ -113,6 +113,7 @@ body {
     margin-left: 0;
 }
 
+
 a {
     color: var(--link-color);
 }
@@ -130,6 +131,7 @@ a {
     box-shadow: 2px 2px 5px var(--socket-status-shadow-color);
     z-index: 10;
     color: var(--text-color);
+    transition: all 0.3s ease;
 }
 
 .socket-status p {
@@ -138,6 +140,36 @@ a {
 
 .socket-status p#username {
     font-weight: bold;
+}
+
+#toggleSocketStatus {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 11;
+    background-color: var(--socket-status-bg-color);
+    border: 1px solid var(--socket-status-border-color);
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+@media (max-width: 800px) {
+    .socket-status {
+        width: auto;
+        max-width: 150px;
+        font-size: 0.8em;
+        display: none;
+    }
+
+    .socket-status.hidden {
+        display: none;
+    }
+
+    #toggleSocketStatus {
+        display: block;
+    }
 }
 
 #body-profile {
@@ -1246,20 +1278,6 @@ pre {
     pointer-events: all;
 }
 
-.textFileModal .modal-content {
-    background-color: var(--bot-bubble-color);
-    color: var(--bot-bubble-text-color);
-}
-
-.searchdialog .modal-content {
-    background-color: var(--bot-bubble-color);
-    color: var(--bot-bubble-text-color);
-}
-
-.settings-dialog .modal-content {
-    background-color: var(--bot-bubble-color);
-    color: var(--bot-bubble-text-color);
-}
 
 #settingsModal {
     z-index: 1060;
@@ -1450,29 +1468,28 @@ pre {
 
 #SidenavAddons .tab-content {
     display: none;
-    color: var(--bot-bubble-text-color);
     text-decoration: none;
     margin-bottom: 10px;
 }
 
 #SidenavAddons .tab-content a {
     display: block;
-    color: var(--bot-bubble-text-color);
+    color: #333;
     text-decoration: none;
     margin-bottom: 10px;
 }
 
 #SidenavAddons .tab-content a:hover {
     display: block;
-    color: var(--bot-bubble-text-color);
+    color: #333;
     text-decoration: none;
     margin-bottom: 10px;
-    background-color: var(--hover-text-block);
+    background-color: #e7e7e7;
 }
 
 #SidenavAddons .tab-content.active {
     display: block;
-    color: var(--bot-bubble-text-color);
+    color: #333;
     text-decoration: none;
     margin-bottom: 20px;
 }

@@ -1365,15 +1365,36 @@ async def process_function_reply(
     return second_response
 
 
-async def queryRewrite(query, username):
+async def queryRewrite(query, username, user_dir):
+    # Get the notes from the user
+    notes_string = get_notes_as_string(user_dir, username)
+
+    # Get episodic memory
+    memory = _memory.MemoryManager()
+    episodic_memory, timezone = await memory.process_episodic_memory(
+        query,
+        username,
+        query,
+        2560,
+        True,
+    )
+
+    if episodic_memory:
+        episodic_memory_string = f"Episodic Memory of {timezone}:\n{episodic_memory}\n"
+    else:
+        episodic_memory_string = "No relevant episodic memory found.\n"
+
+    current_date_time = await SettingsManager.get_current_date_time(username)
     messages = [
         {
             "role": "system",
-            "content": "you are a query writer, you will be given a query to rewrite",
+            "content": f"Current date: {current_date_time}\nYou will now rewrite the query using the notes and episodic memory. If the query is about one of the relevant notes or episodic memories, please include that in the query. Else just rewrite the query with a similar subject or synonyms.",
         },
-        {"role": "user", "content": f"{query}"},
+        {
+            "role": "user",
+            "content": f"Notes: {notes_string}\n\nEpisodic Memory: {episodic_memory_string}\n\nQuery: {query}",
+        },
     ]
-    from config import fakedata
 
     openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
     async for resp in openai_response.get_response(
@@ -1382,8 +1403,9 @@ async def queryRewrite(query, username):
         stream=False,
         function_metadata=fakedata,
     ):
-        second_response = resp
-    return second_response
+        rewritten_query = resp
+
+    return rewritten_query
 
 
 def convert_username(username):
@@ -1396,3 +1418,21 @@ def convert_username(username):
     # lowercase the name
     username = name.lower()
     return username
+
+
+def get_notes_as_string(user_dir, username):
+    notes_dir = os.path.join(user_dir, username, "notes")
+    notes_string = ""
+
+    if not os.path.exists(notes_dir):
+        return notes_string
+
+    for filename in os.listdir(notes_dir):
+        file_path = os.path.join(notes_dir, filename)
+        if os.path.isfile(file_path):
+            with open(file_path, "r") as file:
+                notes_string += f"--- {filename} ---\n"
+                notes_string += file.read()
+                notes_string += "\n\n"
+
+    return notes_string.strip()

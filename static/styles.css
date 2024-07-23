@@ -1888,3 +1888,142 @@ pre {
     justify-content: flex-end;
     gap: 10px;
 }
+
+.chat-search-result .chat-title {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chat-search-result .message-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.chat-search-result .message-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.2s;
+}
+
+.chat-search-result .message-item:last-child {
+    border-bottom: none;
+}
+
+.chat-search-result .message-item:hover {
+    background-color: #f1f3f5;
+}
+
+.chat-search-result .message-content {
+    margin-bottom: 5px;
+}
+
+.chat-search-result .message-meta {
+    font-size: 0.8em;
+    color: #6c757d;
+}
+
+.chat-search-result .highlight {
+    background-color: yellow;
+    padding: 2px;
+}
+
+.chat-search-result .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+#searchStatus .fa-spinner {
+    display: none;
+}
+
+#rewrittenQuery {
+    margin-top: 0px;
+    padding: 10px;
+    border-radius: 5px;
+    font-style: italic;
+    font-size: small;
+}
+
+#searchResultText {
+    font-size: medium;
+}
+
+#searchStatus .fa-spinner {
+    display: none;
+}
+
+#searchStatus .fa-search {
+    display: inline-block;
+}
+
+#searchStatus.loading .fa-spinner {
+    display: inline-block;
+}
+
+#searchStatus.loading .fa-search {
+    display: none;
+}
+
+
+.chat-search-result {
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.chat-search-result .chat-title {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-search-result .chat-title:hover {
+    background-color: #e9ecef;
+}
+
+.chat-search-result .chat-title::after {
+    content: '\25BC';
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+}
+
+.chat-search-result .chat-title.collapsed::after {
+    transform: rotate(-90deg);
+}
+
+.chat-search-result .message-list {
+    max-height: 300px;
+    overflow-y: auto;
+    display: none;
+}
+
+.chat-search-result .message-list.show {
+    display: block;
+}
+
+#chatSearchModal .modal-dialog {
+    max-width: 800px;
+    width: 90%;
+    margin: 1.75rem auto;
+}
+
+#chatSearchModal .modal-content {
+    width: 100%;
+}
+
+#searchStatus {
+    width: 40px;
+    text-align: center;
+}
+
+#searchStatus i {
+    font-size: 1.2em;
+}

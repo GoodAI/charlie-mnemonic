@@ -337,13 +337,12 @@
         </div>
         <!-- Chat Search modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="chatSearchModal">
-            <div class="modal-dialog modal-dialog-centered searchdialog"
-                 role="document">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Search Chats</h5>
                         <button type="button"
-                                class="close btn btn-default"
+                                class="close"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeChatSearch()">
@@ -351,59 +350,22 @@
                         </button>
                     </div>
                     <div class="modal-body">
-                        <input type="text"
-                               id="searchInput"
-                               class="form-control"
-                               placeholder="Search..."
-                               oninput="debouncedChatSearch()">
-                        <div class="memory-container">
-                            <div id="memoriesSection" class="memory-section">
-                                <h3>Memories</h3>
-                                <table class="table table-hover memoryTable">
-                                    <colgroup>
-                                        <col style="width: 10%">
-                                        <col style="width: 50%">
-                                        <col style="width: 20%">
-                                        <col style="width: 10%">
-                                        <col style="width: 10%">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">ID</th>
-                                            <th scope="col">Message</th>
-                                            <th scope="col">Date Created</th>
-                                            <th scope="col">Distance</th>
-                                            <th scope="col">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="memoryTableBody" data-category="chat">
-                                    </tbody>
-                                </table>
+                        <div class="input-group">
+                            <input type="text"
+                                   id="searchInput"
+                                   class="form-control"
+                                   placeholder="Search..."
+                                   oninput="debouncedChatSearch()"
+                                   autocomplete="off">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="searchStatus">
+                                    <i class="fas fa-search"></i>
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </span>
                             </div>
-                            <div id="rewrittenMemoriesSection" class="memory-section">
-                                <h3>With Query Rewrite</h3>
-                                <div id="rewrittenQuery"></div>
-                                <table class="table table-hover memoryTable">
-                                    <colgroup>
-                                        <col style="width: 10%">
-                                        <col style="width: 50%">
-                                        <col style="width: 20%">
-                                        <col style="width: 10%">
-                                        <col style="width: 10%">
-                                    </colgroup>
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">ID</th>
-                                            <th scope="col">Message</th>
-                                            <th scope="col">Date Created</th>
-                                            <th scope="col">Distance</th>
-                                            <th scope="col">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="rewrittenMemoryTableBody" data-category="chat">
-                                    </tbody>
-                                </table>
-                            </div>
+                        </div>
+                        <div id="searchResults">
+                            <!-- Search results will be dynamically inserted here -->
                         </div>
                     </div>
                 </div>
@@ -481,7 +443,7 @@
             <i>Your personal assistant with long-term memory</i>
         </div>
         <div class="sub_title">
-            <b>Version:</b> {{ version }} | <b>Release date:</b> 15/07/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 23/07/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
     target="_blank">Release Notes</a>
         </div>
         <div id="overlay">

@@ -1,21 +1,18 @@
-const debouncedChatSearch = debounce(searchChatHandler, 1000);
+const debouncedChatSearch = debounce(searchChatHandler, 300);
 
 function searchChatHandler() {
-    var searchQuery = document.getElementById('searchInput').value;
-
-    var memoryTableBody = document.getElementById('memoryTableBody');
-    var rewrittenMemoryTableBody = document.getElementById('rewrittenMemoryTableBody');
-    var memoriesSection = document.getElementById('memoriesSection');
-    var rewrittenMemoriesSection = document.getElementById('rewrittenMemoriesSection');
-    var rewrittenQuery = document.getElementById('rewrittenQuery');
+    const searchQuery = document.getElementById('searchInput').value;
+    const searchStatus = document.getElementById('searchStatus');
+    const searchResults = document.getElementById('searchResults');
 
     if (searchQuery.trim() === '') {
-        // Clear the search results but keep the table headers visible
-        memoryTableBody.innerHTML = '';
-        rewrittenMemoryTableBody.innerHTML = '';
-        rewrittenQuery.innerHTML = '';
+        searchResults.innerHTML = '';
+        searchStatus.classList.remove('loading');
         return;
     }
+
+    // Show loading spinner
+    searchStatus.classList.add('loading');
 
     fetch('/search_chats/', {
         method: 'POST',
@@ -29,103 +26,150 @@ function searchChatHandler() {
             'sort_order': 'asc'
         })
     })
-    .then(response => response.text())
+    .then(response => response.json())
     .then(data => {
-        data = JSON.parse(data);
+        // Reset loading spinner
+        searchStatus.classList.remove('loading');
 
-        memoryTableBody.innerHTML = '';
-        rewrittenMemoryTableBody.innerHTML = '';
-        rewrittenQuery.innerHTML = '';
+        searchResults.innerHTML = '';
 
         if (data.memories.length === 0 && data.rewritten_memories.length === 0) {
-            showAlert('No memories found.', 'info');
+            searchResults.innerHTML = '<p class="text-muted">No results found.</p>';
         } else {
-            if (data.memories.length > 0) {
-                memoriesSection.style.display = 'block';
-                data.memories.forEach(memory => {
-                    var row = memoryTableBody.insertRow();
-                    var shortId = memory.id.replace(/^0+/, '') || '0';
-                    var formattedDate = formatDate(memory.metadata.created_at);
-
-                    row.innerHTML = `
-                        <td>${shortId}</td>
-                        <td>${memory.document}</td>
-                        <td>${formattedDate}</td>
-                        <td>${memory.distance.toFixed(3)}</td>
-                        <td>
-                            <button class="btn btn-primary" onclick="openMemory('${memory.metadata.uid}', '${memory.metadata.chat_id}')">Open</button>
-                        </td>
-                    `;
-                });
+            // Render rewritten query if available
+            if (data.rewritten) {
+                const rewrittenElement = document.createElement('div');
+                rewrittenElement.id = 'rewrittenQuery';
+                rewrittenElement.innerHTML = `<strong>Rewritten query:</strong> ${data.rewritten}`;
+                searchResults.appendChild(rewrittenElement);
             }
-            if (data.rewritten_memories.length > 0) {
-                rewrittenMemoriesSection.style.display = 'block';
-                data.rewritten_memories.forEach(alt_memory => {
-                    var row = rewrittenMemoryTableBody.insertRow();
-                    var shortId = alt_memory.id.replace(/^0+/, '') || '0';
-                    var formattedDate = formatDate(alt_memory.metadata.created_at);
 
-                    row.innerHTML = `
-                        <td>${shortId}</td>
-                        <td>${alt_memory.document}</td>
-                        <td>${formattedDate}</td>
-                        <td>${alt_memory.distance.toFixed(3)}</td>
-                        <td>
-                            <button class="btn btn-primary" onclick="openMemory('${alt_memory.metadata.uid}', '${alt_memory.metadata.chat_id}')">Open</button>
-                        </td>
-                    `;
-                });
-            }
-            rewrittenQuery.innerHTML = data.rewritten;
+            // Add search result text
+            const searchResultText = document.createElement('div');
+            searchResultText.id = 'searchResultText';
+            searchResultText.innerHTML = '<strong>Results:</strong>';
+            searchResults.appendChild(searchResultText);
+
+            // Group memories by chat_id (title)
+            const groupedMemories = groupMemoriesByChat(data.memories);
+            
+            // Render grouped memories
+            Object.entries(groupedMemories).forEach(([chatTitle, messages]) => {
+                const chatResultElement = createChatResultElement(chatTitle, messages);
+                searchResults.appendChild(chatResultElement);
+            });
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('An error occurred while searching memories.', 'danger');
+        searchStatus.classList.remove('loading');
+        searchResults.innerHTML = '<p class="text-danger">An error occurred while searching.</p>';
     });
 }
 
-function formatDate(timestamp) {
-    const date = new Date(timestamp * 1000); // Convert to milliseconds
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are zero-based
-    const year = date.getFullYear();
+function createChatResultElement(chatTitle, messages) {
+    const chatElement = document.createElement('div');
+    chatElement.className = 'chat-search-result';
 
-    return `${day}/${month}/${year} - ${hours}:${minutes}:${seconds}`;
+    const titleElement = document.createElement('div');
+    titleElement.className = 'chat-title collapsed';
+    titleElement.textContent = chatTitle;
+    titleElement.onclick = () => toggleMessageList(titleElement);
+    chatElement.appendChild(titleElement);
+
+    const messageListElement = document.createElement('div');
+    messageListElement.className = 'message-list';
+
+    messages.forEach(message => {
+        const messageElement = createMessageElement(message);
+        messageListElement.appendChild(messageElement);
+    });
+
+    chatElement.appendChild(messageListElement);
+    return chatElement;
+}
+
+function toggleMessageList(titleElement) {
+    titleElement.classList.toggle('collapsed');
+    const messageList = titleElement.nextElementSibling;
+    messageList.classList.toggle('show');
 }
 
 function openChatSearch() {
-    // open a search modal for chats
     $('#chatSearchModal').modal('show');
+    // Clear previous search results and input
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    // Reset search icon
+    document.getElementById('searchStatus').classList.remove('loading');
 }
 
 function closeChatSearch() {
-    // close the chat search modal
     $('#chatSearchModal').modal('hide');
 }
 
+
+function groupMemoriesByChat(memories) {
+    return memories.reduce((acc, memory) => {
+        const chatTitle = memory.chat_title || 'Untitled Chat';
+        if (!acc[chatTitle]) {
+            acc[chatTitle] = [];
+        }
+        acc[chatTitle].push(memory);
+        return acc;
+    }, {});
+}
+
+
+function createMessageElement(message) {
+    const messageElement = document.createElement('div');
+    messageElement.className = 'message-item';
+
+    const contentElement = document.createElement('div');
+    contentElement.className = 'message-content';
+    contentElement.innerHTML = highlightSearchTerms(message.document, document.getElementById('searchInput').value);
+    messageElement.appendChild(contentElement);
+
+    const metaElement = document.createElement('div');
+    metaElement.className = 'message-meta';
+    metaElement.innerHTML = `
+        <span class="message-date">${formatDate(message.metadata.created_at)}</span>
+        <span class="message-distance">Distance: ${message.distance.toFixed(3)}</span>
+        <button class="btn btn-sm btn-primary float-right" onclick="openMemory('${message.metadata.uid}', '${message.metadata.chat_id}')">Open</button>
+    `;
+    messageElement.appendChild(metaElement);
+
+    return messageElement;
+}
+
+function highlightSearchTerms(text, searchQuery) {
+    const words = searchQuery.trim().split(/\s+/);
+    let highlightedText = text;
+    words.forEach(word => {
+        const regex = new RegExp(word, 'gi');
+        highlightedText = highlightedText.replace(regex, match => `<span class="highlight">${match}</span>`);
+    });
+    return highlightedText;
+}
+
+function formatDate(timestamp) {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
+}
+
 function openMemory(memoryId, chatId) {
-    // Open the chat tab with the memory
     setChat(chatId);
     $('#chatSearchModal').modal('hide');
 
-    // Wait for the chat tab to be active, then scroll to the message
     setTimeout(function () {
         scrollToMessage(memoryId);
     }, 500);
 }
 
 function scrollToMessage(memoryId) {
-    // Find the message bubble with the given data-uuid
-    var messageBubble = document.querySelector('.bubble[data-uuid="' + memoryId + '"]');
-
-    // Check if the message bubble exists
+    const messageBubble = document.querySelector(`.bubble[data-uuid="${memoryId}"]`);
     if (messageBubble) {
-        // Scroll the messages container to the message bubble's position
-        var messagesContainer = document.getElementById('messages');
+        const messagesContainer = document.getElementById('messages');
         messagesContainer.scrollTop = messageBubble.offsetTop - messagesContainer.offsetTop;
     } else {
         console.log('Message bubble not found:', memoryId);

@@ -1364,11 +1364,17 @@ async def search_memories(
     # Include the distance value in each memory object
     for memory in memories:
         memory["distance"] = memory.get("distance", 0.0)
+        # get the title of the chat tab based on the chat_id
+        with ChatTabsDAO() as chat_tabs_dao:
+            chat_title = chat_tabs_dao.get_tab_description(
+                memory["metadata"]["chat_id"]
+            )
+            memory["chat_title"] = chat_title
 
     from utils import queryRewrite
 
-    rewritten = await queryRewrite(search_query, username)
-    print(rewritten)
+    rewritten = await queryRewrite(search_query, username, USERS_DIR)
+
     rewritten_memories = search_memory(
         category,
         rewritten,

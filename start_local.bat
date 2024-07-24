@@ -31,27 +31,14 @@ echo Home Directory: %HOME%
 echo Charlie User Directory: %CHARLIE_USER_DIR%
 
 :: Check if this is a git repository
-git rev-parse --is-inside-work-tree >nul 2>nul
-if not "!ERRORLEVEL!"=="0" (
-    echo "This directory is not a Git repository. Initializing Git repository..."
+if not exist .git (
+    echo This directory is not a Git repository. Initializing...
     git init
-    if "!ERRORLEVEL!"=="0" (
-        echo "Initialized empty Git repository."
-        echo "Setting remote origin to !REPO_URL!..."
-        git remote add origin !REPO_URL!
-        if "!ERRORLEVEL!"=="0" (
-            echo "Remote origin set to !REPO_URL!."
-            git fetch origin
-            if not "!ERRORLEVEL!"=="0" (
-                echo "Failed to fetch from remote repository."
-                exit /b 1
-            )
-        ) else (
-            echo "Failed to set remote origin."
-            exit /b 1
-        )
-    ) else (
-        echo "Failed to initialize Git repository."
+    git remote add origin %REPO_URL%
+    git fetch origin
+    git checkout -b main origin/dev
+    if errorlevel 1 (
+        echo Failed to initialize repository. Please check your internet connection and try again.
         exit /b 1
     )
 )
@@ -59,10 +46,11 @@ if not "!ERRORLEVEL!"=="0" (
 if "%UPDATE%"=="true" (
     echo Fetching remote branches...
     git fetch origin
-    if not "!ERRORLEVEL!"=="0" (
-        echo "Failed to fetch from remote repository."
+    if errorlevel 1 (
+        echo Failed to fetch from remote repository. Please check your internet connection and try again.
         exit /b 1
     )
+    
     echo Available branches:
     git branch -r
 
@@ -72,39 +60,23 @@ if "%UPDATE%"=="true" (
 
     :: Stash any changes
     echo Stashing any local changes...
-    git stash push -m "Temporary stash before updating" --include-untracked
+    git add .
+    git stash save "Automatic stash before update"
 
     if not "!BRANCH!"=="" (
-        echo Checking if branch is a local branch...
-        for /f "tokens=2 delims=/" %%a in ("!BRANCH!") do set LOCAL_BRANCH=%%a
-
-        git rev-parse --verify --quiet refs/heads/!LOCAL_BRANCH! >nul
-        if "!ERRORLEVEL!"=="0" (
-            echo "!LOCAL_BRANCH!" is a local branch
-            echo Switching to branch !LOCAL_BRANCH!
-            git checkout !LOCAL_BRANCH!
-        ) else (
-            git rev-parse --verify --quiet refs/remotes/origin/!LOCAL_BRANCH! >nul
-            if "!ERRORLEVEL!"=="0" (
-                echo "!LOCAL_BRANCH!" is a remote branch. Creating and switching to a local tracking branch...
-                git checkout -b !LOCAL_BRANCH! origin/!LOCAL_BRANCH!
-            ) else (
-                echo "!BRANCH!" is not a valid branch
-                git stash pop
-                exit /b 1
-            )
-        )
+        echo Switching to branch !BRANCH!
+        git checkout -B !BRANCH! origin/!BRANCH!
+    ) else (
+        echo Updating current branch
+        git pull origin HEAD
     )
-
-    echo Pulling latest changes...
-    git pull origin !LOCAL_BRANCH!
 
     :: Try to apply stashed changes
     echo Attempting to apply stashed changes...
     git stash pop
-    if not !ERRORLEVEL!==0 (
-        echo "Note: There were conflicts when applying your local changes."
-        echo "Your changes are preserved in the stash. You may need to manually resolve conflicts."
+    if errorlevel 1 (
+        echo Note: There were conflicts when applying your local changes.
+        echo Your changes are preserved in the stash. You may need to manually resolve conflicts.
     )
 )
 
@@ -116,17 +88,17 @@ if not exist .env (
     echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
 )
 
-if not !ERRORLEVEL!==0 (
+if errorlevel 1 (
     echo Failed to find docker, is it installed?
-    exit /b !ERRORLEVEL!
+    exit /b 1
 )
 
 echo Checking if docker daemon is running
 docker info
 
-if not !ERRORLEVEL!==0 (
+if errorlevel 1 (
     echo Docker daemon not running. Please start Docker Desktop.
-    exit /b !ERRORLEVEL!
+    exit /b 1
 )
 
 echo Removing any existing containers with the same names
@@ -135,18 +107,18 @@ docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env
 echo Stopping any existing Docker containers
 docker-compose down
 
-if not !ERRORLEVEL!==0 (
-    echo Docker Compose down command failed with error level !ERRORLEVEL!.
-    exit /b !ERRORLEVEL!
+if errorlevel 1 (
+    echo Docker Compose down command failed.
+    exit /b 1
 )
 
 echo Starting Charlie Mnemonic using Docker Compose...
 echo First run takes a while
 docker-compose up --build -d
 
-if not !ERRORLEVEL!==0 (
-    echo Docker Compose up command failed with error level !ERRORLEVEL!.
-    exit /b !ERRORLEVEL!
+if errorlevel 1 (
+    echo Docker Compose up command failed.
+    exit /b 1
 )
 
 echo Entering check loop

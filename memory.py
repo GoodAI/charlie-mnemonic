@@ -231,6 +231,76 @@ class MemoryManager:
                 memory["document"].replace("User :", username + ":")
         return memories[:n_results]
 
+    async def get_episodic_memory(
+        self,
+        new_messages,
+        username=None,
+        all_messages=None,
+        remaining_tokens=1000,
+        verbose=False,
+    ):
+        category = "active_brain"
+        process_dict = {
+            "input": new_messages,
+            "results": [],
+            "subject": "none",
+            "error": None,
+        }
+
+        openai_response = llmcalls.OpenAIResponser(
+            config.api_keys["openai"], config.default_params
+        )
+        async for resp in openai_response.get_response(
+            username,
+            all_messages,
+            function_metadata=config.fakedata,
+            role="date-extractor",
+        ):
+            if resp:
+                process_dict["subject"] = resp
+            else:
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
+
+        if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
+            # return process_dict
+            return []
+
+        logger.debug(f"Timeline: {process_dict['subject']}")
+
+        parsed_date = None
+        if isinstance(process_dict["subject"], str):
+            date_formats = [
+                "%Y-%m-%d",
+                "%d/%m/%Y %H:%M:%S",
+                "%d-%m-%Y",
+                "%d/%m/%Y",
+                "%d-%m-%Y",
+                "%d-%m-%Y %H:%M:%S",
+            ]
+
+            for date_format in date_formats:
+                try:
+                    parsed_date = datetime.strptime(
+                        process_dict["subject"].strip(), date_format
+                    )
+                    logger.debug(f"parsed_date: {parsed_date}")
+                    break
+                except ValueError:
+                    continue
+
+        if parsed_date is not None:
+            logger.debug(
+                f"searching for episodic messages on a specific date: {parsed_date} in category: {category} for user: {username} and message: {new_messages}"
+            )
+            episodic_messages = search_memory_by_date(
+                category, new_messages, username=username, filter_date=parsed_date
+            )
+            logger.debug(f"episodic_messages: {len(episodic_messages)}")
+
+        return episodic_messages
+
     async def process_episodic_memory(
         self,
         new_messages,
@@ -255,9 +325,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -304,7 +374,7 @@ class MemoryManager:
                 formatted_date = datetime.fromtimestamp(date).strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
-                results_string += f"{formatted_date} - {memory['document']} (score: {memory['distance']})\n"
+                results_string += f"({formatted_date}) [{memory['metadata']['username']}]: {memory['document']} (score: {memory['distance']:.4f})\n"
             logger.debug(f"results_string:\n{results_string}")
 
             # Check tokens
@@ -349,9 +419,6 @@ class MemoryManager:
                 metadata={"uid": uid, "chat_id": chat_id},
                 mUsername="user",
                 regenerate=regenerate,
-            )
-            print(
-                f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"
             )
             logger.debug(
                 f"adding memory: {chunk} to category: {category} with uid: {uid} for user: {username} and chat_id: {chat_id}"

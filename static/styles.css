@@ -2027,3 +2027,7 @@ pre {
 #searchStatus i {
     font-size: 1.2em;
 }
+
+.input-group {
+    align-items: center;
+}

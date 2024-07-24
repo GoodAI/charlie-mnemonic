@@ -7,6 +7,7 @@ import urllib.parse
 import zipfile
 from datetime import datetime
 from typing import List, Optional
+from agentmemory.helpers import chroma_collection_to_list
 from agentmemory.main import search_memory
 import llmcalls
 
@@ -58,6 +59,7 @@ from memory import (
     get_memories,
     update_memory,
     delete_memory,
+    MemoryManager,
 )
 from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO, AdminControlsDAO
@@ -69,6 +71,7 @@ from utils import (
     SettingsManager,
     BrainProcessor,
     MessageParser,
+    queryRewrite,
 )
 
 logger = logs.Log("routes", "routes.log").get_logger()
@@ -1361,19 +1364,35 @@ async def search_memories(
     else:
         memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
 
+    # get episodic memories
+    memory_manager = MemoryManager()
+    episodic_memory = await memory_manager.get_episodic_memory(
+        search_query,
+        username,
+        search_query,
+        2560,
+    )
+
+    # add the episodic memory to the memories if it exists
+    if episodic_memory:
+        # convert the query response to list and return
+        result_list = chroma_collection_to_list(episodic_memory)
+        memories.extend(result_list)
+
     # Include the distance value in each memory object
     for memory in memories:
-        memory["distance"] = memory.get("distance", 0.0)
-        # get the title of the chat tab based on the chat_id
-        with ChatTabsDAO() as chat_tabs_dao:
-            chat_title = chat_tabs_dao.get_tab_description(
-                memory["metadata"]["chat_id"]
-            )
-            memory["chat_title"] = chat_title
+        if isinstance(memory, dict):
+            memory["distance"] = memory.get("distance", 0.0)
+            # get the title of the chat tab based on the chat_id
+            with ChatTabsDAO() as chat_tabs_dao:
+                chat_id = memory.get("metadata", {}).get("chat_id")
+                if chat_id:
+                    chat_title = chat_tabs_dao.get_tab_description(chat_id)
+                    memory["chat_title"] = chat_title
+        else:
+            print("memory is not a dict", memory)
 
-    from utils import queryRewrite
-
-    rewritten = await queryRewrite(search_query, username, USERS_DIR)
+    rewritten = await queryRewrite(search_query, username, USERS_DIR, memories)
 
     rewritten_memories = search_memory(
         category,

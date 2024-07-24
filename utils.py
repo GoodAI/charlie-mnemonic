@@ -1365,34 +1365,24 @@ async def process_function_reply(
     return second_response
 
 
-async def queryRewrite(query, username, user_dir):
+async def queryRewrite(query, username, user_dir, memories):
     # Get the notes from the user
     notes_string = get_notes_as_string(user_dir, username)
 
-    # Get episodic memory
-    memory = _memory.MemoryManager()
-    episodic_memory, timezone = await memory.process_episodic_memory(
-        query,
-        username,
-        query,
-        2560,
-        True,
-    )
+    # Format the memories
+    formatted_memories = [format_memory(memory) for memory in memories]
 
-    if episodic_memory:
-        episodic_memory_string = f"Episodic Memory of {timezone}:\n{episodic_memory}\n"
-    else:
-        episodic_memory_string = "No relevant episodic memory found.\n"
+    relevant_memories_string = "Relevant memories:\n" + "\n".join(formatted_memories)
 
     current_date_time = await SettingsManager.get_current_date_time(username)
     messages = [
         {
             "role": "system",
-            "content": f"Current date: {current_date_time}\nYou will now rewrite the query using the notes and episodic memory. If the query is about one of the relevant notes or episodic memories, please include that in the query. Else just rewrite the query with a similar subject or synonyms.",
+            "content": f"Current date: {current_date_time}\nYou will get a query, notes and relevant memories. Your task is to reply with a rewritten query, if the query is about one of the relevant notes or memories, please include that in the rewritten query. Else just rewrite the query with a similar subject or synonym. For example, the user asks: what meals did you suggest to me yesterday? If the episodic memory includes details about for example a tortilla, you can rewrite the query to 'tortilla recipes'",
         },
         {
             "role": "user",
-            "content": f"Notes: {notes_string}\n\nEpisodic Memory: {episodic_memory_string}\n\nQuery: {query}",
+            "content": f"Notes: {notes_string}\n\nRelevant memories: {relevant_memories_string}\n\nQuery: {query}",
         },
     ]
 
@@ -1436,3 +1426,13 @@ def get_notes_as_string(user_dir, username):
                 notes_string += "\n\n"
 
     return notes_string.strip()
+
+
+def format_memory(memory):
+    date = datetime.fromtimestamp(memory["metadata"]["created_at"]).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    user_type = memory["metadata"]["username"]
+    document = memory["document"]
+    distance = memory["distance"]
+    return f"({date}) [{user_type}]: {document} ({distance:.4f})"

@@ -30,16 +30,40 @@ echo Current Directory: %CD%
 echo Home Directory: %HOME%
 echo Charlie User Directory: %CHARLIE_USER_DIR%
 
+:: Create .env file if it doesn't exist
+if not exist .env (
+    echo Creating .env file
+    echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
+)
+
 :: Check if this is a git repository
 if not exist .git (
     echo This directory is not a Git repository. Initializing...
+    
+    :: Backup the existing start_local.bat
+    if exist start_local.bat (
+        echo Backing up existing start_local.bat
+        move start_local.bat start_local.bat.bak
+    )
+    
     git init
     git remote add origin %REPO_URL%
     git fetch origin
+    
+    :: Attempt to checkout, and if it fails, restore the backup
     git checkout -b main origin/dev
     if errorlevel 1 (
-        echo Failed to initialize repository. Please check your internet connection and try again.
+        echo Failed to initialize repository. Restoring backup...
+        if exist start_local.bat.bak (
+            move start_local.bat.bak start_local.bat
+        )
+        echo Please check your internet connection and try again.
         exit /b 1
+    )
+    
+    :: If checkout was successful, remove the backup
+    if exist start_local.bat.bak (
+        del start_local.bat.bak
     )
 )
 
@@ -55,38 +79,30 @@ if "%UPDATE%"=="true" (
     git branch -r
 
     echo Please enter the branch name:
-    set /p BRANCH="Enter the full name of the branch you want to switch to (or press Enter to update the current branch): "
+    set /p BRANCH="Enter the name of the branch you want to switch to (without 'origin/'): "
     echo Branch entered: !BRANCH!
 
-    :: Stash any changes
-    echo Stashing any local changes...
-    git add .
-    git stash save "Automatic stash before update"
+    :: Force reset to remove all local changes
+    echo Resetting local changes...
+    git reset --hard
+
+    :: Remove all untracked files and directories
+    echo Removing untracked files and directories...
+    git clean -fd
 
     if not "!BRANCH!"=="" (
         echo Switching to branch !BRANCH!
-        git checkout -B !BRANCH! origin/!BRANCH!
+        git checkout -B !BRANCH! origin/!BRANCH! --force
     ) else (
         echo Updating current branch
-        git pull origin HEAD
+        git pull origin HEAD --force
     )
 
-    :: Try to apply stashed changes
-    echo Attempting to apply stashed changes...
-    git stash pop
-    if errorlevel 1 (
-        echo Note: There were conflicts when applying your local changes.
-        echo Your changes are preserved in the stash. You may need to manually resolve conflicts.
-    )
+    echo Branch update complete.
 )
 
 echo Checking if docker is installed
 docker --version
-
-if not exist .env (
-    echo Creating .env file
-    echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
-)
 
 if errorlevel 1 (
     echo Failed to find docker, is it installed?
@@ -102,15 +118,10 @@ if errorlevel 1 (
 )
 
 echo Removing any existing containers with the same names
-docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env
+docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env 2>nul
 
 echo Stopping any existing Docker containers
-docker-compose down
-
-if errorlevel 1 (
-    echo Docker Compose down command failed.
-    exit /b 1
-)
+docker-compose down 2>nul
 
 echo Starting Charlie Mnemonic using Docker Compose...
 echo First run takes a while

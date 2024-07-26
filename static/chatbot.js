@@ -501,6 +501,8 @@ function createMemoryTabContent(tabId) {
     var resetButton = document.createElement('button');
     resetButton.textContent = 'Reset to Default';
     resetButton.onclick = function () {
+        var maxTokens = parseInt("128000");
+        maxTokensDropdown.value = maxTokens;
         var defaultValues = [0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.97, 1.0];
         slider.noUiSlider.set(defaultValues);
     };

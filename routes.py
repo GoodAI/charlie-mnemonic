@@ -1348,7 +1348,7 @@ async def search_memories(
         search_query,
         username=username,
         n_results=100,
-        max_distance=1.6,
+        max_distance=1.4,
         min_distance=0.0,
     )
 
@@ -1399,7 +1399,7 @@ async def search_memories(
         rewritten,
         username=username,
         n_results=100,
-        max_distance=1.6,
+        max_distance=1.4,
         min_distance=0.0,
     )
 

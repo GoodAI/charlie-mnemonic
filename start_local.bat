@@ -9,6 +9,8 @@ set HOME=%USERPROFILE%
 set CHARLIE_USER_DIR=%HOME%\AppData\Roaming\charlie-mnemonic\users
 set UPDATE=false
 set REPO_URL=https://github.com/GoodAI/charlie-mnemonic
+set BACKUP_FOLDER=%HOME%\charlie_backups\charlie_backup_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%
+set BACKUP_FOLDER=%BACKUP_FOLDER: =0%
 
 echo Variables set
 
@@ -36,45 +38,24 @@ if not exist .env (
     echo CHARLIE_USER_DIR=%CHARLIE_USER_DIR% > .env
 )
 
-:: Check if this is a git repository
-if not exist .git (
-    echo This directory is not a Git repository. Initializing...
-    
-    :: Backup the existing start_local.bat
-    if exist start_local.bat (
-        echo Backing up existing start_local.bat
-        move start_local.bat start_local.bat.bak
-    )
-    
-    git init
-    git remote add origin %REPO_URL%
-    git fetch origin
-    
-    :: Attempt to checkout, and if it fails, restore the backup
-    git checkout -b main origin/dev
-    if errorlevel 1 (
-        echo Failed to initialize repository. Restoring backup...
-        if exist start_local.bat.bak (
-            move start_local.bat.bak start_local.bat
-        )
-        echo Please check your internet connection and try again.
-        exit /b 1
-    )
-    
-    :: If checkout was successful, remove the backup
-    if exist start_local.bat.bak (
-        del start_local.bat.bak
-    )
-)
-
 if "%UPDATE%"=="true" (
-    echo Fetching remote branches...
-    git fetch origin
-    if errorlevel 1 (
-        echo Failed to fetch from remote repository. Please check your internet connection and try again.
-        exit /b 1
+    :: Create backup folder and copy all files
+    echo Creating backup of existing files...
+    if not exist "%HOME%\charlie_backups" mkdir "%HOME%\charlie_backups"
+    mkdir "%BACKUP_FOLDER%"
+    xcopy /E /I /H /Y . "%BACKUP_FOLDER%"
+    echo Backup created in folder: %BACKUP_FOLDER%
+
+    :: Check if this is a git repository
+    if not exist .git (
+        echo This directory is not a Git repository. Initializing...
+        git init
+        git remote add origin %REPO_URL%
     )
-    
+
+    echo Fetching latest changes from the repository...
+    git fetch origin
+
     echo Available branches:
     git branch -r
 
@@ -82,23 +63,18 @@ if "%UPDATE%"=="true" (
     set /p BRANCH="Enter the name of the branch you want to switch to (without 'origin/'): "
     echo Branch entered: !BRANCH!
 
-    :: Force reset to remove all local changes
-    echo Resetting local changes...
-    git reset --hard
-
-    :: Remove all untracked files and directories
-    echo Removing untracked files and directories...
-    git clean -fd
-
     if not "!BRANCH!"=="" (
         echo Switching to branch !BRANCH!
-        git checkout -B !BRANCH! origin/!BRANCH! --force
+        git checkout -B !BRANCH! origin/!BRANCH!
     ) else (
         echo Updating current branch
-        git pull origin HEAD --force
+        git pull origin HEAD
     )
 
-    echo Branch update complete.
+    :: Update submodules if any
+    git submodule update --init --recursive
+
+    echo Repository update complete.
 )
 
 echo Checking if docker is installed
@@ -149,3 +125,6 @@ if !ERRORLEVEL!==0 (
 )
 
 echo Script completed
+if "%UPDATE%"=="true" (
+    echo Your original files are preserved in the backup folder: %BACKUP_FOLDER%
+)

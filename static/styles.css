@@ -1889,13 +1889,6 @@ pre {
     gap: 10px;
 }
 
-.chat-search-result .chat-title {
-    background-color: #f8f9fa;
-    padding: 10px 15px;
-    font-weight: bold;
-    border-bottom: 1px solid #e0e0e0;
-}
-
 .chat-search-result .message-list {
     max-height: 300px;
     overflow-y: auto;
@@ -1981,8 +1974,19 @@ pre {
     border-bottom: 1px solid #e0e0e0;
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+}
+
+.chat-search-result .chat-title .title-text {
+    margin-bottom: 5px;
+}
+
+.chat-search-result .chat-title .chat-date {
+    font-size: 0.8em;
+    color: #6c757d;
+    font-weight: normal;
 }
 
 .chat-search-result .chat-title:hover {

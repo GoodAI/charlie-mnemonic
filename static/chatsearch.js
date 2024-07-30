@@ -73,7 +73,10 @@ function createChatResultElement(chatTitle, messages) {
 
     const titleElement = document.createElement('div');
     titleElement.className = 'chat-title collapsed';
-    titleElement.textContent = chatTitle;
+    titleElement.innerHTML = `
+        <span class="title-text">${chatTitle}</span>
+        <span class="chat-date">${formatDate(messages[0].metadata.created_at)}</span>
+    `;
     titleElement.onclick = () => toggleMessageList(titleElement);
     chatElement.appendChild(titleElement);
 

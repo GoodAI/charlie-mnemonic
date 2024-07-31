@@ -357,6 +357,10 @@
                                    placeholder="Search..."
                                    oninput="debouncedChatSearch()"
                                    autocomplete="off">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
+                                <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
+                            </div>
                             <div class="input-group-append">
                                 <span class="input-group-text" id="searchStatus">
                                     <i class="fas fa-search"></i>

@@ -1,11 +1,18 @@
 const debouncedChatSearch = debounce(searchChatHandler, 300);
 
+let lastSearchQuery = '';
+let lastExactMatch = false;
+
 function searchChatHandler() {
     const searchQuery = document.getElementById('searchInput').value;
+    const exactMatch = document.getElementById('exactSearchCheckbox').checked;
     const searchStatus = document.getElementById('searchStatus');
     const searchResults = document.getElementById('searchResults');
 
-    if (searchQuery.trim() === '') {
+    // Check if only the checkbox state changed
+    const onlyCheckboxChanged = searchQuery === lastSearchQuery && exactMatch !== lastExactMatch;
+
+    if (searchQuery.trim() === '' && !onlyCheckboxChanged) {
         searchResults.innerHTML = '';
         searchStatus.classList.remove('loading');
         return;
@@ -23,7 +30,8 @@ function searchChatHandler() {
             'category': "active_brain",
             'search_query': searchQuery,
             'sort_by': 'distance',
-            'sort_order': 'asc'
+            'sort_order': 'asc',
+            'exact_match': exactMatch
         })
     })
     .then(response => response.json())
@@ -59,6 +67,10 @@ function searchChatHandler() {
                 searchResults.appendChild(chatResultElement);
             });
         }
+
+        // Update last search query and exact match state
+        lastSearchQuery = searchQuery;
+        lastExactMatch = exactMatch;
     })
     .catch(error => {
         console.error('Error:', error);

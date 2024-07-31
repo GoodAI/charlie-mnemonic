@@ -329,9 +329,10 @@ def search_memory(
     min_distance=None,  # 0.0 - 1.0
     novel=False,
     username=None,
+    exact_match=False,
 ):
     """
-    Cearch a collection with given query texts.
+    Search a collection with given query texts.
 
     Arguments:
     category (str): Category of the collection.
@@ -346,65 +347,67 @@ def search_memory(
     min_distance (float): Only include memories that are at least this distance
         0.0 = No memories will be excluded, 0.9 = most memories will be excluded
     novel (bool): Only include memories that are marked as novel
+    username (str): Username for the client
+    exact_match (bool): Whether to perform an exact match search
 
     Returns:
     list: List of search results.
-
-    Example:
-    >>> search_memory('sample_category', 'search_text', n_results=2, filter_metadata={'sample_key': 'sample_value'}, contains_text='sample', include_embeddings=True, include_distances=True)
-    [{'metadata': '...', 'document': '...', 'id': '...'}, {'metadata': '...', 'document': '...', 'id': '...'}]
     """
 
-    # check if contains_text is provided and format it for the query
-    if contains_text is not None:
-        contains_text = {"$contains": contains_text}
-
-    # get or create the collection
     memories = get_client(username=username).get_or_create_collection(category)
 
     if (memories.count()) == 0:
         return []
 
-    # min n_results to prevent searching for more elements than are available
     n_results = min(n_results, memories.count())
+    include_types = ["documents", "metadatas"]
+    if include_embeddings:
+        include_types.append("embeddings")
 
-    # get the types to include
-    include_types = get_include_types(include_embeddings, include_distances)
-
-    # filter_metadata is a dictionary of metadata to filter by
-    if filter_metadata is not None and len(filter_metadata.keys()) > 1:
-        # map each key:value in filter_metadata to an object shaped like { "key": { "$eq": "value" } }
-        filter_metadata = [
-            {key: {"$eq": value}} for key, value in filter_metadata.items()
-        ]
-
-        filter_metadata = {"$and": filter_metadata}
+    # Prepare filter_metadata
+    if filter_metadata is None:
+        filter_metadata = {}
 
     if novel:
-        if filter_metadata is None:
-            filter_metadata = {}
         filter_metadata["novel"] = "True"
 
-    # perform the query and get the response
-    query = memories.query(
-        query_texts=[search_text],
-        where=filter_metadata,
-        where_document=contains_text,
-        n_results=n_results,
-        include=include_types,
-    )
+    # Prepare where_document
+    where_document = None
+    if contains_text:
+        where_document = {"$contains": contains_text}
 
-    # if isinstance(query, list):
-    query = flatten_arrays(query)
+    # For exact match, we'll use get() instead of query()
+    if exact_match:
+        results = memories.get(
+            where=filter_metadata, where_document=where_document, include=include_types
+        )
+        result_list = chroma_collection_to_list(results)
+        result_list = [
+            res for res in result_list if search_text.lower() in res["document"].lower()
+        ]
+        result_list = result_list[:n_results]  # Limit results after filtering
+    else:
+        # Perform the query for non-exact match
+        query = memories.query(
+            query_texts=[search_text],
+            where=filter_metadata,
+            where_document=where_document,
+            n_results=n_results,
+            include=include_types + (["distances"] if include_distances else []),
+        )
+        query = flatten_arrays(query)
+        result_list = chroma_collection_to_list(query)
 
-    # convert the query response to list and return
-    result_list = chroma_collection_to_list(query)
+    if not exact_match:
+        if min_distance is not None and min_distance > 0:
+            result_list = [
+                res for res in result_list if res.get("distance", 0) >= min_distance
+            ]
 
-    if min_distance is not None and min_distance > 0:
-        result_list = [res for res in result_list if res["distance"] >= min_distance]
-
-    if max_distance is not None and max_distance < 2.0:
-        result_list = [res for res in result_list if res["distance"] <= max_distance]
+        if max_distance is not None and max_distance < 2.0:
+            result_list = [
+                res for res in result_list if res.get("distance", 0) <= max_distance
+            ]
 
     debug_log(f"Searched memory: {search_text}", result_list)
 

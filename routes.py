@@ -1341,8 +1341,10 @@ async def search_memories(
     search_query: str = Form(...),
     sort_by: str = Form(...),
     sort_order: str = Form(...),
+    exact_match: bool = Form(False),
 ):
     username = request.state.user.username
+
     memories = search_memory(
         category,
         search_query,
@@ -1350,6 +1352,7 @@ async def search_memories(
         n_results=100,
         max_distance=1.4,
         min_distance=0.0,
+        exact_match=exact_match,
     )
 
     # Sort the memories based on the selected sorting option and order
@@ -1357,7 +1360,7 @@ async def search_memories(
         memories.sort(
             key=lambda x: x["metadata"]["created_at"], reverse=sort_order == "desc"
         )
-    elif sort_by == "distance":
+    elif sort_by == "distance" and not exact_match:
         memories.sort(
             key=lambda x: x.get("distance", 0.0), reverse=sort_order == "desc"
         )
@@ -1401,6 +1404,7 @@ async def search_memories(
         n_results=100,
         max_distance=1.4,
         min_distance=0.0,
+        exact_match=exact_match,
     )
 
     return JSONResponse(

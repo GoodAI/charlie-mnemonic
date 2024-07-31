@@ -592,6 +592,9 @@ document.addEventListener('DOMContentLoaded', function () {
         closeAllDropdowns();
     });
 
+    // Event delegation for exact search checkbox
+    document.getElementById('exactSearchCheckbox').addEventListener('change', debouncedChatSearch);
+
 });
 
 function toggleTabs() {

@@ -65,10 +65,12 @@ if "%UPDATE%"=="true" (
 
     if not "!BRANCH!"=="" (
         echo Switching to branch !BRANCH!
-        git checkout -B !BRANCH! origin/!BRANCH!
+        git reset --hard origin/!BRANCH!
+        git clean -fd
     ) else (
         echo Updating current branch
-        git pull origin HEAD
+        git reset --hard origin/HEAD
+        git clean -fd
     )
 
     :: Update submodules if any

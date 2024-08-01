@@ -946,14 +946,21 @@ class MemoryManager:
                 if not os.path.isdir(filedir):
                     os.makedirs(filedir, exist_ok=True)
 
+                def content_to_str(content):
+                    if isinstance(content, list) or isinstance(content, dict):
+                        return json.dumps(content, indent=2)
+                    return str(content)
+
                 if action == "create":
                     with open(filepath, "w") as f:
-                        f.write(content)
+                        f.write(content_to_str(content))
                 elif action == "add":
                     with open(filepath, "a") as f:
-                        if f.tell() != 0 and not content.startswith("\n"):
+                        if f.tell() != 0 and not content_to_str(content).startswith(
+                            "\n"
+                        ):
                             f.write("\n")
-                        f.write(content)
+                        f.write(content_to_str(content))
                 elif action == "read":
                     if not os.path.exists(filepath):
                         process_dict["error"] = "Error: File does not exist"
@@ -970,11 +977,11 @@ class MemoryManager:
                                 lines = f.readlines()
                             with open(filepath, "w") as f:
                                 for line in lines:
-                                    if line.strip("\n") != content:
+                                    if line.strip("\n") != content_to_str(content):
                                         f.write(line)
                 elif action == "update":
                     with open(filepath, "w") as f:
-                        f.write(content)
+                        f.write(content_to_str(content))
                 elif action == "skip":
                     pass
                 else:

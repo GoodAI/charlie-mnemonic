@@ -856,7 +856,23 @@ class SettingsManager:
     @staticmethod
     async def load_settings(users_dir, username):
         settings = {}
-        settings_file = os.path.join(users_dir, username, "settings.json")
+        settings_dir = os.path.join(users_dir, username)
+        settings_file = os.path.join(settings_dir, "settings.json")
+
+        # Make sure the directory exists
+        if not os.path.exists(settings_dir):
+            os.makedirs(settings_dir)
+
+        # Make sure the settings file exists
+        if not os.path.exists(settings_file):
+            with open(settings_file, "w") as f:
+                # Write default settings to the file
+                json.dump({}, f)
+
+        # Load addons
+        await AddonManager.load_addons(username, users_dir)
+
+        # Load settings
         with open(settings_file, "r") as f:
             settings = json.load(f)
 
@@ -897,7 +913,7 @@ class SettingsManager:
         settings = await SettingsManager().load_settings("users", username)
         timezone = settings.get("timezone", {}).get("timezone", "auto")
 
-        if timezone == "auto":
+        if timezone == "auto" or timezone == "Auto":
             # If the timezone is set to 'auto', use the local timezone
             user_tz = get_localzone()
         else:

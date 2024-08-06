@@ -979,7 +979,7 @@ class MemoryManager:
                                 for line in lines:
                                     if line.strip("\n") != content_to_str(content):
                                         f.write(line)
-                elif action == "update":
+                elif action == "edit":
                     with open(filepath, "w") as f:
                         f.write(content_to_str(content))
                 elif action == "skip":

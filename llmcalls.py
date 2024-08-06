@@ -360,15 +360,18 @@ class OpenAIResponser:
         if role == "categorise":
             role_content = "You get a small chathistory and a last message. Break the last message down in a category (Factual Information, Personal Information, Procedural Knowledge, Conceptual Knowledge, Meta-knowledge or Temporal Information). 1 category per line. Only reply in this format: category\ncategory\n\nExample:\nProcedural Knowledge\nPersonal Information\n"
         if role == "retriever":
-            role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a vectorsearches. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
+            role_content = "You get a small chathistory and a last message. Break the last message down in multiple search queries to retrieve relevant messages with a vector search. Only reply in this format: query\nquery\n,...\nExample:\nWhat is the capital of France?\nInfo about the capital of France\n"
         if role == "notetaker":
             role_content = """
-You are a Memory Organizer. You will receive a list of the current notes, a small chat history, and a last message. Your task is to determine if the last message should be added, or if existing tasks or notes are completed and should be updated or deleted. Only store notes and memories if explicitly asked (e.g., the user asks to remember or learn a task or notes) or for things like shopping lists, reminders, user info, procedural instructions. DO NOT save imperative instructions, chat history, or regular messages! Delete completed tasks or questions. Use timestamps only if needed. Reply in a JSON format with the following keys: 'action' (add, create, delete, update, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.). When updating a list, repeat the whole updated list; otherwise, the rest gets removed. 
+You are a Memory Organizer. You will receive a list of the current notes, a small chat history, and a last message. Your task is to determine if the last message should be added, or if existing tasks or notes are completed and should be updated or deleted. Only store notes and memories if explicitly asked (e.g., the user asks to remember or learn a task or notes) or things like shopping lists, reminders, user info, instructions or a history of changes. Keep everything in appropriate seperate files. DO NOT save chat history, or regular messages! Mark completed tasks or questions. Use timestamps. Reply in a JSON format with the following keys: 'action' (add, create, delete, edit, skip), 'file' (shoppinglist, notes, etc.), 'content' (the message to be added, updated, deleted, etc.). When updating notes, repeat everything; otherwise, the rest gets removed. 
 
 Example:
 [
     {"action": "create", "file": "shoppinglist", "content": "cookies"},
-    {"action": "update", "file": "shoppinglist", "content": "cookies\napples\nbananas\npotatoes"}
+    {"action": "add", "file": "shoppinglist", "content": "apples\nbananas\npotatoes"},
+    {"action": "create", "file": "userdetails", "content": "Username: Robin"},
+    {"action": "edit", "file": "userdetails", "content": "Old Usernames: Robin\nNew username: Antony"},
+    {"action": "create", "file": "events", "content": "Antony went to a concert of Metallica on 12/07/2024"},
 ]
 """
         if role == "summary_memory":

@@ -416,7 +416,8 @@ async def handle_message(request: Request, message: userMessage):
         # this logic is a bit weird when used as API
         else:
             chat_tabs_dao.update_created_at(user_id, message.chat_id)
-            message.chat_id = active_tab_data.chat_id
+            if active_tab_data is not None:
+                message.chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {user.username} does not have access")
         raise HTTPException(

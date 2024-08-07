@@ -247,21 +247,39 @@ class MemoryManager:
             "error": None,
         }
 
-        openai_response = llmcalls.OpenAIResponser(
-            config.api_keys["openai"], config.default_params
+        responder = llmcalls.get_responder(
+            (
+                config.api_keys["openai"]
+                if config.chosen_model.startswith("gpt")
+                else config.api_keys["anthropic"]
+            ),
+            config.chosen_model,
+            config.default_params,
         )
-        async for resp in openai_response.get_response(
+
+        async for resp in responder.get_response(
             username,
             all_messages,
+            stream=False,
             function_metadata=config.fakedata,
-            role="date-extractor",
+            function_call="auto",
         ):
+
+            # openai_response = llmcalls.OpenAIResponser(
+            #     config.api_keys["openai"], config.default_params
+            # )
+            # async for resp in openai_response.get_response(
+            #     username,
+            #     all_messages,
+            #     function_metadata=config.fakedata,
+            #     role="date-extractor",
+            # ):
             if resp:
                 process_dict["subject"] = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
             # return process_dict
@@ -313,21 +331,36 @@ class MemoryManager:
         process_dict = {"input": new_messages}
 
         subject = "none"
-        openai_response = llmcalls.OpenAIResponser(
-            config.api_keys["openai"], config.default_params
+        responder = llmcalls.get_responder(
+            (
+                config.api_keys["openai"]
+                if config.chosen_model.startswith("gpt")
+                else config.api_keys["anthropic"]
+            ),
+            config.chosen_model,
+            config.default_params,
         )
-        async for resp in openai_response.get_response(
+        async for resp in responder.get_response(
             username,
             all_messages,
             function_metadata=config.fakedata,
             role="date-extractor",
         ):
+            # openai_response = llmcalls.OpenAIResponser(
+            #     config.api_keys["openai"], config.default_params
+            # )
+            # async for resp in openai_response.get_response(
+            #     username,
+            #     all_messages,
+            #     function_metadata=config.fakedata,
+            #     role="date-extractor",
+            # ):
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -425,17 +458,32 @@ class MemoryManager:
             )
             process_dict["created_new_memory"] = "yes"
         if remaining_tokens > 100:
-            openai_response = llmcalls.OpenAIResponser(
-                config.api_keys["openai"], config.default_params
-            )
             subject_query = None
             response = ""
-            async for resp in openai_response.get_response(
+            responder = llmcalls.get_responder(
+                (
+                    config.api_keys["openai"]
+                    if config.chosen_model.startswith("gpt")
+                    else config.api_keys["anthropic"]
+                ),
+                config.chosen_model,
+                config.default_params,
+            )
+            async for resp in responder.get_response(
                 username,
                 all_messages,
                 function_metadata=config.fakedata,
-                role="retriever",
+                role="date-extractor",
             ):
+                # openai_response = llmcalls.OpenAIResponser(
+                #     config.api_keys["openai"], config.default_params
+                # )
+                # async for resp in openai_response.get_response(
+                #     username,
+                #     all_messages,
+                #     function_metadata=config.fakedata,
+                #     role="retriever",
+                # ):
                 if resp:
                     subject_query = resp
 
@@ -527,15 +575,30 @@ class MemoryManager:
         unique_results = set()
         logger.debug(f"Processing incoming memory: {content}")
         subject_query = "none"
-        openai_response = llmcalls.OpenAIResponser(
-            config.api_keys["openai"], config.default_params
+        responder = llmcalls.get_responder(
+            (
+                config.api_keys["openai"]
+                if config.chosen_model.startswith("gpt")
+                else config.api_keys["anthropic"]
+            ),
+            config.chosen_model,
+            config.default_params,
         )
-        async for resp in openai_response.get_response(
+        async for resp in responder.get_response(
             username,
             content,
             function_metadata=config.fakedata,
             role="categorise_query",
         ):
+            # openai_response = llmcalls.OpenAIResponser(
+            #     config.api_keys["openai"], config.default_params
+            # )
+            # async for resp in openai_response.get_response(
+            #     username,
+            #     content,
+            #     function_metadata=config.fakedata,
+            #     role="categorise_query",
+            # ):
             if resp:
                 subject_query = resp
             else:
@@ -626,15 +689,30 @@ class MemoryManager:
                 )
         else:
             subject_category = "none"
-            openai_response = llmcalls.OpenAIResponser(
-                config.api_keys["openai"], config.default_params
+            responder = llmcalls.get_responder(
+                (
+                    config.api_keys["openai"]
+                    if config.chosen_model.startswith("gpt")
+                    else config.api_keys["anthropic"]
+                ),
+                config.chosen_model,
+                config.default_params,
             )
-            async for resp in openai_response.get_response(
+            async for resp in responder.get_response(
                 username,
                 content,
                 function_metadata=config.fakedata,
                 role="categorise",
             ):
+                # openai_response = llmcalls.OpenAIResponser(
+                #     config.api_keys["openai"], config.default_params
+                # )
+                # async for resp in openai_response.get_response(
+                #     username,
+                #     content,
+                #     function_metadata=config.fakedata,
+                #     role="categorise",
+                # ):
                 if resp:
                     subject_category = resp
                 else:
@@ -853,15 +931,30 @@ class MemoryManager:
                     max_tokens_per_file = max_tokens / len(dir_list)
                     with open(current_file, "r") as f:
                         file_content = f.read()
-                        openai_response = llmcalls.OpenAIResponser(
-                            config.api_keys["openai"], config.default_params
+                        responder = llmcalls.get_responder(
+                            (
+                                config.api_keys["openai"]
+                                if config.chosen_model.startswith("gpt")
+                                else config.api_keys["anthropic"]
+                            ),
+                            config.chosen_model,
+                            config.default_params,
                         )
-                        async for response in openai_response.get_response(
+                        async for response in responder.get_response(
                             username,
                             file_content,
                             function_metadata=config.fakedata,
                             role="summary_memory",
                         ):
+                            # openai_response = llmcalls.OpenAIResponser(
+                            #     config.api_keys["openai"], config.default_params
+                            # )
+                            # async for response in openai_response.get_response(
+                            #     username,
+                            #     file_content,
+                            #     function_metadata=config.fakedata,
+                            #     role="summary_memory",
+                            # ):
                             if response:
                                 summary = response
                             else:
@@ -883,15 +976,30 @@ class MemoryManager:
 
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
-                openai_response = llmcalls.OpenAIResponser(
-                    config.api_keys["openai"], config.default_params
+                responder = llmcalls.get_responder(
+                    (
+                        config.api_keys["openai"]
+                        if config.chosen_model.startswith("gpt")
+                        else config.api_keys["anthropic"]
+                    ),
+                    config.chosen_model,
+                    config.default_params,
                 )
-                async for response in openai_response.get_response(
+                async for response in responder.get_response(
                     username,
                     message,
                     function_metadata=config.fakedata,
                     role="summarize",
                 ):
+                    # openai_response = llmcalls.OpenAIResponser(
+                    #     config.api_keys["openai"], config.default_params
+                    # )
+                    # async for response in openai_response.get_response(
+                    #     username,
+                    #     message,
+                    #     function_metadata=config.fakedata,
+                    #     role="summarize",
+                    # ):
                     if response:
                         message = response
                     else:
@@ -906,15 +1014,30 @@ class MemoryManager:
             while retry_count < 5:
                 try:
                     note_taking_query = {}
-                    openai_response = llmcalls.OpenAIResponser(
-                        config.api_keys["openai"], config.default_params
+                    responder = llmcalls.get_responder(
+                        (
+                            config.api_keys["openai"]
+                            if config.chosen_model.startswith("gpt")
+                            else config.api_keys["anthropic"]
+                        ),
+                        config.chosen_model,
+                        config.default_params,
                     )
-                    async for resp in openai_response.get_response(
+                    async for resp in responder.get_response(
                         username,
                         final_message,
                         function_metadata=config.fakedata,
                         role="notetaker",
                     ):
+                        # openai_response = llmcalls.OpenAIResponser(
+                        #     config.api_keys["openai"], config.default_params
+                        # )
+                        # async for resp in openai_response.get_response(
+                        #     username,
+                        #     final_message,
+                        #     function_metadata=config.fakedata,
+                        #     role="notetaker",
+                        # ):
                         if resp:
                             note_taking_query = resp
                         else:

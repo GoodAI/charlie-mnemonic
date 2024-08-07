@@ -19,7 +19,7 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from chat_tabs.dao import ChatTabsDAO
-from config import api_keys, default_params, fakedata, USERS_DIR
+from config import api_keys, default_params, fakedata, USERS_DIR, chosen_model
 from database import Database
 import tiktoken
 from pydub import audio_segment
@@ -169,9 +169,9 @@ class MessageSender:
                         response_count=response_count,
                     )
         except Exception as e:
-            logger.exception(f"An error occurred: {e}")
+            logger.exception(f"An error occurred (utils): {e}")
             await MessageSender.send_message(
-                {"error": "An error occurred: " + str(e)}, "red", username
+                {"error": "An error occurred (utils): " + str(e)}, "red", username
             )
 
 
@@ -953,7 +953,7 @@ async def process_message(
 ):
     """Process the message and generate a response"""
     # reset the stopPressed variable
-    llmcalls.OpenAIResponser.reset_stop_stream(username)
+    llmcalls.reset_stop_stream(username)
     if display_name is None:
         display_name = username
 
@@ -1044,8 +1044,17 @@ async def process_message(
             {"role": "user", "content": all_messages},
         ]
         response = "New Chat"
-        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        async for resp in openai_response.get_response(
+        responder = llmcalls.get_responder(
+            (
+                api_keys["openai"]
+                if chosen_model.startswith("gpt")
+                else api_keys["anthropic"]
+            ),
+            chosen_model,
+            default_params,
+        )
+
+        async for resp in responder.get_response(
             username,
             messages,
             stream=False,
@@ -1053,6 +1062,15 @@ async def process_message(
             chat_id=chat_id,
         ):
             response = resp
+        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        # async for resp in openai_response.get_response(
+        #     username,
+        #     messages,
+        #     stream=False,
+        #     function_metadata=fakedata,
+        #     chat_id=chat_id,
+        # ):
+        #     response = resp
 
         with ChatTabsDAO() as db:
             db.update_tab_description(chat_id, response)
@@ -1313,8 +1331,17 @@ async def generate_response(
     #         prettyprint(f"System: {message['content']}", "green")
 
     response = ""
-    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-    async for resp in openai_response.get_response(
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if chosen_model.startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        chosen_model,
+        default_params,
+    )
+
+    async for resp in responder.get_response(
         username,
         messages,
         stream=True,
@@ -1323,6 +1350,16 @@ async def generate_response(
         uid=uid,
     ):
         response = resp
+        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        # async for resp in openai_response.get_response(
+        #     username,
+        #     messages,
+        #     stream=True,
+        #     function_metadata=function_metadata,
+        #     chat_id=chat_id,
+        #     uid=uid,
+        # ):
+        #     response = resp
         await MessageSender.send_debug(f"response: {response}", 1, "green", username)
 
     return response
@@ -1368,15 +1405,30 @@ async def process_function_reply(
             "content": str(function_response),
         },
     ]
-
-    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-    async for resp in openai_response.get_response(
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if chosen_model.startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        chosen_model,
+        default_params,
+    )
+    async for resp in responder.get_response(
         username,
         messages,
         stream=True,
         function_metadata=function_metadata,
         chat_id=chat_id,
     ):
+        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        # async for resp in openai_response.get_response(
+        #     username,
+        #     messages,
+        #     stream=True,
+        #     function_metadata=function_metadata,
+        #     chat_id=chat_id,
+        # ):
         second_response = resp
     return second_response
 
@@ -1402,13 +1454,28 @@ async def queryRewrite(query, username, user_dir, memories):
         },
     ]
 
-    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-    async for resp in openai_response.get_response(
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if chosen_model.startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        chosen_model,
+        default_params,
+    )
+    async for resp in responder.get_response(
         username,
         messages,
         stream=False,
         function_metadata=fakedata,
     ):
+        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
+        # async for resp in openai_response.get_response(
+        #     username,
+        #     messages,
+        #     stream=False,
+        #     function_metadata=fakedata,
+        # ):
         rewritten_query = resp
 
     return rewritten_query

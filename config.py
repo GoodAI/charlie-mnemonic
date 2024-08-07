@@ -35,6 +35,7 @@ def update_api_keys() -> Dict[str, Optional[str]]:
     api_keys.update(
         {
             "openai": os.getenv("OPENAI_API_KEY"),
+            "anthropic": os.getenv("ANTHROPIC_API_KEY"),
         }
     )
     return api_keys
@@ -58,6 +59,8 @@ CHATGPT_MODEL = os.environ.get("CHATGPT_MODEL", default_params["model"])
 
 # not used for now, embedding model used in the ChromaDB files
 OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-davinci-003")
+
+chosen_model = os.getenv("CHOSEN_MODEL") if os.getenv("CHOSEN_MODEL") else "gpt-4o"
 
 
 def origins():

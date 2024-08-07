@@ -525,7 +525,7 @@ async def regenerate_response(request: Request, message: regenerateMessage):
 
 @router.post("/stop_streaming/", tags=[LOGIN_REQUIRED])
 async def stop_streaming(request: Request, user: UserName):
-    llmcalls.OpenAIResponser.user_pressed_stop(user.username)
+    llmcalls.user_pressed_stop(user.username)
     return {"message": "Streaming stopped successfully"}
 
 

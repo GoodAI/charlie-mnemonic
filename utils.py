@@ -19,7 +19,7 @@ from fastapi import HTTPException, BackgroundTasks, UploadFile
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from chat_tabs.dao import ChatTabsDAO
-from config import api_keys, default_params, fakedata, USERS_DIR, chosen_model
+from config import api_keys, default_params, fakedata, USERS_DIR
 from database import Database
 import tiktoken
 from pydub import audio_segment
@@ -189,6 +189,7 @@ class AddonManager:
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "timezone": {"timezone": "Auto"},
+            "active_model": {"active_model": "gpt-4o"},
             "memory": {
                 "functions": 6400,
                 "ltm1": 2560,
@@ -444,6 +445,8 @@ class MessageParser:
         username: str, chat_id: str, regenerator: bool = False, uuid: str = None
     ) -> List[Dict[str, Any]]:
         memory = _memory.MemoryManager()
+        settings = await SettingsManager.load_settings("active_brain", username)
+        memory.model_used = settings["active_model"]["active_model"]
         recent_messages = await memory.get_most_recent_messages(
             "active_brain", username, chat_id=chat_id
         )
@@ -749,6 +752,8 @@ class MessageParser:
                 with UsersDAO() as db:
                     display_name = db.get_display_name(username)
                 memory = _memory.MemoryManager()
+                settings = await SettingsManager.load_settings("active_brain", username)
+                memory.model_used = settings["active_model"]["active_model"]
                 await memory.process_incoming_memory_assistant(
                     "active_brain",
                     response["content"],
@@ -1039,7 +1044,7 @@ async def process_message(
         messages = [
             {
                 "role": "system",
-                "content": "You are a chat tab title generator. You will give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it!",
+                "content": "You are a chat tab title generator. You will give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it! Only reply with the title, nothing else!",
             },
             {"role": "user", "content": all_messages},
         ]
@@ -1047,10 +1052,10 @@ async def process_message(
         responder = llmcalls.get_responder(
             (
                 api_keys["openai"]
-                if chosen_model.startswith("gpt")
+                if settings.get("active_model").get("active_model").startswith("gpt")
                 else api_keys["anthropic"]
             ),
-            chosen_model,
+            settings.get("active_model").get("active_model"),
             default_params,
         )
 
@@ -1092,6 +1097,7 @@ async def process_message(
 
     if regenerate is False:
         memory = _memory.MemoryManager()
+        memory.model_used = settings["active_model"]["active_model"]
         (
             kw_brain_string,
             token_usage_active_brain,
@@ -1105,6 +1111,7 @@ async def process_message(
             chat_id=chat_id,
             regenerate=regenerate,
             uid=uuid,
+            settings=settings,
         )
 
         token_usage += token_usage_active_brain
@@ -1113,7 +1120,12 @@ async def process_message(
 
         if tokens_episodic_memory > 100:
             episodic_memory, timezone = await memory.process_episodic_memory(
-                og_message, username, all_messages, tokens_episodic_memory, verbose
+                og_message,
+                username,
+                all_messages,
+                tokens_episodic_memory,
+                verbose,
+                settings,
             )
             if episodic_memory is None or episodic_memory == "":
                 episodic_memory_string = ""
@@ -1137,7 +1149,7 @@ async def process_message(
                 token_usage_relevant_memory,
                 unique_results2,
             ) = await memory.process_incoming_memory(
-                None, og_message, username, tokens_cat_brain, verbose
+                None, og_message, username, tokens_cat_brain, verbose, settings
             )
             merged_results_dict = {
                 id: (document, distance, formatted_date)
@@ -1186,6 +1198,7 @@ async def process_message(
                 show=False,
                 verbose=verbose,
                 tokens_notes=tokens_notes,
+                settings=settings,
             )
 
             if notes is not None or notes != "":
@@ -1334,10 +1347,10 @@ async def generate_response(
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
-            if chosen_model.startswith("gpt")
+            if settings.get("active_model").get("active_model").startswith("gpt")
             else api_keys["anthropic"]
         ),
-        chosen_model,
+        settings.get("active_model").get("active_model"),
         default_params,
     )
 
@@ -1399,19 +1412,30 @@ async def process_function_reply(
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"{message}"},
-        {
-            "role": "function",
-            "name": function_call_name,
-            "content": str(function_response),
-        },
     ]
+    settings = await SettingsManager.load_settings(users_dir, username)
+    if settings.get("active_model").get("active_model").startswith("gpt"):
+        messages.append(
+            {
+                "role": "function",
+                "name": function_call_name,
+                "content": str(function_response),
+            },
+        )
+    else:
+        messages.append(
+            {
+                "role": "assistant",
+                "content": str(function_response),
+            }
+        )
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
-            if chosen_model.startswith("gpt")
+            if settings.get("active_model").get("active_model").startswith("gpt")
             else api_keys["anthropic"]
         ),
-        chosen_model,
+        settings.get("active_model").get("active_model"),
         default_params,
     )
     async for resp in responder.get_response(
@@ -1453,14 +1477,14 @@ async def queryRewrite(query, username, user_dir, memories):
             "content": f"Notes: {notes_string}\n\nRelevant memories: {relevant_memories_string}\n\nQuery: {query}",
         },
     ]
-
+    settings = await SettingsManager.load_settings(user_dir, username)
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
-            if chosen_model.startswith("gpt")
+            if settings.get("active_model").get("active_model").startswith("gpt")
             else api_keys["anthropic"]
         ),
-        chosen_model,
+        settings.get("active_model").get("active_model"),
         default_params,
     )
     async for resp in responder.get_response(

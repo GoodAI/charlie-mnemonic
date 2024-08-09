@@ -4,9 +4,9 @@
     --chatbox-bg-color: #fff;
     --text-color: #4c4c4c;
     --bubble-bg-color: #ddd;
-    --user-bubble-color: #5084d8;
-    --user-bubble-text-color: #fff;
-    --bot-bubble-color: #ddd;
+    --user-bubble-color: #c2c2c21c;
+    --user-bubble-text-color: #4c4c4c;
+    --bot-bubble-color: #dddddd00;
     --bot-bubble-text-color: #333;
     --modal-bg-color: #fff;
     --button-bg-color: #1c3f77;
@@ -41,9 +41,9 @@
     --chatbox-bg-color: #333;
     --text-color: #ddd;
     --bubble-bg-color: #333;
-    --user-bubble-color: #184386;
+    --user-bubble-color: #c2c2c20a;
     --user-bubble-text-color: #eef1f7;
-    --bot-bubble-color: #595656;
+    --bot-bubble-color: #59565600;
     --bot-bubble-text-color: #ddd;
     --modal-bg-color: #222;
     --button-bg-color: #ddd;
@@ -614,19 +614,52 @@ a {
 .message {
     margin-bottom: 20px;
     display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.message.user {
+    align-items: flex-end;
+}
+
+.message.bot .bubble {
+    max-width: 80%;
+    word-wrap: break-word;
+    padding: 10px 0px;
+    background-color: var(--bot-bubble-color);
+    color: var(--bot-bubble-text-color);
+    border-radius: 0;
+    align-self: flex-start;
+}
+
+.message.user .bubble {
+    max-width: 80%;
+    word-wrap: break-word;
+    padding: 10px 15px;
+    border-radius: 18px;
+    background-color: var(--user-bubble-color);
+    color: var(--user-bubble-text-color);
+    border-radius: 18px;
+    align-self: flex-end;
+}
+
+.message.user .bubble p {
+    margin-bottom: 0;
+    margin-top: 0;
 }
 
 .message span.timestamp {
     font-size: 0.7em;
     color: #888;
-    padding-right: 5px;
+    margin-top: 5px;
 }
 
-.message .bubble {
-    display: block;
+.message.bot span.timestamp {
+    align-self: flex-start;
+}
+
+.message.user span.timestamp {
+    align-self: flex-end;
 }
 
 .message .bubble img {
@@ -657,15 +690,6 @@ a {
     text-wrap: nowrap;
 }
 
-.message.bot .bubble {
-    background-color: var(--bot-bubble-color);
-    color: var(--bot-bubble-text-color);
-    border-radius: 6px;
-    padding: 10px 15px;
-    display: inline;
-    max-width: 80%;
-    word-wrap: break-word;
-}
 
 .message.system .bubble {
     background-color: #c4d4be;
@@ -715,17 +739,6 @@ a {
     word-wrap: break-word;
 }
 
-.message.user .bubble {
-    background-color: var(--user-bubble-color);
-    color: var(--user-bubble-text-color);
-    border-radius: 6px;
-    padding: 10px 15px;
-    display: inline;
-    max-width: 80vh;
-    word-wrap: break-word;
-    align-self: flex-end;
-    min-width: 20vh;
-}
 
 .message.user .bubble a {
     color: #eef1f7;

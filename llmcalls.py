@@ -11,10 +11,10 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import aiohttp
 import utils
-from config import CHATGPT_MODEL
 
 from anthropic import AsyncAnthropic, APIStatusError
-from anthropic.types import ToolUseBlock
+from anthropic.types import ToolUseBlock, TextDelta
+
 
 load_dotenv()
 
@@ -22,12 +22,26 @@ stopPressed = {}
 
 
 class ClaudeResponser:
-    def __init__(self, api_key: str, default_params=None):
+    def __init__(
+        self, api_key: str, default_params=None, model="claude-3-sonnet-20240620"
+    ):
         if default_params is None:
             default_params = {}
 
         self.client = AsyncAnthropic(api_key=api_key)
         self.default_params = default_params
+        self.addons = self.load_addons()
+        self.model = model
+
+    def load_addons(self):
+        """Load the addons from the addons directory."""
+        addons = {}
+        for filename in os.listdir("addons"):
+            if filename.endswith(".py") and filename != "__init__.py":
+                addon_name = filename.replace(".py", "")
+                addon = __import__(f"addons.{addon_name}", fromlist=[""])
+                addons[addon_name] = addon
+        return addons
 
     async def get_response(
         self,
@@ -45,7 +59,10 @@ class ClaudeResponser:
             function_metadata = []
 
         current_date_time = await utils.SettingsManager.get_current_date_time(username)
-        role_content = self.get_role_content(role, current_date_time)
+        role_content = (
+            self.get_role_content(role, current_date_time)
+            + "\nDo not reply to the last user message! It is important to follow the instructions and adhere to the required format and structure. Do not say anything else."
+        )
 
         # Prepare the messages for Claude API
         if isinstance(message, list):
@@ -85,21 +102,22 @@ class ClaudeResponser:
             messages = [{"role": "user", "content": message}]
             system_message = role_content if role is not None else None
 
-        # debug print
-        for msg in messages:
-            if msg["role"] == "user":
-                print(f"\033[92m{msg['content']}\033[0m")
-            else:
-                print(f"\033[94m{msg['content']}\033[0m")
+        # # debug print
+        # for msg in messages:
+        #     if msg["role"] == "user":
+        #         print(f"\033[92m{msg['content']}\033[0m")
+        #     else:
+        #         print(f"\033[94m{msg['content']}\033[0m")
 
         tools = self.convert_to_claude_tools(function_metadata)
-        print(f"function_metadata: {json.dumps(function_metadata, indent=2)}")
-        print(f"Converted tools: {json.dumps(tools, indent=2)}")
+        # # debug print
+        # print(f"function_metadata: {json.dumps(function_metadata, indent=2)}")
+        # print(f"Converted tools: {json.dumps(tools, indent=2)}")
 
         params = self.default_params.copy()
         params.update(
             {
-                "model": self.default_params.get("model", "claude-3-opus-20240229"),
+                "model": self.model,
                 "max_tokens": self.default_params.get("max_tokens", 1000),
                 "messages": messages,
                 "stream": stream,
@@ -112,7 +130,11 @@ class ClaudeResponser:
         if system_message:
             params["system"] = system_message
 
-        print(f"Final params for Claude API: {json.dumps(params, indent=2)}")
+        # debug print
+        print(f"Using model: {self.model}")
+
+        # Debug print
+        # print(f"Final params for Claude API: {json.dumps(params, indent=2)}")
 
         timeout = 180.0
         now = time.time()
@@ -125,7 +147,12 @@ class ClaudeResponser:
                 )
                 if stream:
                     collected_messages = []
-                    async for event in response:
+                    tool_call = None
+                    tool_call_content = ""
+                    async for chunk in response:
+                        # print(f"Chunk type: {chunk.type}")
+                        # print(f"Chunk content: {chunk}")
+
                         # Check if the user pressed stop
                         global stopPressed
                         stopStream = False
@@ -141,32 +168,81 @@ class ClaudeResponser:
                             )
                             break
 
-                        if event.type == "content_block_start":
-                            continue
-                        elif event.type == "content_block_delta":
-                            content = event.delta.text
-                            if content:
-                                collected_messages.append(content)
-                                yield await utils.MessageSender.send_message(
-                                    {"chunk_message": content, "chat_id": chat_id},
-                                    "blue",
-                                    username,
-                                )
-                        elif event.type == "message_delta":
-                            continue
-                        elif event.type == "message_stop":
-                            full_response = "".join(collected_messages)
-                            print(f"\nFull response: {full_response}\n")
-                            yield full_response
-                            await utils.MessageSender.send_message(
-                                {"stop_message": True, "chat_id": chat_id},
-                                "blue",
-                                username,
-                            )
+                        if chunk.type == "content_block_start":
+                            if isinstance(chunk.content_block, ToolUseBlock):
+                                tool_call = chunk.content_block
+                        elif chunk.type == "content_block_delta":
+                            if chunk.delta.type == "text_delta":
+                                content = chunk.delta.text
+                                if content:
+                                    collected_messages.append(content)
+                                    yield await utils.MessageSender.send_message(
+                                        {"chunk_message": content, "chat_id": chat_id},
+                                        "blue",
+                                        username,
+                                    )
+                            elif chunk.delta.type == "input_json_delta":
+                                tool_call_content += chunk.delta.partial_json
+                        elif chunk.type == "message_delta":
+                            if chunk.delta.stop_reason == "tool_use":
+                                break
+                        elif chunk.type == "message_stop":
                             break
 
+                    full_response = "".join(collected_messages)
+                    print(f"\nFull claude response: {full_response}\n")
+                    yield full_response
+                    await utils.MessageSender.send_message(
+                        {"stop_message": True, "chat_id": chat_id},
+                        "blue",
+                        username,
+                    )
+
+                    # Process tool call if any
+                    if tool_call and tool_call_content:
+                        try:
+                            tool_input = json.loads(tool_call_content)
+                            print(
+                                f"Processing tool call: {tool_call.name} with input {tool_input}"
+                            )
+                            yield f"Executing tool: {tool_call.name} with input {tool_input}"
+                            tool_result = (
+                                await utils.MessageParser.process_function_call(
+                                    tool_call.name,
+                                    tool_input,
+                                    self.addons,
+                                    function_metadata,
+                                    message,
+                                    message,
+                                    username,
+                                    None,
+                                    chat_id=chat_id,
+                                )
+                            )
+                            print(f"Claude Tool result: {tool_result}")
+                            yield f"{tool_result}"
+
+                            # # Append the tool result to the user's message and continue the conversation
+                            # new_message = f"{message}\n\nTool '{tool_call.name}' was called and returned: {tool_result}"
+                            # async for response in self.get_response(
+                            #     username,
+                            #     new_message,
+                            #     stream=stream,
+                            #     function_metadata=function_metadata,
+                            #     function_call=function_call,
+                            #     chat_id=chat_id,
+                            #     role=role,
+                            #     uid=uid,
+                            # ):
+                            #     yield response
+                        except json.JSONDecodeError:
+                            print(
+                                f"Error decoding tool input JSON: {tool_call_content}"
+                            )
+                            yield f"Error processing tool call: Invalid JSON input"
+
                 else:
-                    print(f"Response: {response}")
+                    print(f"Claude Response: {response}")
                     yield response.content[0].text
 
                 elapsed = time.time() - now
@@ -277,7 +353,7 @@ Remember to only reply with the JSON format, nothing else.
 
 
 class OpenAIResponser:
-    def __init__(self, api_key: str, default_params=None):
+    def __init__(self, api_key: str, default_params=None, model="gpt-4o"):
         if default_params is None:
             default_params = {}
 
@@ -285,6 +361,7 @@ class OpenAIResponser:
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.default_params = default_params
         self.addons = self.load_addons()
+        self.model = model
 
     def load_addons(self):
         """Load the addons from the addons directory."""
@@ -398,7 +475,7 @@ class OpenAIResponser:
         params = self.default_params.copy()
         params.update(
             {
-                "model": self.default_params.get("model", "gpt-4o"),
+                "model": self.model,
                 "temperature": self.default_params.get("temperature", 0.1),
                 "max_tokens": self.default_params.get("max_tokens", 1000),
                 "n": self.default_params.get("n", 1),
@@ -412,6 +489,9 @@ class OpenAIResponser:
                 "parallel_tool_calls": False,
             }
         )
+
+        # debug print
+        print(f"Using model: {self.model}")
 
         timeout = 180.0
         now = time.time()
@@ -609,8 +689,8 @@ def reset_stop_stream(username):
 
 def get_responder(api_key: str, model: str, default_params=None):
     if model.startswith("gpt"):
-        return OpenAIResponser(api_key, default_params)
+        return OpenAIResponser(api_key, default_params, model)
     elif model.startswith("claude"):
-        return ClaudeResponser(api_key, default_params)
+        return ClaudeResponser(api_key, default_params, model)
     else:
         raise ValueError(f"Unsupported model: {model}")

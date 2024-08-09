@@ -404,6 +404,33 @@ function createGeneralSettingsTabContent(settings, tabId) {
     // }
     // tabContent.appendChild(cotItem);
 
+    // Populate chat model choice settings
+    h3 = document.createElement('h3');
+    h3.textContent = 'Chat Model';
+    tabContent.appendChild(h3);
+    var chatModelItem = document.createElement('select');
+    chatModelItem.id = 'chatModel';
+    chatModelItem.name = 'chatModel';
+    var chatModels = [
+        'gpt-4o',
+        'gpt-4o-mini',
+        'gpt-4-turbo',
+        'claude-3-5-sonnet-20240620',
+        'claude-3-opus-20240229'
+    ];
+    chatModels.forEach(function (chatModel) {
+        var option = document.createElement('option');
+        option.value = chatModel;
+        option.text = chatModel;
+        chatModelItem.appendChild(option);
+    });
+    chatModelItem.value = settings.active_model.active_model;
+    chatModelItem.onchange = function (e) {
+        edit_status('active_model', 'active_model', e.target.value);
+    }
+
+    tabContent.appendChild(chatModelItem);
+
     return tabContent;
 }
 

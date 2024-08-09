@@ -1367,14 +1367,12 @@ async def search_memories(
         )
     else:
         memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
-
+    settings = await SettingsManager.load_settings(USERS_DIR, username)
     # get episodic memories
     memory_manager = MemoryManager()
+    memory_manager.model_used = settings["active_model"]["active_model"]
     episodic_memory = await memory_manager.get_episodic_memory(
-        search_query,
-        username,
-        search_query,
-        2560,
+        search_query, username, search_query, 2560, settings=settings
     )
 
     # add the episodic memory to the memories if it exists

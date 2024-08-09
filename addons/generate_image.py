@@ -49,7 +49,7 @@ def generate_image(prompt, size="1024x1024", quality="standard", n=1, username=N
 
     image_paths = []
     volume_paths = []
-    random_string = os.urandom(8).hex()
+    random_string = os.urandom(3).hex()
     for i, data in enumerate(response.data):
         image_url = data.url
         image_filename = f"generated_image_{random_string}_{i+1}.png"

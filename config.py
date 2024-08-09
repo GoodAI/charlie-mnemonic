@@ -54,13 +54,8 @@ DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE = get_root("users/user.env")
 PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
 USERS_DIR = "users"
 
-MEMORY_MODEL = os.environ.get("MEMORY_MODEL", default_params["model"])
-CHATGPT_MODEL = os.environ.get("CHATGPT_MODEL", default_params["model"])
-
 # not used for now, embedding model used in the ChromaDB files
 OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-davinci-003")
-
-chosen_model = os.getenv("CHOSEN_MODEL") if os.getenv("CHOSEN_MODEL") else "gpt-4o"
 
 
 def origins():

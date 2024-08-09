@@ -48,7 +48,7 @@ class MemoryManager:
     """A class to manage the memory of the agent."""
 
     def __init__(self):
-        self.model_used = config.MEMORY_MODEL
+        self.model_used = "gpt-4o"
         pass
 
     async def create_memory(
@@ -238,6 +238,7 @@ class MemoryManager:
         all_messages=None,
         remaining_tokens=1000,
         verbose=False,
+        settings={},
     ):
         category = "active_brain"
         process_dict = {
@@ -250,10 +251,10 @@ class MemoryManager:
         responder = llmcalls.get_responder(
             (
                 config.api_keys["openai"]
-                if config.chosen_model.startswith("gpt")
+                if settings.get("active_model").get("active_model").startswith("gpt")
                 else config.api_keys["anthropic"]
             ),
-            config.chosen_model,
+            settings.get("active_model").get("active_model"),
             config.default_params,
         )
 
@@ -264,7 +265,6 @@ class MemoryManager:
             function_metadata=config.fakedata,
             function_call="auto",
         ):
-
             # openai_response = llmcalls.OpenAIResponser(
             #     config.api_keys["openai"], config.default_params
             # )
@@ -277,9 +277,9 @@ class MemoryManager:
             if resp:
                 process_dict["subject"] = resp
             else:
-                process_dict["error"] = (
-                    "timeline does not contain the required elements"
-                )
+                process_dict[
+                    "error"
+                ] = "timeline does not contain the required elements"
 
         if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
             # return process_dict
@@ -326,6 +326,7 @@ class MemoryManager:
         all_messages=None,
         remaining_tokens=1000,
         verbose=False,
+        settings={},
     ):
         category = "active_brain"
         process_dict = {"input": new_messages}
@@ -334,10 +335,10 @@ class MemoryManager:
         responder = llmcalls.get_responder(
             (
                 config.api_keys["openai"]
-                if config.chosen_model.startswith("gpt")
+                if settings.get("active_model").get("active_model").startswith("gpt")
                 else config.api_keys["anthropic"]
             ),
-            config.chosen_model,
+            settings.get("active_model").get("active_model"),
             config.default_params,
         )
         async for resp in responder.get_response(
@@ -358,9 +359,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict["error"] = (
-                    "timeline does not contain the required elements"
-                )
+                process_dict[
+                    "error"
+                ] = "timeline does not contain the required elements"
 
         if (
             subject.lower() == "none"
@@ -434,6 +435,7 @@ class MemoryManager:
         chat_id=None,
         regenerate=False,
         uid=None,
+        settings={},
     ):
         """Process the active brain and return the updated active brain data."""
         category = "active_brain"
@@ -463,10 +465,12 @@ class MemoryManager:
             responder = llmcalls.get_responder(
                 (
                     config.api_keys["openai"]
-                    if config.chosen_model.startswith("gpt")
+                    if settings.get("active_model")
+                    .get("active_model")
+                    .startswith("gpt")
                     else config.api_keys["anthropic"]
                 ),
-                config.chosen_model,
+                settings.get("active_model").get("active_model"),
                 config.default_params,
             )
             async for resp in responder.get_response(
@@ -568,7 +572,13 @@ class MemoryManager:
             return "", 0, set()
 
     async def process_incoming_memory(
-        self, category, content, username=None, remaining_tokens=1000, verbose=False
+        self,
+        category,
+        content,
+        username=None,
+        remaining_tokens=1000,
+        verbose=False,
+        settings={},
     ):
         """Process the incoming memory and return the updated active brain data."""
         process_dict = {"input": content}
@@ -578,10 +588,10 @@ class MemoryManager:
         responder = llmcalls.get_responder(
             (
                 config.api_keys["openai"]
-                if config.chosen_model.startswith("gpt")
+                if settings.get("active_model").get("active_model").startswith("gpt")
                 else config.api_keys["anthropic"]
             ),
-            config.chosen_model,
+            settings.get("active_model").get("active_model"),
             config.default_params,
         )
         async for resp in responder.get_response(
@@ -692,10 +702,12 @@ class MemoryManager:
             responder = llmcalls.get_responder(
                 (
                     config.api_keys["openai"]
-                    if config.chosen_model.startswith("gpt")
+                    if settings.get("active_model")
+                    .get("active_model")
+                    .startswith("gpt")
                     else config.api_keys["anthropic"]
                 ),
-                config.chosen_model,
+                settings.get("active_model").get("active_model"),
                 config.default_params,
             )
             async for resp in responder.get_response(
@@ -894,6 +906,7 @@ class MemoryManager:
         show=True,
         verbose=False,
         tokens_notes=1000,
+        settings={},
     ):
         max_tokens = tokens_notes
         process_dict = {
@@ -934,10 +947,12 @@ class MemoryManager:
                         responder = llmcalls.get_responder(
                             (
                                 config.api_keys["openai"]
-                                if config.chosen_model.startswith("gpt")
+                                if settings.get("active_model")
+                                .get("active_model")
+                                .startswith("gpt")
                                 else config.api_keys["anthropic"]
                             ),
-                            config.chosen_model,
+                            settings.get("active_model").get("active_model"),
                             config.default_params,
                         )
                         async for response in responder.get_response(
@@ -979,10 +994,12 @@ class MemoryManager:
                 responder = llmcalls.get_responder(
                     (
                         config.api_keys["openai"]
-                        if config.chosen_model.startswith("gpt")
+                        if settings.get("active_model")
+                        .get("active_model")
+                        .startswith("gpt")
                         else config.api_keys["anthropic"]
                     ),
-                    config.chosen_model,
+                    settings.get("active_model").get("active_model"),
                     config.default_params,
                 )
                 async for response in responder.get_response(
@@ -1017,10 +1034,12 @@ class MemoryManager:
                     responder = llmcalls.get_responder(
                         (
                             config.api_keys["openai"]
-                            if config.chosen_model.startswith("gpt")
+                            if settings.get("active_model")
+                            .get("active_model")
+                            .startswith("gpt")
                             else config.api_keys["anthropic"]
                         ),
-                        config.chosen_model,
+                        settings.get("active_model").get("active_model"),
                         config.default_params,
                     )
                     async for resp in responder.get_response(
@@ -1114,7 +1133,9 @@ class MemoryManager:
             await utils.MessageSender.send_message(
                 {"type": "note_taking", "content": process_dict}, "blue", username
             )
-        return await self.note_taking(content, message, user_dir, username, show=True)
+        return await self.note_taking(
+            content, message, user_dir, username, show=True, settings=settings
+        )
 
     def process_note_taking_query(self, query):
         actions = []

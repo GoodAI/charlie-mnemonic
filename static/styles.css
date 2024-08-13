@@ -2158,6 +2158,9 @@ pre {
     padding: 5px;
 }
 
+#SidenavAddons input[type="range"] {
+    padding: 0px;
+}
 #SidenavAddons .form-check-input:checked {
     background-color: #1c3f77;
 }

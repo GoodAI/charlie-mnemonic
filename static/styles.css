@@ -1499,7 +1499,6 @@ pre {
     color: #333;
     text-decoration: none;
     margin-bottom: 10px;
-    background-color: #e7e7e7;
 }
 
 #SidenavAddons .tab-content.active {
@@ -1510,7 +1509,7 @@ pre {
 }
 
 .nav-tabs {
-    border-bottom: 1px solid #ccc;
+    border-bottom: 0px solid #cccccc00;
 }
 
 .nav-item {
@@ -1540,7 +1539,7 @@ pre {
 .settings-dialog {
     max-width: 800px;
     width: 80vw;
-
+    font-size: small;
 }
 
 #slider {
@@ -2049,4 +2048,166 @@ pre {
 
 .input-group {
     align-items: center;
+}
+/* General styles */
+#SidenavAddons {
+    font-family: 'Arial', sans-serif;
+    color: #333;
+    padding: 20px;
+}
+
+/* Tab navigation */
+#SidenavAddons .nav-tabs {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 20px;
+    padding-left: 0;
+}
+
+#SidenavAddons .nav-item {
+    list-style-type: none;
+}
+
+#SidenavAddons .nav-item a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+#SidenavAddons .nav-item a:hover,
+#SidenavAddons .nav-item a.active {
+    color: #1c3f77;
+    border-bottom-color: #1c3f77;
+}
+
+#SidenavAddons .nav-item a i {
+    margin-right: 5px;
+}
+
+/* Tab content */
+#SidenavAddons .tab-content {
+    background-color: #fff;
+    border-radius: 5px;
+    padding: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+#SidenavAddons .tab-content h3 {
+    color: #1b1b1b;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 10px;
+    font-size: 12px;
+}
+
+/* Form elements */
+#SidenavAddons select, 
+#SidenavAddons input[type="text"], 
+#SidenavAddons input[type="range"], 
+#SidenavAddons textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 10px;
+}
+
+#SidenavAddons select:focus, 
+#SidenavAddons input[type="text"]:focus, 
+#SidenavAddons textarea:focus {
+    outline: none;
+    border-color: #1c3f77;
+    box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* Buttons */
+#SidenavAddons button {
+    background-color: #1c3f77;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-right: 10px;
+    margin-bottom: 10px;
+}
+
+#SidenavAddons button:hover {
+    background-color: #1c3f77;
+}
+
+/* Switches */
+#SidenavAddons .form-check-input {
+    width: 40px;
+    height: 22px;
+    background-color: #ccc;
+    border-radius: 20px;
+    transition: 0.3s;
+    cursor: pointer;
+    position: relative;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+#SidenavAddons .form-check-label {
+    padding: 5px;
+}
+
+#SidenavAddons .form-check-input:checked {
+    background-color: #1c3f77;
+}
+
+#SidenavAddons .form-check-input:before {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    top: 1px;
+    left: 1px;
+    background-color: white;
+    transition: 0.3s;
+}
+
+#SidenavAddons .form-check-input:checked:before {
+    left: 21px;
+}
+
+
+/* Category values */
+#SidenavAddons #values p {
+    margin-bottom: 5px;
+}
+
+#SidenavAddons #values span {
+    font-weight: bold;
+    color: #1c3f77;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    #SidenavAddons .nav-tabs {
+        flex-direction: column;
+    }
+
+    #SidenavAddons .nav-item {
+        width: 100%;
+        text-align: center;
+    }
+
+    #SidenavAddons .nav-item a {
+        border-bottom: none;
+        border-left: 2px solid transparent;
+    }
+
+    #SidenavAddons .nav-item a:hover,
+    #SidenavAddons .nav-item a.active {
+        border-bottom: none;
+        border-left-color: #1c3f77;
+    }
 }

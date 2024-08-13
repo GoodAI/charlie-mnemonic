@@ -14,15 +14,23 @@ function populateSettingsMenu(settings) {
         settingsMenu.firstChild.remove();
     }
 
-    var tabs = ['Addons', 'Data', 'General Settings', 'User Data', 'Memory Configuration'];
+    var tabs = [
+        { name: 'General', icon: 'fas fa-cog' },
+        { name: 'Chat', icon: 'fas fa-comments' },
+        { name: 'Addons', icon: 'fas fa-puzzle-piece' },
+        { name: 'Audio', icon: 'fas fa-volume-up' },
+        { name: 'User Data', icon: 'fas fa-user' },
+        { name: 'Memory', icon: 'fas fa-memory' }
+    ];
     var tabNav = createTabNav(tabs);
     settingsMenu.appendChild(tabNav);
 
-    settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab1'));
-    settingsMenu.appendChild(createDataTabContent(settings.audio, 'tab2'));
-    settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab3'));
-    settingsMenu.appendChild(createUserDataTabContent('tab4'));
-    settingsMenu.appendChild(createMemoryTabContent('tab5'));
+    settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab1'));
+    settingsMenu.appendChild(createChatSettingsTabContent(settings, 'tab2'));
+    settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab3'));
+    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4'));
+    settingsMenu.appendChild(createUserDataTabContent('tab5'));
+    settingsMenu.appendChild(createMemoryTabContent('tab6'));
 
     var maxRange = settings.memory.max_tokens;
     var minRange = settings.memory.min_tokens;
@@ -62,7 +70,7 @@ function createTabNav(tabs) {
     tabs.forEach((tab, index) => {
         var tabLink = document.createElement('a');
         tabLink.href = '#';
-        tabLink.textContent = tab;
+        tabLink.innerHTML = `<i class="${tab.icon}"></i> ${tab.name}`;
         tabLink.onclick = function (e) {
             e.preventDefault();
             switchTab(index + 1);
@@ -96,7 +104,7 @@ function createAddonsTabContent(addons, tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Addons';
+    h3.innerHTML = '<i class="fas fa-puzzle-piece"></i> Addons';
     tabContent.appendChild(h3);
     // todo: don't hardcode the addon descriptions
     var addon_descriptions = [
@@ -136,7 +144,6 @@ function createAddonsTabContent(addons, tabId) {
             name: 'google_search',
             description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
         }
-
     ];
 
     for (let addon in addons) {
@@ -159,13 +166,13 @@ function createAddonsTabContent(addons, tabId) {
     return tabContent;
 }
 
-function createDataTabContent(audio, tabId) {
+function createAudioTabContent(audio, tabId) {
     var tabContent = document.createElement('div');
     tabContent.id = tabId;
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Audio';
+    h3.innerHTML = '<i class="fas fa-volume-up"></i> Audio';
     tabContent.appendChild(h3);
 
     for (let audioItem in audio) {
@@ -194,7 +201,7 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     // Populate language settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Language';
+    h3.innerHTML = '<i class="fas fa-language"></i> Language';
     tabContent.appendChild(h3);
 
     var languageItem = document.createElement('select');
@@ -212,7 +219,7 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     // Populate Display Name settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Display Name';
+    h3.innerHTML = '<i class="fas fa-user"></i> Display Name';
     tabContent.appendChild(h3);
 
     var displayNameItem = document.createElement('textarea');
@@ -224,9 +231,100 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(displayNameItem);
 
-    // Populate System Prompt settings
+    // Populate timezone settings
     h3 = document.createElement('h3');
-    h3.textContent = 'System Prompt';
+    h3.innerHTML = '<i class="fas fa-globe"></i> Timezone';
+    tabContent.appendChild(h3);
+
+    var timezoneItem = document.createElement('select');
+    timezoneItem.id = 'timezone';
+    timezoneItem.name = 'timezone';
+    var timezones = [
+        'Auto',
+        'UTC-12',
+        'UTC-11',
+        'UTC-10',
+        'UTC-9',
+        'UTC-8',
+        'UTC-7',
+        'UTC-6',
+        'UTC-5',
+        'UTC-4',
+        'UTC-3',
+        'UTC-2',
+        'UTC-1',
+        'UTC',
+        'UTC+1',
+        'UTC+2',
+        'UTC+3',
+        'UTC+4',
+        'UTC+5',
+        'UTC+6',
+        'UTC+7',
+        'UTC+8',
+        'UTC+9',
+        'UTC+10',
+        'UTC+11',
+        'UTC+12',
+    ];
+    timezones.forEach(function (timezone) {
+        var option = document.createElement('option');
+        option.value = timezone;
+        option.text = timezone;
+        timezoneItem.appendChild(option);
+    });
+
+    // Detect user's timezone if settings.timezone.timezone is set to "auto"
+    if (settings.timezone && settings.timezone.timezone === 'auto') {
+        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var utcOffset = new Date().getTimezoneOffset() / -60;
+        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+        timezoneItem.value = utcOffsetString;
+    } else {
+        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
+    }
+
+    timezoneItem.onchange = function (e) {
+        if (e.target.value === 'Auto') {
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+            edit_status('timezone', 'timezone', utcOffsetString);
+        } else {
+            edit_status('timezone', 'timezone', e.target.value);
+        }
+    }
+    tabContent.appendChild(timezoneItem);
+
+    // add slider for chat Spacing
+    h3 = document.createElement('h3');
+    h3.innerHTML = '<i class="fas fa-arrows-alt-h"></i> Chat Spacing';
+    tabContent.appendChild(h3);
+
+    var chatPaddingItem = document.createElement('input');
+    chatPaddingItem.type = 'range';
+    chatPaddingItem.min = 50;
+    chatPaddingItem.max = 600;
+    chatPaddingItem.step = 50;
+    // get the current chat padding from local storage
+    var chatPadding = localStorage.getItem('chatPadding') || 100;
+    chatPaddingItem.value = chatPadding;
+    chatPaddingItem.oninput = function (e) {
+        set_chat_padding(e.target.value);
+    }
+    tabContent.appendChild(chatPaddingItem);
+
+    return tabContent;
+}
+
+function createChatSettingsTabContent(settings, tabId) {
+    var tabContent = document.createElement('div');
+    tabContent.id = tabId;
+    tabContent.className = 'tab-content';
+
+    // Populate System Prompt settings
+    var h3 = document.createElement('h3');
+    h3.innerHTML = '<i class="fas fa-cogs"></i> System Prompt';
     tabContent.appendChild(h3);
 
     var systemPromptContainer = document.createElement('div');
@@ -312,10 +410,9 @@ function createGeneralSettingsTabContent(settings, tabId) {
         }
     };
 
-
     // Other settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Other settings';
+    h3.innerHTML = '<i class="fas fa-sliders-h"></i> Other settings';
     tabContent.appendChild(h3);
 
     // Populate verbose settings
@@ -329,84 +426,9 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
-    // Populate timezone settings
-    h3 = document.createElement('h3');
-    h3.textContent = 'Timezone';
-    tabContent.appendChild(h3);
-
-    var timezoneItem = document.createElement('select');
-    timezoneItem.id = 'timezone';
-    timezoneItem.name = 'timezone';
-    var timezones = [
-        'Auto',
-        'UTC-12',
-        'UTC-11',
-        'UTC-10',
-        'UTC-9',
-        'UTC-8',
-        'UTC-7',
-        'UTC-6',
-        'UTC-5',
-        'UTC-4',
-        'UTC-3',
-        'UTC-2',
-        'UTC-1',
-        'UTC',
-        'UTC+1',
-        'UTC+2',
-        'UTC+3',
-        'UTC+4',
-        'UTC+5',
-        'UTC+6',
-        'UTC+7',
-        'UTC+8',
-        'UTC+9',
-        'UTC+10',
-        'UTC+11',
-        'UTC+12',
-    ];
-    timezones.forEach(function (timezone) {
-        var option = document.createElement('option');
-        option.value = timezone;
-        option.text = timezone;
-        timezoneItem.appendChild(option);
-    });
-
-    // Detect user's timezone if settings.timezone.timezone is set to "auto"
-    if (settings.timezone && settings.timezone.timezone === 'auto') {
-        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        var utcOffset = new Date().getTimezoneOffset() / -60;
-        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
-        timezoneItem.value = utcOffsetString;
-    } else {
-        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
-    }
-
-    timezoneItem.onchange = function (e) {
-        if (e.target.value === 'Auto') {
-            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            var utcOffset = new Date().getTimezoneOffset() / -60;
-            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
-            edit_status('timezone', 'timezone', utcOffsetString);
-        } else {
-            edit_status('timezone', 'timezone', e.target.value);
-        }
-    }
-    tabContent.appendChild(timezoneItem);
-    // Populate chain of thought settings (disabled for now)
-    // var cotItem = document.createElement('a');
-    // cotItem.href = "#";
-    // var status = settings.cot_enabled.cot_enabled ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-    // cotItem.innerHTML = 'Chain of thought (experimental): ' + status;
-    // cotItem.onclick = function (e) {
-    //     e.preventDefault();
-    //     edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
-    // }
-    // tabContent.appendChild(cotItem);
-
     // Populate chat model choice settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Chat Model';
+    h3.innerHTML = '<i class="fas fa-robot"></i> Chat Model';
     tabContent.appendChild(h3);
     var chatModelItem = document.createElement('select');
     chatModelItem.id = 'chatModel';
@@ -431,24 +453,6 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     tabContent.appendChild(chatModelItem);
 
-    // add slider for chat Spacing
-    h3 = document.createElement('h3');
-    h3.textContent = 'Chat Spacing';
-    tabContent.appendChild(h3);
-
-    var chatPaddingItem = document.createElement('input');
-    chatPaddingItem.type = 'range';
-    chatPaddingItem.min = 50;
-    chatPaddingItem.max = 600;
-    chatPaddingItem.step = 50;
-    // get the current chat padding from local storage
-    var chatPadding = localStorage.getItem('chatPadding') || 100;
-    chatPaddingItem.value = chatPadding;
-    chatPaddingItem.oninput = function (e) {
-        set_chat_padding(e.target.value);
-    }
-    tabContent.appendChild(chatPaddingItem);
-
     return tabContent;
 }
 
@@ -458,17 +462,17 @@ function createUserDataTabContent(tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'User Data';
+    h3.innerHTML = '<i class="fas fa-user-cog"></i> User Data';
     tabContent.appendChild(h3);
 
     var saveDataBtn = document.createElement('button');
     saveDataBtn.id = 'saveDataBtn';
-    saveDataBtn.textContent = 'Save Data';
+    saveDataBtn.innerHTML = '<i class="fas fa-save"></i> Save Data';
     tabContent.appendChild(saveDataBtn);
 
     var deleteDataBtn = document.createElement('button');
     deleteDataBtn.id = 'deleteDataBtn';
-    deleteDataBtn.textContent = 'Delete Data';
+    deleteDataBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Data';
     tabContent.appendChild(deleteDataBtn);
 
     var uploadDataInput = document.createElement('input');
@@ -478,9 +482,8 @@ function createUserDataTabContent(tabId) {
 
     var uploadDataBtn = document.createElement('button');
     uploadDataBtn.id = 'uploadDataBtn';
-    uploadDataBtn.textContent = 'Upload Data';
+    uploadDataBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Data';
     tabContent.appendChild(uploadDataBtn);
-
 
     saveDataBtn.addEventListener('click', save_user_data);
     deleteDataBtn.addEventListener('click', delete_user_data);
@@ -500,7 +503,7 @@ function createMemoryTabContent(tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Memory Configuration';
+    h3.innerHTML = '<i class="fas fa-memory"></i> Memory Configuration';
     tabContent.appendChild(h3);
 
     var maxTokensLabel = document.createElement('label');
@@ -544,7 +547,7 @@ function createMemoryTabContent(tabId) {
     tabContent.appendChild(container);
 
     var resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset to Default';
+    resetButton.innerHTML = '<i class="fas fa-undo"></i> Reset to Default';
     resetButton.onclick = function () {
         var maxTokens = parseInt("128000");
         maxTokensDropdown.value = maxTokens;
@@ -554,7 +557,7 @@ function createMemoryTabContent(tabId) {
     tabContent.appendChild(resetButton);
 
     var saveButton = document.createElement('button');
-    saveButton.textContent = 'Save Memory Configuration';
+    saveButton.innerHTML = '<i class="fas fa-save"></i> Save Memory Configuration';
     saveButton.onclick = saveMemoryConfiguration;
     tabContent.appendChild(saveButton);
 

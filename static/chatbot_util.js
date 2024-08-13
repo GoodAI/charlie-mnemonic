@@ -241,3 +241,10 @@ function debounce(func, delay) {
         timeoutId = setTimeout(() => func.apply(context, args), delay);
     };
 }
+
+function set_chat_padding(width) {
+    const messages = document.getElementById("messages");
+    messages.style.padding = `20px ${width}px`;
+    // save the padding in local storage
+    localStorage.setItem("chatPadding", width);
+}

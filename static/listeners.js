@@ -545,6 +545,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelEmailButton = document.getElementById('cancel-email');
     const hiddenIdField = document.getElementById('emailId');
 
+    // load the chatPadding from local storage
+    const chatPadding = localStorage.getItem("chatPadding");
+    if (chatPadding) {
+        set_chat_padding(chatPadding);
+    }
+
     if (currentTheme) {
         document.body.classList.add(currentTheme);
     }

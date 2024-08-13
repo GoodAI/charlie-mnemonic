@@ -264,6 +264,7 @@ class MemoryManager:
             stream=False,
             function_metadata=config.fakedata,
             function_call="auto",
+            role="date-extractor",
         ):
             # openai_response = llmcalls.OpenAIResponser(
             #     config.api_keys["openai"], config.default_params
@@ -288,6 +289,7 @@ class MemoryManager:
         logger.debug(f"Timeline: {process_dict['subject']}")
 
         parsed_date = None
+        episodic_messages = []
         if isinstance(process_dict["subject"], str):
             date_formats = [
                 "%Y-%m-%d",

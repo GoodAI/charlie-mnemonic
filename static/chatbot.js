@@ -431,6 +431,24 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     tabContent.appendChild(chatModelItem);
 
+    // add slider for chat Spacing
+    h3 = document.createElement('h3');
+    h3.textContent = 'Chat Spacing';
+    tabContent.appendChild(h3);
+
+    var chatPaddingItem = document.createElement('input');
+    chatPaddingItem.type = 'range';
+    chatPaddingItem.min = 50;
+    chatPaddingItem.max = 600;
+    chatPaddingItem.step = 50;
+    // get the current chat padding from local storage
+    var chatPadding = localStorage.getItem('chatPadding') || 100;
+    chatPaddingItem.value = chatPadding;
+    chatPaddingItem.oninput = function (e) {
+        set_chat_padding(e.target.value);
+    }
+    tabContent.appendChild(chatPaddingItem);
+
     return tabContent;
 }
 

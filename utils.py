@@ -1470,7 +1470,7 @@ async def queryRewrite(query, username, user_dir, memories):
     messages = [
         {
             "role": "system",
-            "content": f"Current date: {current_date_time}\nYou will get a query, notes and relevant memories. Your task is to reply with a rewritten query, if the query is about one of the relevant notes or memories, please include that in the rewritten query. Else just rewrite the query with a similar subject or synonym. For example, the user asks: what meals did you suggest to me yesterday? If the episodic memory includes details about for example a tortilla, you can rewrite the query to 'tortilla recipes'",
+            "content": f"Current date: {current_date_time}\nYou will get a query, notes and relevant memories. Your task is to reply with a rewritten query, if the query is about one of the relevant notes or memories, please include that in the rewritten query. Else just rewrite the query with a similar subject or synonym. For example, the user asks: what meals did you suggest to me yesterday? If the episodic memory includes details about for example a tortilla, you can rewrite the query to 'tortilla recipes'. Its important to keep this list short and concise, do not chat with ther user, only rewrite the query, nothing else!",
         },
         {
             "role": "user",

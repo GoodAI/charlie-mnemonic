@@ -409,7 +409,7 @@ a {
 
 #messages {
     flex: 1;
-    padding: 20px;
+    padding: 20px 100px;
     overflow-y: auto;
 }
 
@@ -421,26 +421,28 @@ a {
 }
 
 .textarea-container {
-    position: inherit;
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
     width: 100%;
 }
 
 .icon-container-left,
 .icon-container-right {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
     display: flex;
     align-items: center;
-    position: absolute;
 }
 
 .icon-container-left {
-    bottom: 4.5vh;
-    transform: translateY(50%);
+    left: 10px;
 }
 
 .icon-container-right {
-    bottom: 4.5vh;
-    right: 25px;
-    transform: translateY(50%);
+    right: 10px;
 }
 
 .input-field textarea {

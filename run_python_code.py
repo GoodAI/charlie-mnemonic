@@ -40,7 +40,8 @@ def sync_run_python_code(content, pip_packages=[], previous_content="", username
         f"trying to run python code: {content}\n\nwith pip packages: {pip_packages}\n\nfor user: {username}"
     )
     # convert the email to a name without special characters to name our container
-    username = convert_username(username)
+    if username:
+        username = convert_username(username)
 
     if previous_content != "":
         new_content = previous_content + "\n" + content

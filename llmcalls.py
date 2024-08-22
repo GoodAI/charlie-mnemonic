@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import time
+import traceback
 import uuid
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -43,6 +44,24 @@ class ClaudeResponser:
                 addons[addon_name] = addon
         return addons
 
+    async def process_chunk(self, chunk, collected_temp, chat_id, username, message):
+        if chunk.type == "content_block_delta" and chunk.delta.type == "text_delta":
+            content = chunk.delta.text
+            if content:
+                collected_temp.append(content)
+        if collected_temp is not None:
+            # Check if we have a complete code block
+            full_content = "".join(collected_temp)
+            if "<execute_code>" in full_content and "</execute_code>" in full_content:
+                code_result = await utils.extract_and_execute_code(
+                    full_content, username
+                )
+                collected_temp.clear()
+                collected_temp.append(full_content.split("</execute_code>")[-1])
+                print(f"Code result: {code_result}")
+                yield f"\n\nCode Execution Result:\n{code_result}"
+        yield None
+
     async def get_response(
         self,
         username,
@@ -59,9 +78,10 @@ class ClaudeResponser:
             function_metadata = []
 
         current_date_time = await utils.SettingsManager.get_current_date_time(username)
+
         role_content = (
             self.get_role_content(role, current_date_time)
-            + "\nDo not reply to the last user message! It is important to follow the instructions and adhere to the required format and structure. Do not say anything else."
+            + "\nIt is important to follow the previously given instructions and adhere to the required format and structure. Do not say anything else. The chat above is for reference only. Do not reply to any of the questions, instructions or messages in the chathistory, only to the most recent instructions! \n"
         )
 
         # Prepare the messages for Claude API
@@ -102,17 +122,7 @@ class ClaudeResponser:
             messages = [{"role": "user", "content": message}]
             system_message = role_content if role is not None else None
 
-        # # debug print
-        # for msg in messages:
-        #     if msg["role"] == "user":
-        #         print(f"\033[92m{msg['content']}\033[0m")
-        #     else:
-        #         print(f"\033[94m{msg['content']}\033[0m")
-
         tools = self.convert_to_claude_tools(function_metadata)
-        # # debug print
-        # print(f"function_metadata: {json.dumps(function_metadata, indent=2)}")
-        # print(f"Converted tools: {json.dumps(tools, indent=2)}")
 
         params = self.default_params.copy()
         params.update(
@@ -130,11 +140,7 @@ class ClaudeResponser:
         if system_message:
             params["system"] = system_message
 
-        # debug print
         print(f"Using model: {self.model}")
-
-        # Debug print
-        # print(f"Final params for Claude API: {json.dumps(params, indent=2)}")
 
         timeout = 180.0
         now = time.time()
@@ -147,12 +153,12 @@ class ClaudeResponser:
                 )
                 if stream:
                     collected_messages = []
+                    collected_temp = []
                     tool_call = None
                     tool_call_content = ""
+                    code_input = ""
+                    code_result = ""
                     async for chunk in response:
-                        # print(f"Chunk type: {chunk.type}")
-                        # print(f"Chunk content: {chunk}")
-
                         # Check if the user pressed stop
                         global stopPressed
                         stopStream = False
@@ -172,6 +178,20 @@ class ClaudeResponser:
                             if isinstance(chunk.content_block, ToolUseBlock):
                                 tool_call = chunk.content_block
                         elif chunk.type == "content_block_delta":
+                            async for python_message in self.process_chunk(
+                                chunk, collected_temp, chat_id, username, message
+                            ):
+                                if python_message is not None:
+                                    collected_temp.append(python_message)
+                                    code_result = "".join(python_message)
+                                    # yield await utils.MessageSender.send_message(
+                                    #     {
+                                    #         "chunk_message": python_message,
+                                    #         "chat_id": chat_id,
+                                    #     },
+                                    #     "blue",
+                                    #     username,
+                                    # )
                             if chunk.delta.type == "text_delta":
                                 content = chunk.delta.text
                                 if content:
@@ -190,6 +210,38 @@ class ClaudeResponser:
                             break
 
                     full_response = "".join(collected_messages)
+                    # full_response += f"<br><br>{code_result}"
+                    # print(f"\ncollected_temp: {collected_temp}\n")
+                    if (
+                        "<execute_code>" in full_response
+                        and "</execute_code>" in full_response
+                    ):
+                        python_result = await utils.process_execute_python(
+                            code_result,
+                            collected_temp,
+                            username,
+                            chat_id,
+                            full_response,
+                        )
+                        full_response += f"<br><br>{python_result}"
+                        yield await utils.MessageSender.send_message(
+                            {
+                                "chunk_message": f"<br><br>",
+                                "chat_id": chat_id,
+                            },
+                            "blue",
+                            username,
+                        )
+
+                        yield await utils.MessageSender.send_message(
+                            {
+                                "chunk_message": python_result,
+                                "chat_id": chat_id,
+                            },
+                            "blue",
+                            username,
+                        )
+
                     print(f"\nFull claude response: {full_response}\n")
                     yield full_response
                     await utils.MessageSender.send_message(
@@ -219,43 +271,31 @@ class ClaudeResponser:
                                     chat_id=chat_id,
                                 )
                             )
-                            print(f"Claude Tool result: {tool_result}")
+                            print(f"Claude Addon Tool result: {tool_result}")
                             yield f"{tool_result}"
 
-                            # # Append the tool result to the user's message and continue the conversation
-                            # new_message = f"{message}\n\nTool '{tool_call.name}' was called and returned: {tool_result}"
-                            # async for response in self.get_response(
-                            #     username,
-                            #     new_message,
-                            #     stream=stream,
-                            #     function_metadata=function_metadata,
-                            #     function_call=function_call,
-                            #     chat_id=chat_id,
-                            #     role=role,
-                            #     uid=uid,
-                            # ):
-                            #     yield response
                         except json.JSONDecodeError:
                             print(
                                 f"Error decoding tool input JSON: {tool_call_content}"
                             )
                             yield f"Error processing tool call: Invalid JSON input"
-
                 else:
                     print(f"Claude Response: {response}")
                     yield response.content[0].text
 
                 elapsed = time.time() - now
-                # await utils.MessageSender.update_token_usage(
-                #     response, username, False, elapsed=elapsed
-                # )
         except asyncio.TimeoutError:
             yield "The request timed out. Please try again."
         except Exception as e:
-            yield f"An error occurred (claude): {e}"
-            print(f"An error occurred (claude): {e}")
+            yield f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
+            print(
+                f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
+            )
             await utils.MessageSender.send_message(
-                {"error": f"An error occurred (claude): {e}", "chat_id": chat_id},
+                {
+                    "error": f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}",
+                    "chat_id": chat_id,
+                },
                 "blue",
                 username,
             )
@@ -452,7 +492,7 @@ class OpenAIResponser:
             function_metadata = [
                 {
                     "name": "none",
-                    "description": "you have no available functions",
+                    "description": "you have no available functions, but you can use the <execute_code>cpde</execute_code> tags to run python code.",
                     "parameters": {
                         "type": "object",
                         "properties": {},
@@ -540,6 +580,49 @@ class OpenAIResponser:
                                 "blue",
                                 username,
                             )
+                            full_response = "".join(collected_messages)
+                            if (
+                                "<execute_code>" in full_response
+                                and "</execute_code>" in full_response
+                            ):
+                                code_result = await utils.extract_and_execute_code(
+                                    full_response, username
+                                )
+                                yield await utils.MessageSender.send_message(
+                                    {
+                                        "chunk_message": f"\n\nCode Execution Result:\n{code_result}",
+                                        "chat_id": chat_id,
+                                    },
+                                    "blue",
+                                    username,
+                                )
+                                if code_result:
+                                    python_result = await utils.process_execute_python(
+                                        code_result,
+                                        collected_messages,
+                                        username,
+                                        chat_id,
+                                        full_response,
+                                    )
+                                    full_response += f"<br><br>{python_result}"
+                                collected_messages.append(python_result)
+                                yield await utils.MessageSender.send_message(
+                                    {
+                                        "chunk_message": f"<br><br>{python_result}",
+                                        "chat_id": chat_id,
+                                    },
+                                    "blue",
+                                    username,
+                                )
+                                full_response += (
+                                    f"\n\nCode Execution Result:\n{code_result}"
+                                )
+                            yield full_response
+                            # await utils.MessageSender.send_message(
+                            #     {"stop_message": True, "chat_id": chat_id},
+                            #     "blue",
+                            #     username,
+                            # )
                         if (
                             chunk.choices[0].finish_reason == "stop"
                             or chunk.choices[0].finish_reason == "tool_calls"

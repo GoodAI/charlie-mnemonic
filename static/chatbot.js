@@ -303,11 +303,11 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     var chatPaddingItem = document.createElement('input');
     chatPaddingItem.type = 'range';
-    chatPaddingItem.min = 50;
-    chatPaddingItem.max = 600;
-    chatPaddingItem.step = 50;
+    chatPaddingItem.min = 5;
+    chatPaddingItem.max = 25;
+    chatPaddingItem.step = 1;
     // get the current chat padding from local storage
-    var chatPadding = localStorage.getItem('chatPadding') || 100;
+    var chatPadding = localStorage.getItem('chatPadding') || 10;
     chatPaddingItem.value = chatPadding;
     chatPaddingItem.oninput = function (e) {
         set_chat_padding(e.target.value);
@@ -1986,14 +1986,14 @@ function formatTempReceived(tempReceived) {
     tempReceived = tempReceived.replace(/(`\s*`\s*`)/g, '```');
     if (count > 0) {
         if (count % 2 == 0) {
-            tempFormatted = marked(tempReceived);
+            tempFormatted = renderMarkdown(tempReceived);
         } else {
             tempReceived = tempReceived.replace('<div class="typing-indicator"><div class="dot"><\/div><\/div>', '');
             tempFormatted = tempReceived + '\n```';
-            tempFormatted = marked(tempFormatted);
+            tempFormatted = renderMarkdown(tempFormatted);
         }
     } else {
-        tempFormatted = marked(tempReceived);
+        tempFormatted = renderMarkdown(tempReceived);
     }
     return tempFormatted;
 }

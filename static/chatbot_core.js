@@ -53,7 +53,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     }
 
     // Apply Markdown formatting
-    message = marked(message);
+    message = renderMarkdown(message);
 
     // If outside of code block, add the typing indicator and replace newline characters
     if (count % 2 === 0 && addIndicator) {
@@ -479,7 +479,7 @@ async function send_image(image_file, prompt) {
         reader.onloadend = function () {
             var base64data = reader.result;
             var fullmessage = '![image](' + base64data + ' "image")<p>' + message + '</p>';
-            fullmessage = marked(fullmessage);
+            fullmessage = renderMarkdown(fullmessage);
             addCustomMessage(fullmessage, 'user', true);
         }
 
@@ -547,7 +547,7 @@ async function send_files(files, prompt) {
             }
         }
         fullmessage += `<p>${message}</p>`;
-        fullmessage = marked(fullmessage);
+        fullmessage = renderMarkdown(fullmessage);
         addCustomMessage(fullmessage, 'user', true);
 
         var messagesContainer = document.getElementById('messages');

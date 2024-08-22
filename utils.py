@@ -33,6 +33,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 import pytz
 from tzlocal import get_localzone
+import traceback
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -1035,7 +1036,12 @@ async def process_message(
     else:
         last_messages_string = ""
 
-    all_messages = last_messages_string + "\n" + og_message
+    all_messages = (
+        last_messages_string
+        + "\n"
+        + og_message
+        + "\n Do not reply to any of the previous questions or messages! The chat above is for reference only. It is important to follow the previously given instructions and adhere to the required format and structure. Do not say anything else.\n"
+    )
 
     with ChatTabsDAO() as dao:
         needs_tab_description = dao.needs_tab_description(chat_id)
@@ -1378,6 +1384,51 @@ async def generate_response(
     return response
 
 
+async def process_execute_python(
+    function_response,
+    message,
+    username,
+    chat_id=None,
+    full_response=None,
+):
+    settings = await SettingsManager.load_settings("users", username)
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if settings.get("active_model").get("active_model").startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        settings.get("active_model").get("active_model"),
+        default_params,
+    )
+    joined_message = "".join(message)
+    messages = [
+        {
+            "role": "user",
+            "content": f'This is an automated response:\nPrevious messages: {full_response}\nYou executed this: {joined_message}\nwith the following result: {function_response}\nUse this info to continue the conversation as if you executed the code and can see the output, do not mention I gave this information or say "Thank you for providing.." or similar. If files are generated, add a link in markdown format, for example [description](data/filename.ext) or html tags for videos (without triple quotes). Do not use sandbox:/ or similar prefixes for file paths.',
+        },
+    ]
+    # debug print the message, properly formatted
+    for message in messages:
+        if message["role"] == "user":
+            prettyprint(f"User: {message['content']}", "blue")
+        elif message["role"] == "assistant":
+            prettyprint(f"Assistant: {message['content']}", "yellow")
+        else:
+            prettyprint(f"System: {message['content']}", "green")
+
+    async for resp in responder.get_response(
+        username,
+        messages,
+        stream=False,
+        chat_id=chat_id,
+        function_metadata=fakedata,
+        function_call="none",
+    ):
+        print(f"function response (utils): {resp}\ntrace: {traceback.format_exc()}")
+        return resp
+
+
 async def process_function_reply(
     function_call_name,
     function_response,
@@ -1543,3 +1594,54 @@ def format_memory(memory):
     document = memory["document"]
     distance = memory["distance"]
     return f"({date}) [{user_type}]: {document} ({distance:.4f})"
+
+
+import re
+from typing import Tuple, List
+from run_python_code import run_python_code
+
+
+async def extract_and_execute_code(text: str, username: str) -> str:
+    pip_packages = extract_pip_packages(text)
+    code = extract_code(text)
+
+    if not code:
+        return "No code to execute."
+
+    result = await run_python_code(code, pip_packages, username=username)
+
+    return format_result(result)
+
+
+def extract_pip_packages(text: str) -> List[str]:
+    pip_match = re.search(r"<pip_install>(.*?)</pip_install>", text, re.DOTALL)
+    if pip_match:
+        # Extract the matched content and split it into lines
+        lines = pip_match.group(1).strip().split("\n")
+        # Exclude lines that start with a #
+        packages = [line.strip() for line in lines if not line.strip().startswith("#")]
+        # Split the remaining lines by commas
+        packages = ",".join(packages).split(",")
+        # Return the cleaned list of packages
+        return [pkg.strip() for pkg in packages if pkg.strip()]
+    return []
+
+
+def extract_code(text: str) -> str:
+    code_match = re.search(r"<execute_code>(.*?)</execute_code>", text, re.DOTALL)
+    if code_match:
+        return code_match.group(1).strip()
+    return ""
+
+
+def format_result(result: dict) -> str:
+    output = ""
+    if "pip" in result and result["pip"]:
+        output += f"Pip installation:\n{result['pip']}\n\n"
+    if "output" in result:
+        output += f"Code execution output:\n{result['output']}\n\n"
+    if "exit_code" in result and result["exit_code"] != "0":
+        output += f"Exit code: {result['exit_code']}\n"
+    if "error" in result:
+        output += f"Error: {result['error']}\n"
+    return output

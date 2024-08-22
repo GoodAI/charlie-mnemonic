@@ -244,7 +244,7 @@ function debounce(func, delay) {
 
 function set_chat_padding(width) {
     const messages = document.getElementById("messages");
-    messages.style.padding = `20px ${width}px`;
+    messages.style.padding = `20px ${width}vw`;
     // save the padding in local storage
     localStorage.setItem("chatPadding", width);
 }

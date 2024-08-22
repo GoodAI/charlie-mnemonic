@@ -125,6 +125,13 @@
             }
         };
 
+        // Custom function to replace <execute_code> and </execute_code>
+        function replaceExecuteCodeBlocks(content) {
+            return content
+                .replace(/<execute_code>/g, '\n```python\n')
+                .replace(/<\/execute_code>/g, '\n```\n');
+        }
+
         // set the options for marked and a highlighter and copy button
         marked.setOptions({
             highlight: function (code, lang) {
@@ -134,6 +141,14 @@
             },
             renderer: renderer,
         });
+
+        function renderMarkdown(content) {
+            // Replace <execute_code> and </execute_code> tags with the desired output
+            var modifiedContent = replaceExecuteCodeBlocks(content);
+
+            // Render the modified content with marked
+            return marked(modifiedContent);
+        }
 
         </script>
         <script src="chatbot.js?v={{version}}"></script>
@@ -447,7 +462,7 @@
             <i>Your personal assistant with long-term memory</i>
         </div>
         <div class="sub_title">
-            <b>Version:</b> {{ version }} | <b>Release date:</b> 13/08/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 22/08/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
     target="_blank">Release Notes</a>
         </div>
         <div id="overlay">

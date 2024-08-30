@@ -50,6 +50,7 @@ from classes import (
     generateAudioMessage,
     regenerateMessage,
     emailMessage,
+    TimeTravelMessage,
 )
 from database import Database
 from memory import (
@@ -1374,7 +1375,6 @@ async def search_memories(
     episodic_memory = await memory_manager.get_episodic_memory(
         search_query, username, search_query, 2560, settings=settings
     )
-
     # add the episodic memory to the memories if it exists
     if episodic_memory:
         # convert the query response to list and return
@@ -1413,4 +1413,70 @@ async def search_memories(
             "rewritten": rewritten,
             "rewritten_memories": rewritten_memories,
         }
+    )
+
+
+@router.post(
+    "/time_travel_message/",
+    tags=["Messaging", LOGIN_REQUIRED],
+    summary="Send a message with a custom timestamp",
+    description="This endpoint allows you to send a message to the AI with a custom timestamp, enabling 'time travel' functionality.",
+    response_description="Returns the AI's response to the time-travelled message.",
+    responses={
+        200: {
+            "description": "AI responded successfully to time-travelled message",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "AI responded successfully to time-travelled message"
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Token is invalid",
+            "content": {
+                "application/json": {"example": {"detail": "Token is invalid"}}
+            },
+        },
+    },
+)
+async def handle_time_travel_message(request: Request, message: TimeTravelMessage):
+    user = request.state.user
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+
+        if not has_access:
+            raise HTTPException(status_code=400, detail="You do not have access.")
+        if total_daily_cost >= daily_limit:
+            raise HTTPException(status_code=400, detail="You reached your daily limit.")
+
+        # Handle chat_id logic
+        if message.chat_id is None:
+            message.chat_id = "0"
+            chat_tabs_dao.insert_tab_data(
+                user_id, message.chat_id, "new chat", message.chat_id, True
+            )
+        else:
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+
+    # Process the time-travelled message
+    return await process_message(
+        message.prompt,
+        user.username,
+        USERS_DIR,
+        message.display_name,
+        chat_id=message.chat_id,
+        timestamp=message.timestamp,
     )

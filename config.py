@@ -20,7 +20,21 @@ fakedata = [
         "type": "function",
         "function": {
             "name": "none",
-            "description": "you have no available functions, but you can use the <execute_code>cpde</execute_code> tags to run python code.",
+            "description": "you have no available functions, but you can use the <execute_code>code</execute_code> tags to run python code, only if explicitly asked for by the user",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    }
+]
+
+fakedata_nothing = [
+    {
+        "type": "function",
+        "function": {
+            "name": "none",
+            "description": "you have no available functions",
             "parameters": {
                 "type": "object",
                 "properties": {},

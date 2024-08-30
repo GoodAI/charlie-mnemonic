@@ -69,7 +69,7 @@ function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = 
     return `<div class="markdown">${message}</div>`;
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null, model = null) {
     var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
 
     if (messageReplaced.endsWith('<br>')) {
@@ -95,7 +95,7 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
         // add bottom buttons to the bubble
         var buttons = document.createElement('div');
         buttons.className = 'bottom-buttons-container';
-        addBottomButtons(buttons);
+        addBottomButtons(buttons, model);
         chatMessage.firstChild.querySelector('.bubble').appendChild(buttons);
     }
 
@@ -122,7 +122,7 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
 }
 
 function isUserAtBottom(container) {
-    const threshold = 50;
+    const threshold = 150;
     return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
 }
 
@@ -131,7 +131,7 @@ function showNewMessageIndicator() {
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'new-message-indicator';
-        indicator.innerHTML = '<button onclick="scrollToBottom()">New Messages ↓</button>';
+        indicator.innerHTML = '<button onclick="scrollToBottom(true)">New Messages ↓</button>';
         document.body.appendChild(indicator);
     }
     indicator.style.display = 'block';
@@ -143,13 +143,6 @@ function hideNewMessageIndicator() {
         indicator.style.display = 'none';
     }
 }
-
-function scrollToBottom() {
-    var messagesContainer = document.getElementById('messages');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    hideNewMessageIndicator();
-}
-
 
 function addExternalMessage(message) {
     var escaped_message = escapeHTML(message);

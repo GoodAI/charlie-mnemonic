@@ -70,6 +70,7 @@ plt.close()
 
 print("The sine wave plot has been saved as 'sine_wave.png' in the /data directory.")
 </execute_code>
+Only use the <execute_code> tags when explicitly asked for by the user.
 """
 
 system_prompt = (

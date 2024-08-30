@@ -446,7 +446,7 @@ class MessageParser:
         username: str, chat_id: str, regenerator: bool = False, uuid: str = None
     ) -> List[Dict[str, Any]]:
         memory = _memory.MemoryManager()
-        settings = await SettingsManager.load_settings("active_brain", username)
+        settings = await SettingsManager.load_settings("users", username)
         memory.model_used = settings["active_model"]["active_model"]
         recent_messages = await memory.get_most_recent_messages(
             "active_brain", username, chat_id=chat_id
@@ -956,6 +956,7 @@ async def process_message(
     chat_id=None,
     regenerate=False,
     uuid=None,
+    timestamp=None,
 ):
     """Process the message and generate a response"""
     # reset the stopPressed variable
@@ -1104,6 +1105,8 @@ async def process_message(
     if regenerate is False:
         memory = _memory.MemoryManager()
         memory.model_used = settings["active_model"]["active_model"]
+        # Use the provided timestamp instead of the current time
+        custom_metadata = {"created_at": timestamp.timestamp()} if timestamp else {}
         (
             kw_brain_string,
             token_usage_active_brain,
@@ -1118,6 +1121,7 @@ async def process_message(
             regenerate=regenerate,
             uid=uuid,
             settings=settings,
+            custom_metadata=custom_metadata,
         )
 
         token_usage += token_usage_active_brain
@@ -1133,7 +1137,11 @@ async def process_message(
                 verbose,
                 settings,
             )
-            if episodic_memory is None or episodic_memory == "":
+            if (
+                episodic_memory is None
+                or episodic_memory == ""
+                or episodic_memory == "none"
+            ):
                 episodic_memory_string = ""
             else:
                 episodic_memory_string = (
@@ -1141,7 +1149,6 @@ async def process_message(
                 )
         else:
             episodic_memory_string = ""
-
         episodic_memory_tokens = MessageParser.num_tokens_from_string(
             episodic_memory_string, "gpt-4"
         )
@@ -1265,6 +1272,7 @@ async def process_message(
         chat_id=chat_id,
         regenerate=regenerate,
         uid=uuid,
+        timestamp=timestamp,
     )
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
@@ -1310,6 +1318,7 @@ async def generate_response(
     chat_id=None,
     regenerate=False,
     uid=None,
+    timestamp=None,
 ):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
@@ -1327,9 +1336,14 @@ async def generate_response(
     else:
         system_prompt = settings_system_prompt + "\n" + prompts.system_prompt
 
-    # add time in front of system prompt
-    current_date_time = await SettingsManager.get_current_date_time(username)
-    system_prompt = current_date_time + "\n" + system_prompt
+    # Modify the system prompt to include the custom timestamp
+    if timestamp:
+        custom_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        system_prompt = f"Current date: {custom_time}\n" + system_prompt
+    else:
+        current_date_time = await SettingsManager.get_current_date_time(username)
+        system_prompt = current_date_time + "\n" + system_prompt
+
     messages = [
         {"role": "system", "content": system_prompt + "\n" + memory_message},
     ]
@@ -1409,13 +1423,13 @@ async def process_execute_python(
         },
     ]
     # debug print the message, properly formatted
-    for message in messages:
-        if message["role"] == "user":
-            prettyprint(f"User: {message['content']}", "blue")
-        elif message["role"] == "assistant":
-            prettyprint(f"Assistant: {message['content']}", "yellow")
-        else:
-            prettyprint(f"System: {message['content']}", "green")
+    # for message in messages:
+    #     if message["role"] == "user":
+    #         prettyprint(f"User: {message['content']}", "blue")
+    #     elif message["role"] == "assistant":
+    #         prettyprint(f"Assistant: {message['content']}", "yellow")
+    #     else:
+    #         prettyprint(f"System: {message['content']}", "green")
 
     async for resp in responder.get_response(
         username,

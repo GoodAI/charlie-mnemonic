@@ -885,7 +885,7 @@ function showMessage(message, type, instant) {
     canSendMessage();
     document.getElementById('message').placeholder = 'Type a message...';
     // Auto-scroll to the bottom of the chat
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    setTimeout(() => scrollToBottom(), 10);
 };
 
 
@@ -908,16 +908,12 @@ function handleDebugMessage(msg) {
     let debugContentElementId = `debugContent${debugNumber}`;
     let objDiv = document.getElementById(debugContentElementId);
 
-    let isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-
     let debugMessage = document.createElement('p');
     debugMessage.style.color = color;
     debugMessage.innerHTML = message;
     objDiv.appendChild(debugMessage);
 
-    if (isNearBottom) {
-        objDiv.scrollTop = objDiv.scrollHeight;
-    }
+    setTimeout(() => scrollToBottom(), 10);
 }
 
 function handleUsage(msg) {
@@ -972,14 +968,7 @@ function handlePlanMessage(msg) {
     var botMessageElement = document.createElement('div');
     botMessageElement.innerHTML = botMessage;
     document.getElementById('messages').appendChild(botMessageElement);
-
-    var messagesContainer = document.getElementById('messages');
-    if (isUserAtBottom(messagesContainer)) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        hideNewMessageIndicator();
-    } else {
-        showNewMessageIndicator();
-    }
+    setTimeout(() => scrollToBottom(), 10);
     content = '';
     tempReceived = '';
     tempFormatted = '';
@@ -1112,7 +1101,7 @@ async function handleCancelMessage(msg) {
     resetState();
 }
 
-function addBottomButtons(div) {
+function addBottomButtons(div, model) {
     var buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'bottom-buttons-container';
     // check if the settings exist
@@ -1157,6 +1146,31 @@ function addBottomButtons(div) {
     copyButtonLink.appendChild(copyButton);
     copyButtonWrapper.appendChild(copyButtonLink);
 
+    // Create a model indicator button
+    var modelButtonWrapper = document.createElement('div');
+    modelButtonWrapper.className = 'model-button-wrapper';
+    var modelButtonLink = document.createElement('a');
+    modelButtonLink.href = '#';
+    var modelTooltip = model ? model : 'Unknown Model';
+    modelButtonLink.setAttribute('data-tooltip', modelTooltip);
+    var modelButton = document.createElement('i');
+    
+    if (model) {
+        // Set icon based on the model
+        if (model.toLowerCase().includes('gpt')) {
+            modelButton.className = 'fas fa-robot model-button';
+        } else if (model.toLowerCase().includes('claude')) {
+            modelButton.className = 'fas fa-brain model-button';
+        } else {
+            modelButton.className = 'fas fa-microchip model-button';
+        }
+    } else {
+        modelButton.className = 'fas fa-question model-button';
+    }
+
+    modelButtonLink.appendChild(modelButton);
+    modelButtonWrapper.appendChild(modelButtonLink);
+
     // // Create a regenerate button with the same structure and styling as the play button
     // var regenerateButtonWrapper = document.createElement('div');
     // regenerateButtonWrapper.className = 'regen-button-wrapper';
@@ -1175,6 +1189,7 @@ function addBottomButtons(div) {
 
     // Append the button wrappers to the container
     buttonsContainer.appendChild(copyButtonWrapper);
+    buttonsContainer.appendChild(modelButtonWrapper);
     // buttonsContainer.appendChild(regenerateButtonWrapper);
 
     // Append the buttons container to the div
@@ -1183,6 +1198,7 @@ function addBottomButtons(div) {
 
 async function handleStopMessage(msg) {
     var target_chat_id = msg.chat_id;
+    resetDebugBubble();
     // check if the current active tab is the same as the target chat id
     var chatTabs = document.getElementById('chat-tabs-container');
     var activeTab = chatTabs.querySelector('.active');
@@ -1212,7 +1228,7 @@ async function handleStopMessage(msg) {
     // add bottom buttons to the last message
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
-        addBottomButtons(lastMessage);
+        addBottomButtons(lastMessage, msg.model);
     }
     // if (settings.audio.voice_output) {
     //     var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
@@ -1242,6 +1258,7 @@ async function handleStopMessage(msg) {
     tempFullChunk = '';
     applyTooltips('[data-tooltip]');
     resetState();
+    setTimeout(() => scrollToBottom(), 50);
 }
 
 function handleChunkMessage(msg) {
@@ -1294,13 +1311,7 @@ function handleChunkMessage(msg) {
         return '<div class="typing-indicator"><div class="dot"></div></div>';
     }
     // Auto-scroll to the bottom of the chat
-    var messagesContainer = document.getElementById('messages');
-    if (isUserAtBottom(messagesContainer)) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        hideNewMessageIndicator();
-    } else {
-        showNewMessageIndicator();
-    }
+    setTimeout(() => scrollToBottom(), 10);
 }
 
 
@@ -1367,67 +1378,122 @@ function handleNoteTaking(msg) {
     updateOrCreateDebugBubble("exploring notes...", timestamp, msg);
 }
 
+let lastDebugBubble = null;
+
 function updateOrCreateDebugBubble(message, timestamp, msg) {
     var messagesContainer = document.getElementById('messages');
-    var lastMessageWrapper = messagesContainer.lastElementChild;
-    var lastMessage = lastMessageWrapper ? lastMessageWrapper.firstElementChild : null;
-    var isLastDebug = lastMessage && lastMessage.classList.contains('debug');
+    var formattedMsgContent = formatDebugContent(msg);
 
-    var formattedMsgContent = '';
-    for (var key in msg) {
-        if (msg.hasOwnProperty(key)) {
-            if (showDebug == true) {
-                console.log('key:', key, 'value:', msg[key]);
-            }
-            if (["created_new_memory", "active_brain", "error", "Function", "Arguments", "Response", "timestamp"].includes(key)) {
-                formattedMsgContent += `<b>${escapeHtml(key)}:</b> `;
-                if (key === 'active_brain' && typeof msg[key] === 'object') {
-                    // Summarize the contents of active_brain
-                    formattedMsgContent += 'Query Categories: ' + Object.keys(msg[key]).length + '<br/>';
-                } else if (key === 'Arguments') {
-                    // Escape only the arguments
-                    formattedMsgContent += `${escapeHtml(JSON.stringify(msg[key], null, 2)).replace(/\n/g, '<br/>')}<br/>`;
-                } else {
-                    // Format other keys normally
-                    formattedMsgContent += `${formatContent(msg[key])}<br/>`;
-                }
-            }
-        }
-    }
-    var expandableContent = `<div class="expandable-content" style="display: none;">${formattedMsgContent}</div>`;
-
-    if (isLastDebug) {
+    if (lastDebugBubble) {
         // Update existing debug bubble
-        let typewriterText = lastMessage.querySelector('.typewriter-text');
+        let typewriterText = lastDebugBubble.querySelector('.typewriter-text');
         if (typewriterText) {
             typewriterText.textContent = message;
-            typewriterText.classList.remove('typewriter-text'); // Remove class
-            void typewriterText.offsetWidth; // Trigger reflow
-            typewriterText.classList.add('typewriter-text'); // Add class back
         }
-        var expandableContentElement = lastMessageWrapper.querySelector('.expandable-content');
+        var expandableContentElement = lastDebugBubble.querySelector('.expandable-content');
         if (expandableContentElement) {
-            expandableContentElement.innerHTML += formattedMsgContent; // Append new data
-        } else {
-            lastMessageWrapper.innerHTML += expandableContent;
+            expandableContentElement.innerHTML += formattedMsgContent;
         }
-
     } else {
         // Create new debug bubble
-        let botMessage = `
+        let debugMessage = `
             <div class="message debug">
                 <span class="timestamp">${timestamp}</span>
                 <div class="bubble">
-                    <div class="typewriter-container">
-                        <div class="loading-icon"></div>
-                        <div class="typewriter-text">${escapeHtml(message)}</div>
+                    <div class="debug-header">
+                        <div class="typewriter-container">
+                            <div class="loading-icon"></div>
+                            <div class="typewriter-text">${escapeHtml(message)}</div>
+                        </div>
+                        <button class="toggle-expand" onclick="toggleDebugExpand(this)">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
                     </div>
+                    <div class="expandable-content">${formattedMsgContent}</div>
                 </div>
             </div>`;
-        let botMessageWrapper = document.createElement('div');
-        botMessageWrapper.innerHTML = botMessage + expandableContent;
-        messagesContainer.appendChild(botMessageWrapper);
+        let debugMessageWrapper = document.createElement('div');
+        debugMessageWrapper.innerHTML = debugMessage;
+        lastDebugBubble = debugMessageWrapper.firstElementChild;
+        messagesContainer.appendChild(lastDebugBubble);
+        setTimeout(() => scrollToBottom(), 10);
     }
+}
+
+function formatDebugContent(msg) {
+    let formattedContent = '<div class="debug-content">';
+    const categories = {
+        'Memory': ['input', 'created_new_memory', 'active_brain', 'results_list_before_token_check', 'results_list_after_token_check', 'result_string', 'token_count'],
+        'Notes': ['actions', 'content', 'message', 'timestamp', 'final_message', 'note_taking_query', 'files_content_string'],
+        'Function Call': ['Function', 'Arguments'],
+        'Function Response': ['Response']
+    };
+
+    for (let category in categories) {
+        let categoryContent = '';
+        for (let key of categories[category]) {
+            if (msg.hasOwnProperty(key)) {
+                if (showDebug === true) {
+                    console.log('key:', key, 'value:', msg[key]);
+                }
+                categoryContent += `
+                    <div class="debug-item">
+                        <span class="debug-key">${escapeHtml(key)}:</span>
+                        <span class="debug-value">${formatValue(msg[key])}</span>
+                    </div>`;
+            }
+        }
+        if (categoryContent) {
+            formattedContent += `
+                <div class="debug-category">
+                    <div class="debug-category-header" onclick="toggleCategory(this)">
+                        <i class="fas fa-chevron-right"></i> ${category}
+                    </div>
+                    <div class="debug-category-content" style="display: none;">
+                        ${categoryContent}
+                    </div>
+                </div>`;
+        }
+    }
+    formattedContent += '</div>';
+    return formattedContent;
+}
+
+function formatValue(value) {
+    if (typeof value === 'object') {
+        return `<pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+    } else {
+        return escapeHtml(value.toString());
+    }
+}
+
+function toggleDebugExpand(button) {
+    const bubble = button.closest('.bubble');
+    bubble.classList.toggle('expanded');
+    button.querySelector('i').classList.toggle('fa-chevron-down');
+    button.querySelector('i').classList.toggle('fa-chevron-up');
+}
+
+function toggleCategory(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('i');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+    } else {
+        content.style.display = 'none';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+    }
+}
+
+function resetDebugBubble() {
+    if (lastDebugBubble) {
+        const loadingIcon = lastDebugBubble.querySelector('.loading-icon');
+        if (loadingIcon) {
+            loadingIcon.remove();
+        }
+    }
+    lastDebugBubble = null;
 }
 
 function formatContent(value) {
@@ -1704,37 +1770,41 @@ async function get_recent_messages(username, chat_id) {
         let currentMessage = '';
         let currentUser = '';
         let currentTimestamp = null;
+        let currentModel = '';
 
         data.forEach(message => {
             const uuid = message.metadata.uid;
             const text = message.document;
             const user = message.metadata.username;
             const timestamp = message.metadata.updated_at;
+            const message_model = message.metadata.model;
 
             // Check for UUID continuity
             if (uuid === currentUUID) {
                 currentMessage += '\n' + text;
             } else {
                 if (currentUUID !== null) {
-                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID });
+                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID, model: currentModel });
                 }
                 currentUUID = uuid;
                 currentMessage = text;
                 currentUser = user;
                 currentTimestamp = timestamp;
+                currentModel = message_model;
             }
         });
 
         // Add the last message if it exists
         if (currentUUID !== null) {
-            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID });
+            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID, model: currentModel });
         }
 
         // Process and display the messages
         messages.forEach(message => {
-            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true, true, message.uuid);
+            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true, true, message.uuid, message.model);
         });
-
+        // call the tooltip function
+        applyTooltips('[data-tooltip]');
     } catch (error) {
         console.error('Failed to get messages: ', error);
         showMessage('Failed to get messages: ' + error, "error", false);
@@ -2003,13 +2073,7 @@ function resetState() {
     tempFormatted = '';
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
-        var messagesContainer = document.getElementById('messages');
-        if (isUserAtBottom(messagesContainer)) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            hideNewMessageIndicator();
-        } else {
-            showNewMessageIndicator();
-        }
+        setTimeout(() => scrollToBottom(), 10);
     }
     content = '';
     canSend = true;

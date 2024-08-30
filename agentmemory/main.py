@@ -47,7 +47,9 @@ def create_memory(
     memories = get_client(username=username).get_or_create_collection(category)
 
     # add timestamps to metadata
-    metadata["created_at"] = datetime.datetime.now().timestamp()
+    # Use provided timestamp if available, otherwise use current time
+    current_time = datetime.datetime.now().timestamp()
+    metadata["created_at"] = metadata.get("created_at", current_time)
     metadata["updated_at"] = datetime.datetime.now().timestamp()
 
     # add username to metadata

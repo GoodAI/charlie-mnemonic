@@ -11,6 +11,7 @@ set UPDATE=false
 set REPO_URL=https://github.com/GoodAI/charlie-mnemonic
 set BACKUP_FOLDER=%HOME%\charlie_backups\charlie_backup_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%
 set BACKUP_FOLDER=%BACKUP_FOLDER: =0%
+set DOCKER_CPUS=8
 
 echo Variables set
 
@@ -108,6 +109,15 @@ docker-compose up --build -d
 if errorlevel 1 (
     echo Docker Compose up command failed.
     exit /b 1
+)
+
+echo Updating CPU allocation for charlie-mnemonic container...
+docker update --cpus %DOCKER_CPUS% charlie-mnemonic
+if errorlevel 1 (
+    echo Failed to update CPU allocation for charlie-mnemonic container.
+    echo Continuing with default allocation...
+) else (
+    echo Successfully updated CPU allocation for charlie-mnemonic container.
 )
 
 echo Entering check loop

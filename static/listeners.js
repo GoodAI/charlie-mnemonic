@@ -468,22 +468,6 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
 });
 
-document.getElementById('messages').addEventListener('click', function (e) {
-    if (e.target.classList.contains('debug') || e.target.parentNode.classList.contains('debug')) {
-        var expandableContent = e.target.querySelector('.expandable-content') || e.target.parentNode.querySelector('.expandable-content');
-        var messageDebug = e.target.closest('.message.debug');
-        if (expandableContent && messageDebug) {
-            if (expandableContent.style.display === 'none') {
-                expandableContent.style.display = 'block';
-                messageDebug.classList.add('active');
-            } else {
-                expandableContent.style.display = 'none';
-                messageDebug.classList.remove('active');
-            }
-        }
-    }
-});
-
 
 document.getElementById('messages').addEventListener('scroll', function () {
     var messagesContainer = this;
@@ -539,6 +523,7 @@ function applyTooltips(selector) {
 
 
 document.addEventListener('DOMContentLoaded', function () {
+    setupScrollObserver();
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");

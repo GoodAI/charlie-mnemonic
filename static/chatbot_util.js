@@ -248,3 +248,37 @@ function set_chat_padding(width) {
     // save the padding in local storage
     localStorage.setItem("chatPadding", width);
 }
+
+function scrollToBottom(force = false) {
+    const messagesContainer = document.getElementById('messages');
+    if (force || isUserAtBottom(messagesContainer)) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
+}
+
+function setupScrollObserver() {
+    const messagesContainer = document.getElementById('messages');
+    const observer = new MutationObserver((mutations) => {
+        let shouldScroll = false;
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                shouldScroll = true;
+            } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                shouldScroll = true;
+            }
+        });
+        if (shouldScroll) {
+            scrollToBottom();
+        }
+    });
+
+    observer.observe(messagesContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style']
+    });
+}

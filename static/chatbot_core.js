@@ -495,7 +495,6 @@ async function send_image(image_file, prompt) {
 async function send_files(files, prompt) {
     try {
         var message = document.getElementById('message').value;
-        // if prompt is not empty, set the message to prompt
         if (prompt) {
             message = prompt;
         }
@@ -509,16 +508,13 @@ async function send_files(files, prompt) {
                     file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') ||
                     file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') ||
                     file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
-                // convert the image to base64
                 var base64data = await getBase64(file);
                 fullmessage += `![${file.name}](${base64data} "${file.name}") <br>`;
             } else {
                 fullmessage += `[data/${file.name}](data/${file.name}) <br>`;
-                // print debug info
             }
         }
-        fullmessage += `<p>${message}</p>`;
-        fullmessage = renderMarkdown(fullmessage);
+        fullmessage += `<p>${escapeHtml(message)}</p>`;
         addCustomMessage(fullmessage, 'user', true);
 
         var messagesContainer = document.getElementById('messages');
@@ -548,12 +544,23 @@ async function send_files(files, prompt) {
             body: formData,
             credentials: 'include'
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
 
     } catch (error) {
-        await handleError(error);
-        console.error('Failed to upload files: ', error);
+        console.error('Failed to upload files:', error);
+        showMessage(`Failed to upload files: ${error.message}`, "error", false);
+    } finally {
         overlay.style.display = 'none';
+        canRecord = true;
+        canSend = true;
+        isWaiting = false;
+        isRecording = false;
+        canSendMessage();
     }
 }
 

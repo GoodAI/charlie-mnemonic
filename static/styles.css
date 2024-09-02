@@ -888,12 +888,10 @@ a {
 
 
 .message.user .bubble a {
-    color: #eef1f7;
     text-decoration: underline;
 }
 
 .message.user .bubble a:hover {
-    color: #eef1f7;
     text-decoration: none;
 }
 

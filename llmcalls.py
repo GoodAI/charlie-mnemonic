@@ -49,8 +49,7 @@ class ClaudeResponser:
             content = chunk.delta.text
             if content:
                 collected_temp.append(content)
-        if collected_temp is not None:
-            # Check if we have a complete code block
+        if collected_temp:
             full_content = "".join(collected_temp)
             if "<execute_code>" in full_content and "</execute_code>" in full_content:
                 code_result = await utils.extract_and_execute_code(
@@ -58,8 +57,8 @@ class ClaudeResponser:
                 )
                 collected_temp.clear()
                 collected_temp.append(full_content.split("</execute_code>")[-1])
-                yield f"\n\nCode Execution Result:\n{code_result}"
-        yield None
+                return code_result
+        return None
 
     async def get_response(
         self,
@@ -94,7 +93,6 @@ class ClaudeResponser:
                 system_message = role_content if role is not None else None
 
             # Ensure messages alternate between user and assistant
-            # Very hacky way to do this, but it works for now
             formatted_messages = []
             last_role = None
             for msg in messages:
@@ -153,8 +151,7 @@ class ClaudeResponser:
                     collected_temp = []
                     tool_call = None
                     tool_call_content = ""
-                    code_input = ""
-                    code_result = ""
+                    code_result = None
                     async for chunk in response:
                         # Check if the user pressed stop
                         global stopPressed
@@ -175,20 +172,11 @@ class ClaudeResponser:
                             if isinstance(chunk.content_block, ToolUseBlock):
                                 tool_call = chunk.content_block
                         elif chunk.type == "content_block_delta":
-                            async for python_message in self.process_chunk(
+                            python_result = await self.process_chunk(
                                 chunk, collected_temp, chat_id, username, message
-                            ):
-                                if python_message is not None:
-                                    collected_temp.append(python_message)
-                                    code_result = "".join(python_message)
-                                    # yield await utils.MessageSender.send_message(
-                                    #     {
-                                    #         "chunk_message": python_message,
-                                    #         "chat_id": chat_id,
-                                    #     },
-                                    #     "blue",
-                                    #     username,
-                                    # )
+                            )
+                            if python_result:
+                                code_result = python_result
                             if chunk.delta.type == "text_delta":
                                 content = chunk.delta.text
                                 if content:
@@ -198,8 +186,10 @@ class ClaudeResponser:
                                         "blue",
                                         username,
                                     )
-                            elif chunk.delta.type == "input_json_delta":
-                                tool_call_content += chunk.delta.partial_json
+                            elif chunk.delta.type == "tool_calls":
+                                tool_call_content += chunk.delta.tool_calls[
+                                    0
+                                ].function.arguments
                         elif chunk.type == "message_delta":
                             if chunk.delta.stop_reason == "tool_use":
                                 break
@@ -207,33 +197,11 @@ class ClaudeResponser:
                             break
 
                     full_response = "".join(collected_messages)
-                    # full_response += f"<br><br>{code_result}"
-                    # print(f"\ncollected_temp: {collected_temp}\n")
-                    if (
-                        "<execute_code>" in full_response
-                        and "</execute_code>" in full_response
-                        and role is None
-                    ):
-                        python_result = await utils.process_execute_python(
-                            code_result,
-                            collected_temp,
-                            username,
-                            chat_id,
-                            full_response,
-                        )
-                        full_response += f"<br><br>{python_result}"
+                    if code_result and role is None:
+                        full_response += f"<br><br>{code_result}"
                         yield await utils.MessageSender.send_message(
                             {
-                                "chunk_message": f"<br><br>",
-                                "chat_id": chat_id,
-                            },
-                            "blue",
-                            username,
-                        )
-
-                        yield await utils.MessageSender.send_message(
-                            {
-                                "chunk_message": python_result,
+                                "chunk_message": f"<br><br>{code_result}",
                                 "chat_id": chat_id,
                             },
                             "blue",
@@ -487,9 +455,9 @@ class OpenAIResponser:
         if "<execute_code>" in full_content and "</execute_code>" in full_content:
             code_result = await utils.extract_and_execute_code(full_content, username)
             collected_temp.clear()
-            # collected_temp.append(full_content.split("</execute_code>")[-1])
-            yield f"\n\nCode Execution Result:\n{code_result}"
-        yield None
+            collected_temp.append(full_content.split("</execute_code>")[-1])
+            return code_result
+        return None
 
     async def get_response(
         self,
@@ -507,7 +475,7 @@ class OpenAIResponser:
             function_metadata = [
                 {
                     "name": "none",
-                    "description": "you have no available functions, but you can use the <execute_code>cpde</execute_code> tags to run python code.",
+                    "description": "you have no available functions, but you can use the <execute_code>code</execute_code> tags to run python code.",
                     "parameters": {
                         "type": "object",
                         "properties": {},
@@ -566,7 +534,7 @@ class OpenAIResponser:
                     tool_calls_complete = False
                     accumulated_name = ""
                     accumulated_arguments = ""
-                    code_result = ""
+                    code_result = None
                     async for chunk in response:
                         delta = chunk.choices[0].delta
                         # check if the user pressed stop
@@ -583,11 +551,8 @@ class OpenAIResponser:
                                 username,
                             )
                             break
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
-                        )
+
+                        content = delta.content or ""
                         if content:
                             collected_messages.append(content)
                             yield await utils.MessageSender.send_message(
@@ -595,87 +560,7 @@ class OpenAIResponser:
                                 "blue",
                                 username,
                             )
-                            full_response = "".join(collected_messages)
-                            yield full_response
-                            # await utils.MessageSender.send_message(
-                            #     {"stop_message": True, "chat_id": chat_id},
-                            #     "blue",
-                            #     username,
-                            # )
-                        if (
-                            chunk.choices[0].finish_reason == "stop"
-                            or chunk.choices[0].finish_reason == "tool_calls"
-                            or tool_calls_complete
-                        ):
-                            if accumulated_arguments != "":
-                                # TODO: Fix JSON errors on some function calls (especially the python code ones)
-                                try:
-                                    try:
-                                        parsed_arguments = json.loads(
-                                            accumulated_arguments
-                                        )
-                                    except json.JSONDecodeError as e:
-                                        json_objects = re.findall(
-                                            r"\{.*?\}", accumulated_arguments
-                                        )
-                                        parsed_arguments = []
-                                        for json_str in json_objects:
-                                            data = json.loads(json_str)
-                                            parsed_arguments.append(data)
 
-                                    tool_response = (
-                                        await utils.MessageParser.process_function_call(
-                                            accumulated_name,
-                                            parsed_arguments,
-                                            self.addons,
-                                            function_metadata,
-                                            message,
-                                            message,
-                                            username,
-                                            None,
-                                            chat_id=chat_id,
-                                        )
-                                    )
-                                    yield tool_response
-                                    break
-                                except json.JSONDecodeError as e:
-                                    yield f"Error parsing JSON arguments: {e} trace: {traceback.format_exc()}"
-                                    print(
-                                        f"JSON parsing error: {e} trace: {traceback.format_exc()}"
-                                    )
-                                    break
-                            await utils.MessageSender.send_message(
-                                {
-                                    "stop_message": True,
-                                    "chat_id": chat_id,
-                                    "model": self.model,
-                                },
-                                "blue",
-                                username,
-                            )
-                            break
-                        if chunk.choices[0].finish_reason == "length":
-                            print(
-                                f"Length limit reached. Max tokens set to {params['max_tokens']}"
-                            )
-                            await utils.MessageSender.send_message(
-                                {
-                                    "stop_message": True,
-                                    "chat_id": chat_id,
-                                    "model": self.model,
-                                    "reason": "length",
-                                },
-                                "blue",
-                                username,
-                            )
-                            break
-
-                        # Check and accumulate content
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
-                        )
                         if delta.tool_calls:
                             for toolcall_chunk in delta.tool_calls:
                                 if (
@@ -683,24 +568,61 @@ class OpenAIResponser:
                                     and not accumulated_name
                                 ):
                                     accumulated_name = toolcall_chunk.function.name
-
                                 accumulated_arguments += (
-                                    toolcall_chunk.function.arguments
+                                    toolcall_chunk.function.arguments or ""
                                 )
 
-                            if chunk.choices[0].finish_reason == "tool_calls":
-                                tool_calls_complete = True
-                                break
-
-                        content = (
-                            chunk.choices[0].delta.content
-                            if chunk.choices[0].delta.content
-                            else ""
+                        python_result = await self.process_chunk(
+                            chunk, collected_temp, chat_id, username, message
                         )
-                        if not content:
-                            continue
-                        response = "".join(collected_messages)
-                        yield response
+                        if python_result:
+                            code_result = python_result
+
+                        if chunk.choices[0].finish_reason:
+                            break
+
+                    full_response = "".join(collected_messages)
+
+                    if code_result and role is None:
+                        full_response += f"<br><br>{code_result}"
+                        yield await utils.MessageSender.send_message(
+                            {
+                                "chunk_message": f"<br><br>{code_result}",
+                                "chat_id": chat_id,
+                            },
+                            "blue",
+                            username,
+                        )
+
+                    yield full_response
+
+                    await utils.MessageSender.send_message(
+                        {"stop_message": True, "chat_id": chat_id, "model": self.model},
+                        "blue",
+                        username,
+                    )
+
+                    if accumulated_name and accumulated_arguments:
+                        try:
+                            parsed_arguments = json.loads(accumulated_arguments)
+                        except json.JSONDecodeError:
+                            parsed_arguments = (
+                                accumulated_arguments  # Use as-is if not valid JSON
+                            )
+
+                        tool_response = await utils.MessageParser.process_function_call(
+                            accumulated_name,
+                            parsed_arguments,
+                            self.addons,
+                            function_metadata,
+                            message,
+                            message,
+                            username,
+                            None,
+                            chat_id=chat_id,
+                        )
+                        yield tool_response
+
                 else:
                     elapsed = time.time() - now
                     await utils.MessageSender.update_token_usage(

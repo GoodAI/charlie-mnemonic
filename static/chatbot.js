@@ -1215,6 +1215,9 @@ async function handleStopMessage(msg) {
 
         // Appending the new chunk to the existing content of the last message
         lastMessage.innerHTML = parseAndFormatMessage(tempFullChunk);
+        
+        // Apply highlighting to the entire message
+        applyHighlighting(lastMessage);
     }
 
     // Function to remove the typing indicator
@@ -1225,35 +1228,19 @@ async function handleStopMessage(msg) {
         }
     }
 
+    function applyHighlighting(element) {
+        element.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+            // Force a re-highlight after a short delay
+            setTimeout(() => hljs.highlightElement(block), 100);
+        });
+    }
+
     // add bottom buttons to the last message
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
         addBottomButtons(lastMessage, msg.model);
     }
-    // if (settings.audio.voice_output) {
-    //     var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
-    //     var lastMessage = document.querySelector('.last-message .bubble');
-    //     if (lastMessage) {
-    //         lastMessage.innerHTML += playButtonCode;
-    //     }
-    //     var playButtons = document.querySelectorAll('.play-button');
-    //     var playButton = playButtons[playButtons.length - 1];
-    //     playButton.addEventListener('click', async function () {
-    //         this.classList.remove('fa-play');
-    //         this.classList.add('fa-spinner');
-    //         var audioSrc = await request_audio(this);
-    //         var audioElement = document.createElement('audio');
-    //         audioElement.controls = true;
-    //         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-
-    //         var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
-    //         this.closest('.bubble').appendChild(audioElement);
-    //         if (anchorTag) {
-    //             anchorTag.remove();
-    //         }
-    //     });
-    //     applyTooltips('[data-tooltip]');
-    // }
 
     tempFullChunk = '';
     applyTooltips('[data-tooltip]');
@@ -1261,57 +1248,173 @@ async function handleStopMessage(msg) {
     setTimeout(() => scrollToBottom(), 50);
 }
 
+let codeBlockOpen = false;
+let executeCodeOpen = false;
+let currentLanguage = '';
+
 function handleChunkMessage(msg) {
-    // check if the last message is a chunk message or a debug message
-    var target_chat_id = msg.chat_id;
-    // check if the current active tab is the same as the target chat id
-    var chatTabs = document.getElementById('chat-tabs-container');
-    var activeTab = chatTabs.querySelector('.active');
-    var current_chat_id = activeTab.id.replace('chat-tab-', '');
-    if (current_chat_id != target_chat_id) {
-        // if not, do nothing
+    const target_chat_id = msg.chat_id;
+    const chatTabs = document.getElementById('chat-tabs-container');
+    const activeTab = chatTabs.querySelector('.active');
+    const current_chat_id = activeTab.id.replace('chat-tab-', '');
+
+    if (current_chat_id !== target_chat_id) {
         return;
     }
 
-    var timestamp = new Date().toLocaleTimeString();
-    var chunkContent = msg.chunk_message;
+    const timestamp = new Date().toLocaleTimeString();
+    const chunkContent = msg.chunk_message;
     tempFullChunk += chunkContent;
 
-    // remove the spinner from the last message
-    var tempchild = document.getElementById('messages').lastChild;
+    const tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
-        var spinner = tempchild.querySelector('.spinner');
-        if (spinner != null) {
+        const spinner = tempchild.querySelector('.spinner');
+        if (spinner) {
             spinner.remove();
-            document.getElementById('messages').lastChild.remove();
+            tempchild.remove();
         }
     }
 
-    var lastMessage = document.querySelector('.last-message .bubble');
+    const lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
-        // Appending the new chunk to the existing content of the last message
-        var tempcontent = tempFullChunk;
-        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
-
+        lastMessage.innerHTML = parseAndFormatStreamingMessage(tempFullChunk);
+        highlightCodeBlocks(lastMessage);
     } else {
-        // If there is no last message, create a new message element for the chunk
-        var chatMessage = `
-            <div class="message bot last-message">
-                <span class="timestamp">${timestamp}</span>
-                <div class="bubble">${chunkContent + createTypingIndicator()}</div>
-            </div>
-        `;
+        const chatMessage = createNewChatMessage(timestamp, parseAndFormatStreamingMessage(chunkContent));
+        document.getElementById('messages').appendChild(chatMessage);
+        highlightCodeBlocks(chatMessage);
+    }
 
-        var chatMessageElement = document.createElement('div');
-        chatMessageElement.innerHTML = chatMessage;
-        document.getElementById('messages').appendChild(chatMessageElement);
-    }
-    //resetState();
-    function createTypingIndicator() {
-        return '<div class="typing-indicator"><div class="dot"></div></div>';
-    }
-    // Auto-scroll to the bottom of the chat
     setTimeout(() => scrollToBottom(), 10);
+}
+
+function parseAndFormatStreamingMessage(content) {
+    let formattedContent = content;
+
+    // Handle <execute_code> tags
+    formattedContent = formattedContent.replace(/<execute_code>/g, (match) => {
+        executeCodeOpen = true;
+        currentLanguage = 'python';
+        return '<pre><code class="language-python">';
+    });
+
+    formattedContent = formattedContent.replace(/<\/execute_code>/g, (match) => {
+        executeCodeOpen = false;
+        currentLanguage = '';
+        return '</code></pre>';
+    });
+
+    // Handle regular code blocks
+    formattedContent = formattedContent.replace(/```(\w+)?/g, (match, language) => {
+        if (codeBlockOpen) {
+            codeBlockOpen = false;
+            currentLanguage = '';
+            return '</code></pre>';
+        } else {
+            codeBlockOpen = true;
+            currentLanguage = language || '';
+            const languageClass = language ? `language-${language}` : '';
+            return `<pre><code class="${languageClass}">`;
+        }
+    });
+
+    // Handle inline code
+    formattedContent = formattedContent.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Apply Markdown formatting
+    formattedContent = marked(formattedContent);
+
+    // Add typing indicator if we're in the middle of a code block
+    if (codeBlockOpen || executeCodeOpen) {
+        formattedContent += '<span class="typing-code-indicator">...</span>';
+    } else {
+        formattedContent += createTypingIndicator();
+    }
+
+    return formattedContent;
+}
+
+function highlightCodeBlocks(element) {
+    element.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+        // Force a re-highlight after a short delay
+        setTimeout(() => hljs.highlightElement(block), 100);
+    });
+}
+
+function createNewChatMessage(timestamp, content) {
+    const chatMessageElement = document.createElement('div');
+    chatMessageElement.innerHTML = `
+        <div class="message bot last-message">
+            <span class="timestamp">${timestamp}</span>
+            <div class="bubble">${content}</div>
+        </div>
+    `;
+    return chatMessageElement;
+}
+
+function createTypingIndicator() {
+    return '<div class="typing-indicator"><div class="dot"></div></div>';
+}
+
+function parseAndFormatMessage(content, isStreaming = false) {
+    let formattedContent = content;
+
+    // Handle <execute_code> tags
+    formattedContent = formattedContent.replace(/<execute_code>([\s\S]*?)<\/execute_code>/g, (match, code) => {
+        return '```python\n' + code.trim() + '\n```';
+    });
+
+    // Extract code blocks and replace with placeholders
+    let codeBlocks = [];
+    formattedContent = formattedContent.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+        let id = codeBlocks.length;
+        codeBlocks.push({ language, code });
+        return `\n<CODE_BLOCK_${id}>\n`;
+    });
+
+    // Apply Markdown formatting
+    formattedContent = marked(formattedContent);
+
+    // Restore code blocks with syntax highlighting
+    formattedContent = formattedContent.replace(/<CODE_BLOCK_(\d+)>/g, (match, id) => {
+        let { language, code } = codeBlocks[id];
+        const languageClass = language ? `language-${language}` : '';
+        return `<div class="language">${language || 'code'}</div>
+                <button class="copy-btn" onclick="copyCodeToClipboard(this)">Copy</button>
+                <pre><code class="${languageClass}">${escape_Html(code.trim())}</code></pre>`;
+    });
+    // apply syntax highlighting to the code blocks
+    formattedContent = applyHighlighting(formattedContent);
+
+    // Handle inline code
+    formattedContent = formattedContent.replace(/<code>([^<]+)<\/code>/g, (match, code) => {
+        return `<code>${escape_Html(code)}</code>`;
+    });
+
+    if (isStreaming) {
+        formattedContent += createTypingIndicator();
+    }
+
+    return formattedContent;
+}
+
+function applyHighlighting(content) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    tempDiv.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+    });
+    return tempDiv.innerHTML;
+}
+
+function escape_Html(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 

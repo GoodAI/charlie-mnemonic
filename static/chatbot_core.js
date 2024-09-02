@@ -40,33 +40,11 @@ function addUserMessage(message) {
     canSendMessage();
 }
 
-function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = false) {
-    // Replace multiple backticks with triple backticks
-    message = message.replace(/(`\s*`\s*`)/g, '```');
-
-    // Count the number of triple backticks
-    var count = (message.match(/```/g) || []).length;
-
-    // If the count is odd, add an extra set of backticks to close the last code block
-    if (count % 2 !== 0) {
-        message += '\n```';
-    }
-
-    // Apply Markdown formatting
-    message = renderMarkdown(message);
-
-    // If outside of code block, add the typing indicator and replace newline characters
-    if (count % 2 === 0 && addIndicator) {
-        if (!replaceNewLines) {
-            message = message.replace(/\n/g, "");
-        }
-        else {
-            message = message.replace(/\n/g, "<br>");
-        }
-        message += '<span class="typing-indicator"><span class="dot"></span></span>';
-    }
-
-    return `<div class="markdown">${message}</div>`;
+// Custom function to replace <execute_code> and </execute_code>
+function replaceExecuteCodeBlocks(content) {
+    return content
+        .replace(/<execute_code>/g, '\n```python\n')
+        .replace(/<\/execute_code>/g, '\n```\n');
 }
 
 function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null, model = null) {

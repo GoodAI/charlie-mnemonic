@@ -125,13 +125,6 @@
             }
         };
 
-        // Custom function to replace <execute_code> and </execute_code>
-        function replaceExecuteCodeBlocks(content) {
-            return content
-                .replace(/<execute_code>/g, '\n```python\n')
-                .replace(/<\/execute_code>/g, '\n```\n');
-        }
-
         // set the options for marked and a highlighter and copy button
         marked.setOptions({
             highlight: function (code, lang) {
@@ -141,14 +134,6 @@
             },
             renderer: renderer,
         });
-
-        function renderMarkdown(content) {
-            // Replace <execute_code> and </execute_code> tags with the desired output
-            var modifiedContent = replaceExecuteCodeBlocks(content);
-
-            // Render the modified content with marked
-            return marked(modifiedContent);
-        }
 
         </script>
         <script src="chatbot.js?v={{version}}"></script>
@@ -372,16 +357,16 @@
                                    placeholder="Search..."
                                    oninput="debouncedChatSearch()"
                                    autocomplete="off">
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
-                                <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
-                            </div>
                             <div class="input-group-append">
                                 <span class="input-group-text" id="searchStatus">
                                     <i class="fas fa-search"></i>
                                     <i class="fas fa-spinner fa-spin"></i>
                                 </span>
                             </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
+                            <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
                         </div>
                         <div id="searchResults">
                             <!-- Search results will be dynamically inserted here -->

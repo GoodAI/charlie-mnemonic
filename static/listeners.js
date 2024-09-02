@@ -524,6 +524,7 @@ function applyTooltips(selector) {
 
 document.addEventListener('DOMContentLoaded', function () {
     setupScrollObserver();
+    hljs.highlightAll();
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");

@@ -2306,3 +2306,21 @@ pre {
     padding: 10px;
     margin: 10px 0;
 }
+
+#searchInput {
+    height: 40px;
+    padding: 10px;
+    border-radius: 4px 0 0 4px;
+    box-sizing: border-box;
+}
+
+#searchStatus {
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    border-radius: 0 4px 4px 0;
+    background-color: #1c3f77;
+    color: #fff;
+}

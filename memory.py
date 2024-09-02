@@ -252,7 +252,7 @@ class MemoryManager:
 
         default_params = config.default_params
 
-        default_params["max_tokens"] = settings.get("memory").get("max_tokens", 1000)
+        default_params["max_tokens"] = settings.get("memory", {}).get("output", 1000)
 
         responder = llmcalls.get_responder(
             (
@@ -285,9 +285,9 @@ class MemoryManager:
             if response:
                 process_dict["subject"] = response
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
             # return process_dict
@@ -362,9 +362,9 @@ class MemoryManager:
             if resp:
                 subject = resp
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"

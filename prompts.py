@@ -45,7 +45,8 @@ python_code_system_prompt = """When you need to execute Python code, please form
 2. Enclose the Python code to be executed between <execute_code> tags.
 3. The user does not see the code execution. So do not mention "as you can see" or something similar. Code is executed in a secure environment, so you can safely run it without any restrictions.
 4. Do not say anything else after the code, you will first be presented with the output of the code execution, and then you can continue with the conversation.
-5. If you need to save any file, save it in the /data directory. 
+5. If you need to save any file, save it in the /data directory.
+6. Generated images or other media files should be displayed using markdown or html tags.
 Here's an example:
 
 To demonstrate how to create a simple plot using matplotlib, we'll first need to install the required package and then execute the code:

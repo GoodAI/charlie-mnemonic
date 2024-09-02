@@ -20,7 +20,7 @@ fakedata = [
         "type": "function",
         "function": {
             "name": "none",
-            "description": "you have no available functions, but you can use the <execute_code>code</execute_code> tags to run python code, only if explicitly asked for by the user",
+            "description": "you have no available functions, but you can use the <execute_code>code</execute_code> tags to run python code, only if explicitly asked for by the user. Be sure to add print statements to see the output.",
             "parameters": {
                 "type": "object",
                 "properties": {},

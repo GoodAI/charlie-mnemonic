@@ -43,8 +43,14 @@ function playButtonHandler(element) {
     }
     isGeneratingAudio = true;
 
+    // Remove tooltip immediately on button click
+    document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => tooltip.remove());
+
     // remove the event listener to prevent multiple clicks
     element.removeEventListener('click', playButtonHandler);
+
+    // Ensure tooltip is removed
+    document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.remove());
 
     // force the browser to reflow the DOM
     element.offsetWidth;

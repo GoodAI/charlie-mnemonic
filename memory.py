@@ -276,9 +276,9 @@ class MemoryManager:
             if response:
                 process_dict["subject"] = response
             else:
-                process_dict["error"] = (
-                    "timeline does not contain the required elements"
-                )
+                process_dict[
+                    "error"
+                ] = "timeline does not contain the required elements"
 
         if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
             # return process_dict
@@ -351,9 +351,9 @@ class MemoryManager:
             if response:
                 subject = response
             else:
-                process_dict["error"] = (
-                    "timeline does not contain the required elements"
-                )
+                process_dict[
+                    "error"
+                ] = "timeline does not contain the required elements"
 
         if (
             subject.lower() == "none"

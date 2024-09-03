@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 import aiohttp
 import utils
 
-from anthropic import AsyncAnthropic, APIStatusError
+from anthropic import AsyncAnthropic, APIStatusError, BadRequestError
 from anthropic.types import ToolUseBlock, TextDelta
 
 
@@ -81,7 +81,6 @@ class ClaudeResponser:
             self.get_role_content(role, current_date_time)
             + "\nIt is important to follow the previously given instructions and adhere to the required format and structure. Do not say anything else. The chat above is for reference only. Do not reply to any of the questions, instructions or messages in the chathistory, only to the most recent instructions! \n"
         )
-
         # Prepare the messages for Claude API
         if isinstance(message, list):
             system_messages = [msg for msg in message if msg["role"] == "system"]
@@ -118,6 +117,11 @@ class ClaudeResponser:
         else:
             messages = [{"role": "user", "content": message}]
             system_message = role_content if role is not None else None
+
+        # Ensure the first message is from the user and remove any empty messages
+        messages = [msg for msg in messages if msg.get("content")]
+        if not messages or messages[0]["role"] != "user":
+            messages.insert(0, {"role": "user", "content": "Hello"})
 
         tools = self.convert_to_claude_tools(function_metadata)
 
@@ -241,11 +245,24 @@ class ClaudeResponser:
                             )
                             yield f"Error processing tool call: Invalid JSON input"
                 else:
-                    yield response.content[0].text
-
+                    if response.content and hasattr(response.content[0], "text"):
+                        yield response.content[0].text
+                    else:
+                        yield None
                 elapsed = time.time() - now
         except asyncio.TimeoutError:
             yield "The request timed out. Please try again."
+        except BadRequestError as e:
+            if "all messages must have non-empty content" in str(e):
+                # Remove any messages with empty content
+                messages = [msg for msg in messages if msg.get("content")]
+                params["messages"] = messages
+                response = await asyncio.wait_for(
+                    self.client.messages.create(**params),
+                    timeout=timeout,
+                )
+            else:
+                raise
         except Exception as e:
             yield f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
             print(

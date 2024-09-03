@@ -36,9 +36,9 @@ async def run_python_code(content, pip_packages=[], previous_content="", usernam
 
 
 def sync_run_python_code(content, pip_packages=[], previous_content="", username=None):
-    print(
-        f"trying to run python code: {content}\n\nwith pip packages: {pip_packages}\n\nfor user: {username}"
-    )
+    # print(
+    #     f"trying to run python code: {content}\n\nwith pip packages: {pip_packages}\n\nfor user: {username}"
+    # )
     # convert the email to a name without special characters to name our container
     if username:
         username = convert_username(username)

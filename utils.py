@@ -536,6 +536,14 @@ class MessageParser:
                             settings = await SettingsManager.load_settings(
                                 "users", username
                             )
+
+                            default_par = default_params
+                            default_par["max_tokens"] = settings.get("memory", {}).get(
+                                "output", 1000
+                            )
+                            default_par["model"] = settings.get("active_model").get(
+                                "active_model"
+                            )
                             responder = llmcalls.get_responder(
                                 (
                                     api_keys["openai"]
@@ -545,7 +553,7 @@ class MessageParser:
                                     else api_keys["anthropic"]
                                 ),
                                 settings.get("active_model").get("active_model"),
-                                default_params,
+                                default_par,
                             )
 
                             async for resp in responder.get_response(
@@ -981,25 +989,20 @@ async def process_message(
 
     # Retrieve memory settings
     memory_settings = settings.get("memory", {})
-
     # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
     token_usage = 500
     # Extract individual settings with defaults if not found
-    max_token_usage = max(memory_settings.get("max_tokens", 4000), 120000)
+    max_token_usage = min(memory_settings.get("max_tokens", 8000), 128000)
     remaining_tokens = max_token_usage - token_usage
 
     # Calculate token allocations based on percentages
-    tokens_active_brain = int(memory_settings.get("ltm1", 0.15) * max_token_usage)
-    tokens_cat_brain = int(memory_settings.get("ltm2", 0.15) * max_token_usage)
-    tokens_episodic_memory = int(
-        memory_settings.get("episodic", 0.05) * max_token_usage
-    )
-    tokens_recent_messages = int(memory_settings.get("recent", 0.10) * max_token_usage)
-    tokens_notes = int(memory_settings.get("notes", 0.15) * max_token_usage)
-    tokens_input = int(memory_settings.get("input", 0.15) * max_token_usage)
-    tokens_output = min(
-        int(memory_settings.get("output", 0.25) * max_token_usage), 4000
-    )
+    tokens_active_brain = int(memory_settings.get("ltm1", 500))
+    tokens_cat_brain = int(memory_settings.get("ltm2", 500))
+    tokens_episodic_memory = int(memory_settings.get("episodic", 250))
+    tokens_recent_messages = int(memory_settings.get("recent", 1000))
+    tokens_notes = int(memory_settings.get("notes", 750))
+    tokens_input = int(memory_settings.get("input", 1000))
+    tokens_output = min(int(memory_settings.get("output", 4000)), 4000)
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(
@@ -1068,6 +1071,9 @@ async def process_message(
             {"role": "user", "content": all_messages},
         ]
         response = "New Chat"
+        default_par = default_params
+        default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+        default_par["model"] = settings.get("active_model").get("active_model")
         responder = llmcalls.get_responder(
             (
                 api_keys["openai"]
@@ -1075,7 +1081,7 @@ async def process_message(
                 else api_keys["anthropic"]
             ),
             settings.get("active_model").get("active_model"),
-            default_params,
+            default_par,
         )
 
         async for resp in responder.get_response(
@@ -1227,6 +1233,7 @@ async def process_message(
         notes_tokens = MessageParser.num_tokens_from_string(notes_string, "gpt-4")
         token_usage += notes_tokens
         remaining_tokens -= notes_tokens
+        logger.debug(f"5. remaining_tokens: {remaining_tokens}")
 
     if image_prompt is not None:
         image_prompt_injection = (
@@ -1367,6 +1374,9 @@ async def generate_response(
     #         prettyprint(f"System: {message['content']}", "green")
 
     response = ""
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
@@ -1374,7 +1384,7 @@ async def generate_response(
             else api_keys["anthropic"]
         ),
         settings.get("active_model").get("active_model"),
-        default_params,
+        default_par,
     )
 
     async for resp in responder.get_response(
@@ -1399,6 +1409,9 @@ async def process_execute_python(
     full_response=None,
 ):
     settings = await SettingsManager.load_settings("users", username)
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
@@ -1406,7 +1419,7 @@ async def process_execute_python(
             else api_keys["anthropic"]
         ),
         settings.get("active_model").get("active_model"),
-        default_params,
+        default_par,
     )
     joined_message = "".join(message)
     messages = [
@@ -1432,7 +1445,7 @@ async def process_execute_python(
         function_metadata=fakedata,
         function_call="none",
     ):
-        print(f"function response (utils): {resp}\ntrace: {traceback.format_exc()}")
+        # print(f"function response (utils): {resp}\ntrace: {traceback.format_exc()}")
         return resp
 
 
@@ -1487,6 +1500,9 @@ async def process_function_reply(
                 "content": str(function_response),
             }
         )
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
@@ -1494,7 +1510,7 @@ async def process_function_reply(
             else api_keys["anthropic"]
         ),
         settings.get("active_model").get("active_model"),
-        default_params,
+        default_par,
     )
     async for resp in responder.get_response(
         username,
@@ -1528,6 +1544,9 @@ async def queryRewrite(query, username, user_dir, memories):
         },
     ]
     settings = await SettingsManager.load_settings(user_dir, username)
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
     responder = llmcalls.get_responder(
         (
             api_keys["openai"]
@@ -1535,7 +1554,7 @@ async def queryRewrite(query, username, user_dir, memories):
             else api_keys["anthropic"]
         ),
         settings.get("active_model").get("active_model"),
-        default_params,
+        default_par,
     )
     async for resp in responder.get_response(
         username,

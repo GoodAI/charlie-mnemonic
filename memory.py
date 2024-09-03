@@ -253,6 +253,7 @@ class MemoryManager:
         default_params = config.default_params
 
         default_params["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+        default_params["model"] = settings.get("active_model").get("active_model")
 
         responder = llmcalls.get_responder(
             (
@@ -332,6 +333,10 @@ class MemoryManager:
         process_dict = {"input": new_messages}
 
         subject = "none"
+
+        default_params = config.default_params
+        default_params["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+        default_params["model"] = settings.get("active_model").get("active_model")
         responder = llmcalls.get_responder(
             (
                 config.api_keys["openai"]
@@ -339,7 +344,7 @@ class MemoryManager:
                 else config.api_keys["anthropic"]
             ),
             settings.get("active_model").get("active_model"),
-            config.default_params,
+            default_params,
         )
         async for resp in responder.get_response(
             username,
@@ -458,6 +463,12 @@ class MemoryManager:
         if remaining_tokens > 100:
             subject_query = None
             response = ""
+
+            default_params = config.default_params
+            default_params["max_tokens"] = settings.get("memory", {}).get(
+                "output", 1000
+            )
+            default_params["model"] = settings.get("active_model").get("active_model")
             responder = llmcalls.get_responder(
                 (
                     config.api_keys["openai"]
@@ -467,7 +478,7 @@ class MemoryManager:
                     else config.api_keys["anthropic"]
                 ),
                 settings.get("active_model").get("active_model"),
-                config.default_params,
+                default_params,
             )
             async for resp in responder.get_response(
                 username,
@@ -572,6 +583,10 @@ class MemoryManager:
         unique_results = set()
         logger.debug(f"Processing incoming memory: {content}")
         subject_query = "none"
+
+        default_params = config.default_params
+        default_params["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+        default_params["model"] = settings.get("active_model").get("active_model")
         responder = llmcalls.get_responder(
             (
                 config.api_keys["openai"]
@@ -579,7 +594,7 @@ class MemoryManager:
                 else config.api_keys["anthropic"]
             ),
             settings.get("active_model").get("active_model"),
-            config.default_params,
+            default_params,
         )
         async for resp in responder.get_response(
             username,
@@ -677,6 +692,12 @@ class MemoryManager:
                 )
         else:
             subject_category = "none"
+
+            default_params = config.default_params
+            default_params["max_tokens"] = settings.get("memory", {}).get(
+                "output", 1000
+            )
+            default_params["model"] = settings.get("active_model").get("active_model")
             responder = llmcalls.get_responder(
                 (
                     config.api_keys["openai"]
@@ -686,7 +707,7 @@ class MemoryManager:
                     else config.api_keys["anthropic"]
                 ),
                 settings.get("active_model").get("active_model"),
-                config.default_params,
+                default_params,
             )
             async for resp in responder.get_response(
                 username,
@@ -920,6 +941,14 @@ class MemoryManager:
                     max_tokens_per_file = max_tokens / len(dir_list)
                     with open(current_file, "r") as f:
                         file_content = f.read()
+
+                        default_params = config.default_params
+                        default_params["max_tokens"] = settings.get("memory", {}).get(
+                            "output", 1000
+                        )
+                        default_params["model"] = settings.get("active_model").get(
+                            "active_model"
+                        )
                         responder = llmcalls.get_responder(
                             (
                                 config.api_keys["openai"]
@@ -929,7 +958,7 @@ class MemoryManager:
                                 else config.api_keys["anthropic"]
                             ),
                             settings.get("active_model").get("active_model"),
-                            config.default_params,
+                            default_params,
                         )
                         async for response in responder.get_response(
                             username,
@@ -958,6 +987,13 @@ class MemoryManager:
 
             token_count = utils.MessageParser.num_tokens_from_string(message)
             if token_count > 500:
+                default_params = config.default_params
+                default_params["max_tokens"] = settings.get("memory", {}).get(
+                    "output", 1000
+                )
+                default_params["model"] = settings.get("active_model").get(
+                    "active_model"
+                )
                 responder = llmcalls.get_responder(
                     (
                         config.api_keys["openai"]
@@ -967,7 +1003,7 @@ class MemoryManager:
                         else config.api_keys["anthropic"]
                     ),
                     settings.get("active_model").get("active_model"),
-                    config.default_params,
+                    default_params,
                 )
                 async for response in responder.get_response(
                     username,
@@ -989,6 +1025,14 @@ class MemoryManager:
             while retry_count < 5:
                 try:
                     note_taking_query = {}
+
+                    default_params = config.default_params
+                    default_params["max_tokens"] = settings.get("memory", {}).get(
+                        "output", 1000
+                    )
+                    default_params["model"] = settings.get("active_model").get(
+                        "active_model"
+                    )
                     responder = llmcalls.get_responder(
                         (
                             config.api_keys["openai"]
@@ -998,7 +1042,7 @@ class MemoryManager:
                             else config.api_keys["anthropic"]
                         ),
                         settings.get("active_model").get("active_model"),
-                        config.default_params,
+                        default_params,
                     )
                     async for resp in responder.get_response(
                         username,

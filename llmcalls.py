@@ -153,8 +153,8 @@ class ClaudeResponser:
                 if stream:
                     collected_messages = []
                     collected_temp = []
-                    tool_call = None
-                    tool_call_content = ""
+                    tool_calls = []
+                    current_tool_call = None
                     code_result = None
                     async for chunk in response:
                         # Check if the user pressed stop
@@ -174,7 +174,12 @@ class ClaudeResponser:
 
                         if chunk.type == "content_block_start":
                             if isinstance(chunk.content_block, ToolUseBlock):
-                                tool_call = chunk.content_block
+                                current_tool_call = {
+                                    "name": chunk.content_block.name,
+                                    "id": chunk.content_block.id,
+                                    "input": "",
+                                }
+                                tool_calls.append(current_tool_call)
                         elif chunk.type == "content_block_delta":
                             python_result = await self.process_chunk(
                                 chunk, collected_temp, chat_id, username, message
@@ -190,10 +195,14 @@ class ClaudeResponser:
                                         "blue",
                                         username,
                                     )
-                            elif chunk.delta.type == "tool_calls":
-                                tool_call_content += chunk.delta.tool_calls[
-                                    0
-                                ].function.arguments
+                            elif chunk.delta.type == "input_json_delta":
+                                if current_tool_call:
+                                    current_tool_call[
+                                        "input"
+                                    ] += chunk.delta.partial_json
+                        elif chunk.type == "content_block_stop":
+                            if current_tool_call:
+                                current_tool_call = None
                         elif chunk.type == "message_delta":
                             if chunk.delta.stop_reason == "tool_use":
                                 break
@@ -219,14 +228,14 @@ class ClaudeResponser:
                         username,
                     )
 
-                    # Process tool call if any
-                    if tool_call and tool_call_content:
+                    # Process tool calls if any
+                    for tool_call in tool_calls:
                         try:
-                            tool_input = json.loads(tool_call_content)
-                            yield f"Executing tool: {tool_call.name} with input {tool_input}"
+                            tool_input = json.loads(tool_call["input"])
+                            yield f"Executing tool: {tool_call['name']} with input {tool_input}"
                             tool_result = (
                                 await utils.MessageParser.process_function_call(
-                                    tool_call.name,
+                                    tool_call["name"],
                                     tool_input,
                                     self.addons,
                                     function_metadata,
@@ -238,14 +247,14 @@ class ClaudeResponser:
                                 )
                             )
                             yield f"{tool_result}"
-
                         except json.JSONDecodeError:
                             print(
-                                f"Error decoding tool input JSON: {tool_call_content}"
+                                f"Error decoding tool input JSON: {tool_call['input']}"
                             )
                             yield f"Error processing tool call: Invalid JSON input"
+
                 else:
-                    if response.content and hasattr(response.content[0], "text"):
+                    if response.content and len(response.content) > 0:
                         yield response.content[0].text
                     else:
                         yield None

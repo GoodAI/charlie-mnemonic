@@ -11,7 +11,7 @@ set UPDATE=false
 set REPO_URL=https://github.com/GoodAI/charlie-mnemonic
 set BACKUP_FOLDER=%HOME%\charlie_backups\charlie_backup_%date:~-4,4%%date:~-10,2%%date:~-7,2%_%time:~0,2%%time:~3,2%%time:~6,2%
 set BACKUP_FOLDER=%BACKUP_FOLDER: =0%
-set DOCKER_CPUS=8
+set DOCKER_CPUS=2
 
 echo Variables set
 

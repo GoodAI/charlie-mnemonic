@@ -633,7 +633,9 @@ class OpenAIResponser:
             yield "The request timed out. Please try again."
         except Exception as e:
             yield f"An error occurred (openai): {e}"
-            print(f"An error occurred (openai): {e}")
+            print(
+                f"An error occurred (openai): {e}, traceback: {traceback.format_exc()}"
+            )
             await utils.MessageSender.send_message(
                 {"error": f"An error occurred (openai): {e}", "chat_id": chat_id},
                 "blue",

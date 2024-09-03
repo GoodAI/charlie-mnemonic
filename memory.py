@@ -272,22 +272,13 @@ class MemoryManager:
             function_call="auto",
             role="date-extractor",
         ):
-            # openai_response = llmcalls.OpenAIResponser(
-            #     config.api_keys["openai"], config.default_params
-            # )
-            # async for resp in openai_response.get_response(
-            #     username,
-            #     all_messages,
-            #     function_metadata=config.fakedata,
-            #     role="date-extractor",
-            # ):
             response = resp
             if response:
                 process_dict["subject"] = response
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if process_dict["subject"].lower() in ["none", "'none'", '"none"', '""']:
             # return process_dict
@@ -350,21 +341,19 @@ class MemoryManager:
             settings.get("active_model").get("active_model"),
             config.default_params,
         )
-        openai_response = llmcalls.OpenAIResponser(
-            config.api_keys["openai"], config.default_params
-        )
-        async for resp in openai_response.get_response(
+        async for resp in responder.get_response(
             username,
             all_messages,
             function_metadata=config.fakedata,
             role="date-extractor",
         ):
-            if resp:
-                subject = resp
+            response = resp
+            if response:
+                subject = response
             else:
-                process_dict[
-                    "error"
-                ] = "timeline does not contain the required elements"
+                process_dict["error"] = (
+                    "timeline does not contain the required elements"
+                )
 
         if (
             subject.lower() == "none"
@@ -486,15 +475,6 @@ class MemoryManager:
                 function_metadata=config.fakedata,
                 role="date-extractor",
             ):
-                # openai_response = llmcalls.OpenAIResponser(
-                #     config.api_keys["openai"], config.default_params
-                # )
-                # async for resp in openai_response.get_response(
-                #     username,
-                #     all_messages,
-                #     function_metadata=config.fakedata,
-                #     role="retriever",
-                # ):
                 if resp:
                     subject_query = resp
 
@@ -607,15 +587,6 @@ class MemoryManager:
             function_metadata=config.fakedata,
             role="categorise_query",
         ):
-            # openai_response = llmcalls.OpenAIResponser(
-            #     config.api_keys["openai"], config.default_params
-            # )
-            # async for resp in openai_response.get_response(
-            #     username,
-            #     content,
-            #     function_metadata=config.fakedata,
-            #     role="categorise_query",
-            # ):
             if resp:
                 subject_query = resp
             else:
@@ -723,15 +694,6 @@ class MemoryManager:
                 function_metadata=config.fakedata,
                 role="categorise",
             ):
-                # openai_response = llmcalls.OpenAIResponser(
-                #     config.api_keys["openai"], config.default_params
-                # )
-                # async for resp in openai_response.get_response(
-                #     username,
-                #     content,
-                #     function_metadata=config.fakedata,
-                #     role="categorise",
-                # ):
                 if resp:
                     subject_category = resp
                 else:
@@ -975,15 +937,6 @@ class MemoryManager:
                             function_metadata=config.fakedata,
                             role="summary_memory",
                         ):
-                            # openai_response = llmcalls.OpenAIResponser(
-                            #     config.api_keys["openai"], config.default_params
-                            # )
-                            # async for response in openai_response.get_response(
-                            #     username,
-                            #     file_content,
-                            #     function_metadata=config.fakedata,
-                            #     role="summary_memory",
-                            # ):
                             if response:
                                 summary = response
                             else:
@@ -1022,15 +975,6 @@ class MemoryManager:
                     function_metadata=config.fakedata,
                     role="summarize",
                 ):
-                    # openai_response = llmcalls.OpenAIResponser(
-                    #     config.api_keys["openai"], config.default_params
-                    # )
-                    # async for response in openai_response.get_response(
-                    #     username,
-                    #     message,
-                    #     function_metadata=config.fakedata,
-                    #     role="summarize",
-                    # ):
                     if response:
                         message = response
                     else:
@@ -1062,15 +1006,6 @@ class MemoryManager:
                         function_metadata=config.fakedata_nothing,
                         role="notetaker",
                     ):
-                        # openai_response = llmcalls.OpenAIResponser(
-                        #     config.api_keys["openai"], config.default_params
-                        # )
-                        # async for resp in openai_response.get_response(
-                        #     username,
-                        #     final_message,
-                        #     function_metadata=config.fakedata,
-                        #     role="notetaker",
-                        # ):
                         if resp:
                             note_taking_query = resp
                         else:

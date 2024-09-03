@@ -533,10 +533,22 @@ class MessageParser:
                                 {"role": "user", "content": f"{message}"},
                             ]
                             response = None
-                            openai_response = llmcalls.OpenAIResponser(
-                                api_keys["openai"], default_params
+                            settings = await SettingsManager.load_settings(
+                                "users", username
                             )
-                            async for resp in openai_response.get_response(
+                            responder = llmcalls.get_responder(
+                                (
+                                    api_keys["openai"]
+                                    if settings.get("active_model")
+                                    .get("active_model")
+                                    .startswith("gpt")
+                                    else api_keys["anthropic"]
+                                ),
+                                settings.get("active_model").get("active_model"),
+                                default_params,
+                            )
+
+                            async for resp in responder.get_response(
                                 username,
                                 messages,
                                 stream=False,
@@ -1074,15 +1086,6 @@ async def process_message(
             chat_id=chat_id,
         ):
             response = resp
-        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        # async for resp in openai_response.get_response(
-        #     username,
-        #     messages,
-        #     stream=False,
-        #     function_metadata=fakedata,
-        #     chat_id=chat_id,
-        # ):
-        #     response = resp
 
         with ChatTabsDAO() as db:
             db.update_tab_description(chat_id, response)
@@ -1383,16 +1386,6 @@ async def generate_response(
         uid=uid,
     ):
         response = resp
-        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        # async for resp in openai_response.get_response(
-        #     username,
-        #     messages,
-        #     stream=True,
-        #     function_metadata=function_metadata,
-        #     chat_id=chat_id,
-        #     uid=uid,
-        # ):
-        #     response = resp
         await MessageSender.send_debug(f"response: {response}", 1, "green", username)
 
     return response
@@ -1510,14 +1503,6 @@ async def process_function_reply(
         function_metadata=function_metadata,
         chat_id=chat_id,
     ):
-        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        # async for resp in openai_response.get_response(
-        #     username,
-        #     messages,
-        #     stream=True,
-        #     function_metadata=function_metadata,
-        #     chat_id=chat_id,
-        # ):
         second_response = resp
     return second_response
 
@@ -1558,13 +1543,6 @@ async def queryRewrite(query, username, user_dir, memories):
         stream=False,
         function_metadata=fakedata,
     ):
-        # openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        # async for resp in openai_response.get_response(
-        #     username,
-        #     messages,
-        #     stream=False,
-        #     function_metadata=fakedata,
-        # ):
         rewritten_query = resp
 
     return rewritten_query

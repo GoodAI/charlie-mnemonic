@@ -31,51 +31,74 @@ function copyCodeToClipboard(btn) {
     }, 1000);
 };
 
-function copyToClipboard(btn) {
-    // Ensure the button is correctly passed and exists in the DOM
-    if (!btn || !btn.closest) {
-        console.error('copyToClipboard was called with an invalid element or the element is not in the DOM');
+function copyToClipboard(event) {    
+    if (!event.target) {
         return;
     }
-
-    // Navigate up to the parent '.bubble' div
-    var bubbleDiv = btn.closest('.bubble');
+    // Find the closest .bubble ancestor
+    var bubbleDiv = event.target.closest('.bubble');
     if (!bubbleDiv) {
-        console.error('Failed to find the .bubble parent element.');
+        console.warn('Failed to find the .bubble parent element.');
         return;
     }
+    
 
-    // Find the '.markdown' div within the '.bubble' div
-    var markdownDiv = bubbleDiv.querySelector('.markdown');
-    if (!markdownDiv) {
-        console.error('Failed to find the .markdown element within the bubble.');
-        return;
+    // Clone the bubble content
+    var contentToCopy = bubbleDiv.cloneNode(true);
+
+    // Remove the bottom buttons container
+    var bottomButtons = contentToCopy.querySelector('.bottom-buttons-container');
+    if (bottomButtons) {
+        bottomButtons.remove();
     }
 
-    // Get the text content you want to copy
-    var textToCopy = markdownDiv.innerText;
+    // Function to get text content, preserving line breaks
+    function getTextContent(element) {
+        let text = '';
+        for (let node of element.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.nodeName === 'BR' || node.nodeName === 'P' || node.nodeName === 'DIV') {
+                    text += '\n';
+                }
+                text += getTextContent(node);
+            }
+        }
+        return text;
+    }
 
-    var textarea = document.createElement('textarea');
-    textarea.textContent = textToCopy;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
+    // Get the text content
+    var textToCopy = getTextContent(contentToCopy).trim();
 
-    // Display overlay message
+    // Use the Clipboard API to copy the text
+    navigator.clipboard.writeText(textToCopy).then(function() {
+        console.log('Copying to clipboard was successful!');
+        showCopyFeedback();
+    }, function(err) {
+        console.error('Could not copy text: ', err);
+    });
+}
+
+function showCopyFeedback() {
     var overlay = document.getElementById('overlay');
     if (overlay) {
-        overlay.textContent = 'Message copied to clipboard';
+        overlay.textContent = 'Copied to clipboard';
         overlay.classList.add('active');
         setTimeout(function () {
             overlay.classList.remove('active');
-        }, 1000);
+        }, 2000);
     } else {
         console.error('Overlay element not found');
     }
 }
 
-
+// Use event delegation
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('copy-button')) {
+        copyToClipboard(event);
+    }
+});
 
 var renderer = new marked.Renderer();
 
@@ -281,4 +304,31 @@ function setupScrollObserver() {
         attributes: true,
         attributeFilter: ['style']
     });
+}
+
+function showNotification(message, type = 'info') {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        const container = document.createElement('div');
+        container.id = 'notification-container';
+        container.style.position = 'fixed';
+        container.style.top = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show`;
+    notification.role = 'alert';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    document.getElementById('notification-container').appendChild(notification);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
 }

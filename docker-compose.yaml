@@ -22,10 +22,6 @@ services:
     env_file:
       - .env
     privileged: true
-    deploy:
-      resources:
-        limits:
-          cpus: '8'
 
   psdb:
     image: postgres:14

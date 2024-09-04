@@ -100,7 +100,16 @@ class MessageSender:
             current_model = settings["active_model"]["active_model"]
             print(f"[DEBUG] Current model: {current_model}")
 
-            if hasattr(response, "usage"):
+            # if the response is {'audio_cost': 0.0019224}, update the audio cost
+            if "audio_cost" in response:
+                audio_cost = response["audio_cost"]
+                print(f"[DEBUG] Response audio cost: {audio_cost}")
+
+                # update the total cost with the whisper cost
+                with Database() as db:
+                    db.add_whisper_usage(username, audio_cost)
+
+            elif hasattr(response, "usage"):
                 usage = response.usage
                 print(f"[DEBUG] Response usage: {usage}")
                 if hasattr(usage, "input_tokens") and hasattr(usage, "output_tokens"):
@@ -507,11 +516,11 @@ class MessageParser:
         return text
 
     @staticmethod
-    async def start_image_description(image_path, prompt, file_name):
+    async def start_image_description(image_path, prompt, file_name, username):
         """Get the description of an image using the OpenAI Vision API, asynchronously."""
         openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
         resp = await openai_response.get_image_description(
-            image_path=image_path, prompt=prompt, filename=file_name
+            image_path=image_path, prompt=prompt, filename=file_name, username=username
         )
         result = prompts.image_description.format(prompt, file_name, resp)
         return result
@@ -1737,3 +1746,12 @@ def format_result(result: dict) -> str:
     if "error" in result:
         output += f"Error: {result['error']}\n"
     return output
+
+
+async def get_audio_duration(audio_path) -> int:
+    try:
+        audio = audio_segment.AudioSegment.from_file(audio_path)
+        return len(audio) / 1000
+    except Exception as e:
+        logger.error(f"Error getting audio duration: {e}")
+        return 0

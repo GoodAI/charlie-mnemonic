@@ -456,6 +456,13 @@ class OpenAIResponser:
             input=text,
         ) as response:
             await response.stream_to_file(audio_path)
+            # calculate the cost of the audio, $0.006/minute
+            audio_duration = await utils.get_audio_duration(audio_path)
+            audio_cost = audio_duration * 0.006 / 60
+            # add the cost of the audio to the user's token usage
+            await utils.MessageSender.update_token_usage(
+                {"audio_cost": audio_cost}, username, True
+            )
             return audio_path
 
     async def get_audio_transcription(self, audio_path, language, filename):
@@ -469,7 +476,7 @@ class OpenAIResponser:
         )
         return transcription
 
-    async def get_image_description(self, image_paths, prompt):
+    async def get_image_description(self, image_paths, prompt, username):
         """Asynchronously get descriptions of multiple images using the OpenAI Vision API."""
         image_contents = []
         for image_path in image_paths:
@@ -502,6 +509,9 @@ class OpenAIResponser:
         response = await self.client.chat.completions.create(**params)
         if response:
             description = response.choices[0].message.content
+            # update the token usage
+            print("Updating image description token usage")
+            await utils.MessageSender.update_token_usage(response, username, False)
             return description
         else:
             return "Failed to get descriptions."

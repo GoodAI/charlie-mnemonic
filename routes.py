@@ -594,7 +594,7 @@ async def handle_message_image(
     url_encoded_image = urllib.parse.quote(image_file.filename)
     prompt = "![image](data/" + url_encoded_image + ' "image")<p>' + prompt + "</p>"
     result = await MessageParser.start_image_description(
-        image_path, prompt, image_file.filename
+        image_path, prompt, image_file.filename, username
     )
     return await process_message(
         prompt, username, "users", display_name, result, chat_id

@@ -62,7 +62,7 @@ async def get_image_descriptions(image_requests, username=None):
         try:
             openai_response = OpenAIResponser(config.api_keys["openai"])
             resp = await openai_response.get_image_description(
-                image_paths=full_image_paths, prompt=prompt
+                image_paths=full_image_paths, prompt=prompt, username=username
             )
             results.append({"request": request, "description": resp})
         except Exception as e:

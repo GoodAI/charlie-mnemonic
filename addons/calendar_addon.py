@@ -106,10 +106,23 @@ def calendar_addon(
     full_path = (
         os.path.join(users_dir, username, "token.json") if path is None else path
     )
+
     if os.path.exists(full_path):
-        creds = Credentials.from_authorized_user_file(full_path, None)
+        creds = Credentials.from_authorized_user_file(
+            full_path, ["https://www.googleapis.com/auth/calendar"]
+        )
+
     if not creds or not creds.valid:
-        return "Error: Invalid or missing credentials. Please restart the client or run the 'onEnable' function."
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                # Save the refreshed credentials
+                with open(full_path, "w") as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                return f"Error refreshing credentials: {str(e)}. Please run the 'onEnable' function."
+        else:
+            return "Credentials are missing or invalid. Please run the 'onEnable' function."
 
     try:
         service = build("calendar", "v3", credentials=creds)

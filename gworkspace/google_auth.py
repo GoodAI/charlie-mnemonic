@@ -19,29 +19,46 @@ SCOPES = [
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/cse",
+]
+
+
 async def onEnable(username, users_dir):
     creds = None
     username = convert_username(username)
     charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
     full_path = os.path.join(charlie_mnemonic_user_dir, username, "token.json")
+    print(f"checking for token at {full_path} for {username}")  # Debug print
 
     if os.path.exists(full_path):
+        print(f"Token exists at {full_path} for {username}")  # Debug print
         try:
+            print(f"Reading credentials from {full_path}")  # Debug print
             creds = Credentials.from_authorized_user_file(full_path, SCOPES)
         except ValueError as e:
             print(f"Error reading credentials from {full_path}: {e}")
             creds = None
 
     if creds and creds.valid:
+        print(f"Credentials are valid for {username}")  # Debug print
         missing_scopes = set(SCOPES) - set(creds.scopes)
         if missing_scopes:
+            print(f"Missing scopes: {missing_scopes}")  # Debug print
             creds = None
         else:
             return None
 
     if not creds or not creds.valid:
+        print(f"Credentials are invalid for {username}")  # Debug print
         if creds and creds.expired and creds.refresh_token:
+            print(f"Credentials are expired for {username}")  # Debug print
             try:
+                print(f"Refreshing credentials for {username}")  # Debug print
                 creds.refresh(Request())
             except google.auth.exceptions.RefreshError as e:
                 print(f"Refresh error: {e}. Deleting token and re-authorizing.")
@@ -69,6 +86,10 @@ async def onEnable(username, users_dir):
                     return {"error": str(e)}
             else:
                 return {"error": "Google client secret path not found"}
+
+    # Save the refreshed or new credentials
+    with open(full_path, "w") as token:
+        token.write(creds.to_json())
 
     return None
 

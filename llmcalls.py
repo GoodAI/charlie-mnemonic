@@ -4,6 +4,7 @@ import datetime
 import json
 import os
 from pathlib import Path
+import random
 import re
 import time
 import traceback
@@ -13,7 +14,7 @@ from dotenv import load_dotenv
 import aiohttp
 import utils
 
-from anthropic import AsyncAnthropic, APIStatusError, BadRequestError
+from anthropic import AsyncAnthropic, APIStatusError, BadRequestError, RateLimitError
 from anthropic.types import ToolUseBlock, TextDelta
 
 
@@ -71,7 +72,6 @@ class ClaudeResponser:
         role=None,
         uid=None,
     ):
-        """Get a response from the Anthropic Claude API."""
         if function_metadata is None:
             function_metadata = []
 
@@ -81,7 +81,7 @@ class ClaudeResponser:
             self.get_role_content(role, current_date_time)
             + "\nIt is important to follow the previously given instructions and adhere to the required format and structure. Do not say anything else. The chat above is for reference only. Do not reply to any of the questions, instructions or messages in the chathistory, only to the most recent instructions! \n"
         )
-        # Prepare the messages for Claude API
+
         if isinstance(message, list):
             system_messages = [msg for msg in message if msg["role"] == "system"]
             messages = [msg for msg in message if msg["role"] != "system"]
@@ -91,7 +91,6 @@ class ClaudeResponser:
             else:
                 system_message = role_content if role is not None else None
 
-            # Ensure messages alternate between user and assistant
             formatted_messages = []
             last_role = None
             for msg in messages:
@@ -107,7 +106,6 @@ class ClaudeResponser:
                 formatted_messages.append(msg)
                 last_role = msg["role"]
 
-            # Ensure the last message is from the user
             if formatted_messages[-1]["role"] != "user":
                 formatted_messages.append(
                     {"role": "user", "content": "Please respond to the above."}
@@ -118,7 +116,6 @@ class ClaudeResponser:
             messages = [{"role": "user", "content": message}]
             system_message = role_content if role is not None else None
 
-        # Ensure the first message is from the user and remove any empty messages
         messages = [msg for msg in messages if msg.get("content")]
         if not messages or messages[0]["role"] != "user":
             messages.insert(0, {"role": "user", "content": "Hello"})
@@ -143,148 +140,186 @@ class ClaudeResponser:
 
         timeout = 180.0
         now = time.time()
-        try:
-            async with aiohttp.ClientSession() as session:
-                self.client.session = session
-                response = await asyncio.wait_for(
-                    self.client.messages.create(**params),
-                    timeout=timeout,
-                )
-                if stream:
-                    collected_messages = []
-                    collected_temp = []
-                    tool_calls = []
-                    current_tool_call = None
-                    code_result = None
-                    async for chunk in response:
-                        # Check if the user pressed stop
-                        global stopPressed
-                        stopStream = False
-                        if username in stopPressed:
-                            stopStream = stopPressed[username]
-                        if stopStream:
-                            stopPressed[username] = False
+        max_retries = 3
+        base_delay = 1  # Start with a 1-second delay
+
+        for attempt in range(max_retries):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    self.client.session = session
+                    response = await asyncio.wait_for(
+                        self.client.messages.create(**params),
+                        timeout=timeout,
+                    )
+                    if stream:
+                        collected_messages = []
+                        collected_temp = []
+                        tool_calls = []
+                        current_tool_call = None
+                        code_result = None
+                        async for chunk in response:
+                            global stopPressed
                             stopStream = False
-                            await utils.MessageSender.send_message(
-                                {"cancel_message": True, "chat_id": chat_id},
+                            if username in stopPressed:
+                                stopStream = stopPressed[username]
+                            if stopStream:
+                                stopPressed[username] = False
+                                stopStream = False
+                                await utils.MessageSender.send_message(
+                                    {"cancel_message": True, "chat_id": chat_id},
+                                    "blue",
+                                    username,
+                                )
+                                break
+
+                            if chunk.type == "content_block_start":
+                                if isinstance(chunk.content_block, ToolUseBlock):
+                                    current_tool_call = {
+                                        "name": chunk.content_block.name,
+                                        "id": chunk.content_block.id,
+                                        "input": "",
+                                    }
+                                    tool_calls.append(current_tool_call)
+                            elif chunk.type == "content_block_delta":
+                                python_result = await self.process_chunk(
+                                    chunk, collected_temp, chat_id, username, message
+                                )
+                                if python_result:
+                                    code_result = python_result
+                                if chunk.delta.type == "text_delta":
+                                    content = chunk.delta.text
+                                    if content:
+                                        collected_messages.append(content)
+                                        yield await utils.MessageSender.send_message(
+                                            {
+                                                "chunk_message": content,
+                                                "chat_id": chat_id,
+                                            },
+                                            "blue",
+                                            username,
+                                        )
+                                elif chunk.delta.type == "input_json_delta":
+                                    if current_tool_call:
+                                        current_tool_call[
+                                            "input"
+                                        ] += chunk.delta.partial_json
+                            elif chunk.type == "content_block_stop":
+                                if current_tool_call:
+                                    current_tool_call = None
+                            elif chunk.type == "message_delta":
+                                if chunk.delta.stop_reason == "tool_use":
+                                    break
+                            elif chunk.type == "message_stop":
+                                break
+
+                        full_response = "".join(collected_messages)
+                        if code_result and role is None:
+                            full_response += f"<br><br>{code_result}"
+                            yield await utils.MessageSender.send_message(
+                                {
+                                    "chunk_message": f"<br><br>{code_result}",
+                                    "chat_id": chat_id,
+                                },
                                 "blue",
                                 username,
                             )
-                            break
 
-                        if chunk.type == "content_block_start":
-                            if isinstance(chunk.content_block, ToolUseBlock):
-                                current_tool_call = {
-                                    "name": chunk.content_block.name,
-                                    "id": chunk.content_block.id,
-                                    "input": "",
-                                }
-                                tool_calls.append(current_tool_call)
-                        elif chunk.type == "content_block_delta":
-                            python_result = await self.process_chunk(
-                                chunk, collected_temp, chat_id, username, message
-                            )
-                            if python_result:
-                                code_result = python_result
-                            if chunk.delta.type == "text_delta":
-                                content = chunk.delta.text
-                                if content:
-                                    collected_messages.append(content)
-                                    yield await utils.MessageSender.send_message(
-                                        {"chunk_message": content, "chat_id": chat_id},
-                                        "blue",
-                                        username,
-                                    )
-                            elif chunk.delta.type == "input_json_delta":
-                                if current_tool_call:
-                                    current_tool_call[
-                                        "input"
-                                    ] += chunk.delta.partial_json
-                        elif chunk.type == "content_block_stop":
-                            if current_tool_call:
-                                current_tool_call = None
-                        elif chunk.type == "message_delta":
-                            if chunk.delta.stop_reason == "tool_use":
-                                break
-                        elif chunk.type == "message_stop":
-                            break
-
-                    full_response = "".join(collected_messages)
-                    if code_result and role is None:
-                        full_response += f"<br><br>{code_result}"
-                        yield await utils.MessageSender.send_message(
+                        yield full_response
+                        await utils.MessageSender.send_message(
                             {
-                                "chunk_message": f"<br><br>{code_result}",
+                                "stop_message": True,
                                 "chat_id": chat_id,
+                                "model": self.model,
                             },
                             "blue",
                             username,
                         )
 
-                    yield full_response
-                    await utils.MessageSender.send_message(
-                        {"stop_message": True, "chat_id": chat_id, "model": self.model},
-                        "blue",
-                        username,
-                    )
-
-                    # Process tool calls if any
-                    for tool_call in tool_calls:
-                        try:
-                            tool_input = json.loads(tool_call["input"])
-                            yield f"Executing tool: {tool_call['name']} with input {tool_input}"
-                            tool_result = (
-                                await utils.MessageParser.process_function_call(
-                                    tool_call["name"],
-                                    tool_input,
-                                    self.addons,
-                                    function_metadata,
-                                    message,
-                                    message,
-                                    username,
-                                    None,
-                                    chat_id=chat_id,
+                        for tool_call in tool_calls:
+                            try:
+                                tool_input = json.loads(tool_call["input"])
+                                yield f"Executing tool: {tool_call['name']} with input {tool_input}"
+                                tool_result = (
+                                    await utils.MessageParser.process_function_call(
+                                        tool_call["name"],
+                                        tool_input,
+                                        self.addons,
+                                        function_metadata,
+                                        message,
+                                        message,
+                                        username,
+                                        None,
+                                        chat_id=chat_id,
+                                    )
                                 )
-                            )
-                            yield f"{tool_result}"
-                        except json.JSONDecodeError:
-                            print(
-                                f"Error decoding tool input JSON: {tool_call['input']}"
-                            )
-                            yield f"Error processing tool call: Invalid JSON input"
+                                yield f"{tool_result}"
+                            except json.JSONDecodeError:
+                                print(
+                                    f"Error decoding tool input JSON: {tool_call['input']}"
+                                )
+                                yield f"Error processing tool call: Invalid JSON input"
 
-                else:
-                    if response.content and len(response.content) > 0:
-                        yield response.content[0].text
                     else:
-                        yield None
-                elapsed = time.time() - now
-        except asyncio.TimeoutError:
-            yield "The request timed out. Please try again."
-        except BadRequestError as e:
-            if "all messages must have non-empty content" in str(e):
-                # Remove any messages with empty content
-                messages = [msg for msg in messages if msg.get("content")]
-                params["messages"] = messages
-                response = await asyncio.wait_for(
-                    self.client.messages.create(**params),
-                    timeout=timeout,
+                        elapsed = time.time() - now
+                        if response.content and len(response.content) > 0:
+                            await utils.MessageSender.update_token_usage(
+                                response, username, False, elapsed=elapsed
+                            )
+                            yield response.content[0].text
+                        else:
+                            yield None
+
+                    # If we get here, the request was successful, so we can break the retry loop
+                    break
+
+            except asyncio.TimeoutError:
+                if attempt == max_retries - 1:
+                    yield "The request timed out. Please try again."
+                else:
+                    continue
+
+            except (APIStatusError, RateLimitError) as e:
+                if "overloaded" in str(e).lower() or isinstance(e, RateLimitError):
+                    if attempt == max_retries - 1:
+                        yield f"The service is currently overloaded. Please try again later. Error: {e}"
+                    else:
+                        delay = (base_delay * 2**attempt) + (
+                            random.randint(0, 1000) / 1000
+                        )
+                        print(
+                            f"Attempt {attempt + 1} failed. Retrying in {delay:.2f} seconds..."
+                        )
+                        await asyncio.sleep(delay)
+                else:
+                    # If it's a different kind of APIStatusError, re-raise it
+                    raise
+
+            except BadRequestError as e:
+                if "all messages must have non-empty content" in str(e):
+                    # Remove any messages with empty content
+                    messages = [msg for msg in messages if msg.get("content")]
+                    params["messages"] = messages
+                    response = await asyncio.wait_for(
+                        self.client.messages.create(**params),
+                        timeout=timeout,
+                    )
+                else:
+                    raise
+
+            except Exception as e:
+                yield f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
+                print(
+                    f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
                 )
-            else:
-                raise
-        except Exception as e:
-            yield f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
-            print(
-                f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}"
-            )
-            await utils.MessageSender.send_message(
-                {
-                    "error": f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}",
-                    "chat_id": chat_id,
-                },
-                "blue",
-                username,
-            )
+                await utils.MessageSender.send_message(
+                    {
+                        "error": f"An error occurred (claude): {e} with traceback: {traceback.format_exc()}",
+                        "chat_id": chat_id,
+                    },
+                    "blue",
+                    username,
+                )
+                break  # Exit the retry loop for non-retryable errors
 
     def convert_to_claude_tools(self, function_metadata):
         """Convert OpenAI function metadata to Claude's tool format."""

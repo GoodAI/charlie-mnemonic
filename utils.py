@@ -42,6 +42,29 @@ max_responses = 1
 COT_RETRIES = {}
 stopPressed = {}
 
+MODEL_COSTS = {
+    "gpt-4o": {
+        "input": 0.000005,  # $5.00 / 1M tokens
+        "output": 0.000015,  # $15.00 / 1M tokens
+    },
+    "gpt-4o-mini": {
+        "input": 0.00000015,  # $0.150 / 1M tokens
+        "output": 0.0000006,  # $0.600 / 1M tokens
+    },
+    "gpt-4-turbo": {
+        "input": 0.00001,  # $10.00 / 1M tokens
+        "output": 0.00003,  # $30.00 / 1M tokens
+    },
+    "claude-3-5-sonnet-20240620": {
+        "input": 0.000003,  # $3 / 1M tokens
+        "output": 0.000015,  # $15 / 1M tokens
+    },
+    "claude-3-opus-20240229": {
+        "input": 0.000015,  # $15 / 1M tokens
+        "output": 0.000075,  # $75 / 1M tokens
+    },
+}
+
 
 class MessageSender:
     """This class contains functions to send messages to the user"""
@@ -72,48 +95,93 @@ class MessageSender:
     async def update_token_usage(response, username, brain=False, elapsed=0):
         """Update the token usage in the database"""
         try:
-            if not isinstance(response, str) and hasattr(response, "usage"):
-                # Safely access attributes with default values
-                total_tokens_used = getattr(response.usage, "total_tokens", 0)
-                prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
-                completion_tokens = getattr(response.usage, "completion_tokens", 0)
+            print(f"[DEBUG] Starting update_token_usage for user: {username}")
+            settings = await SettingsManager.load_settings("users", username)
+            current_model = settings["active_model"]["active_model"]
+            print(f"[DEBUG] Current model: {current_model}")
 
-                with Database() as db:
-                    result = db.update_token_usage(
-                        username,
-                        total_tokens_used=total_tokens_used,
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
+            if hasattr(response, "usage"):
+                usage = response.usage
+                print(f"[DEBUG] Response usage: {usage}")
+                if hasattr(usage, "input_tokens") and hasattr(usage, "output_tokens"):
+                    # Claude structure
+                    total_tokens_used = usage.input_tokens + usage.output_tokens
+                    input_tokens = usage.input_tokens
+                    output_tokens = usage.output_tokens
+                    print(
+                        f"[DEBUG] Claude structure: Input tokens: {input_tokens}, Output tokens: {output_tokens}"
                     )
-                    if result is not None:
-                        await MessageSender.send_debug(
-                            f"Last message: Prompt tokens: {response.usage.prompt_tokens}, Completion tokens: {response.usage.completion_tokens}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}",
-                            2,
-                            "red",
-                            username,
-                        )
+                elif hasattr(usage, "prompt_tokens") and hasattr(
+                    usage, "completion_tokens"
+                ):
+                    # OpenAI structure
+                    total_tokens_used = usage.total_tokens
+                    input_tokens = usage.prompt_tokens
+                    output_tokens = usage.completion_tokens
+                    print(
+                        f"[DEBUG] OpenAI structure: Input tokens: {input_tokens}, Output tokens: {output_tokens}"
+                    )
+                else:
+                    print(f"[DEBUG] Unexpected usage structure: {usage}")
+                    return
+            else:
+                print(f"[DEBUG] No usage information found in response: {response}")
+                return
 
-                        prompt_cost = round(response.usage.prompt_tokens * 0.00001, 5)
-                        completion_cost = round(
-                            response.usage.completion_tokens * 0.00003, 5
-                        )
-                        this_message_total_cost = round(
-                            prompt_cost + completion_cost, 5
-                        )
+            with Database() as db:
+                print(f"[DEBUG] Updating token usage in database")
+                result = db.update_token_usage(
+                    username,
+                    total_tokens_used=total_tokens_used,
+                    prompt_tokens=input_tokens,
+                    completion_tokens=output_tokens,
+                )
+                if result is not None:
+                    print(f"[DEBUG] Database update result: {result}")
+                    await MessageSender.send_debug(
+                        f"Last message: Input tokens: {input_tokens}, Output tokens: {output_tokens}\nTotal tokens used: {result[0]}, Input tokens: {result[1]}, Output tokens: {result[2]}",
+                        2,
+                        "red",
+                        username,
+                    )
 
-                        total_prompt_cost = round(result[1] * 0.00001, 5)
-                        total_completion_cost = round(result[2] * 0.00003, 5)
-                        total_cost = round(total_prompt_cost + total_completion_cost, 5)
-                        await MessageSender.send_message(
-                            {
-                                "usage": {
-                                    "total_tokens": result[0],
-                                    "total_cost": total_cost,
-                                }
-                            },
-                            "red",
-                            username,
+                    # Calculate costs based on the current model
+                    if current_model in MODEL_COSTS:
+                        model_cost = MODEL_COSTS[current_model]
+                        print(
+                            f"[DEBUG] Using cost for model {current_model}: {model_cost}"
                         )
+                        input_cost = round(input_tokens * model_cost["input"], 5)
+                        output_cost = round(output_tokens * model_cost["output"], 5)
+                    else:
+                        print(
+                            f"[DEBUG] Unknown model: {current_model}. Using default pricing."
+                        )
+                        input_cost = round(input_tokens * 0.00001, 5)
+                        output_cost = round(output_tokens * 0.00003, 5)
+
+                    this_message_total_cost = round(input_cost + output_cost, 5)
+                    print(
+                        f"[DEBUG] This message cost: Input: ${input_cost}, Output: ${output_cost}, Total: ${this_message_total_cost}"
+                    )
+
+                    total_input_cost = round(result[1] * model_cost["input"], 5)
+                    total_output_cost = round(result[2] * model_cost["output"], 5)
+                    total_cost = round(total_input_cost + total_output_cost, 5)
+                    print(
+                        f"[DEBUG] Total cost: Input: ${total_input_cost}, Output: ${total_output_cost}, Total: ${total_cost}"
+                    )
+
+                    await MessageSender.send_message(
+                        {
+                            "usage": {
+                                "total_tokens": result[0],
+                                "total_cost": total_cost,
+                            }
+                        },
+                        "red",
+                        username,
+                    )
 
                     daily_stats = db.get_daily_stats(username)
                     if daily_stats is not None:
@@ -122,31 +190,38 @@ class MessageSender:
                         current_spending_count = 0
                     spending_count = current_spending_count + this_message_total_cost
 
+                    print(
+                        f"[DEBUG] Daily usage update: Current spending: ${current_spending_count}, New spending: ${spending_count}"
+                    )
                     await MessageSender.send_message(
                         {"daily_usage": {"daily_cost": spending_count}}, "red", username
                     )
+
                     # update the daily_stats table
                     if brain:
                         db.update_daily_stats_token_usage(
                             username,
-                            brain_tokens=response.usage.prompt_tokens,
+                            brain_tokens=input_tokens,
                             spending_count=this_message_total_cost,
                         )
                     else:
                         db.update_daily_stats_token_usage(
                             username,
-                            prompt_tokens=response.usage.prompt_tokens,
-                            generation_tokens=response.usage.completion_tokens,
+                            prompt_tokens=input_tokens,
+                            generation_tokens=output_tokens,
                             spending_count=this_message_total_cost,
                         )
+
                     current_stats_spending_count = (
                         db.get_statistic(username)["total_spending_count"] or 0
                     )
                     spending_count = round(
                         current_stats_spending_count + this_message_total_cost, 5
                     )
+                    print(f"[DEBUG] Updating total spending count: ${spending_count}")
                     # update the statistics table
                     db.update_statistic(username, total_spending_count=spending_count)
+
                     # update the elapsed time
                     # get the total response time and response count from the database
                     stats = db.get_daily_stats(username)
@@ -163,17 +238,23 @@ class MessageSender:
                     # calculate the new average response time
                     average_response_time = total_response_time / response_count
 
+                    print(
+                        f"[DEBUG] Updating response time stats: Total: {total_response_time}, Average: {average_response_time}, Count: {response_count}"
+                    )
                     db.replace_daily_stats_token_usage(
                         username,
                         total_response_time=total_response_time,
                         average_response_time=average_response_time,
                         response_count=response_count,
                     )
+
         except Exception as e:
             logger.exception(f"An error occurred (utils): {e}")
             await MessageSender.send_message(
                 {"error": "An error occurred (utils): " + str(e)}, "red", username
             )
+        finally:
+            print("[DEBUG] Finished update_token_usage")
 
 
 class AddonManager:

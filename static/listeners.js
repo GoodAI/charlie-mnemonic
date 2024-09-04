@@ -35,18 +35,22 @@ let lastValidMessage = '';
 
 function playButtonHandler(element) {
     if (!element) return;
-    console.log('Play button clicked');
     element.classList.remove('fa-play');
     element.classList.add('fa-spinner');
 
     if (isGeneratingAudio) {
-        console.log('Audio generation in progress');
         return;
     }
     isGeneratingAudio = true;
 
+    // Remove tooltip immediately on button click
+    document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => tooltip.remove());
+
     // remove the event listener to prevent multiple clicks
     element.removeEventListener('click', playButtonHandler);
+
+    // Ensure tooltip is removed
+    document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.remove());
 
     // force the browser to reflow the DOM
     element.offsetWidth;
@@ -57,7 +61,7 @@ function playButtonHandler(element) {
     var clonedBubbleContainer = bubbleContainer.cloneNode(true);
 
     var codeBlocks = clonedBubbleContainer.querySelectorAll('code[class^="language-"]');
-    codeBlocks.forEach(function(block) {
+    codeBlocks.forEach(function (block) {
         block.parentNode.removeChild(block);
     });
 
@@ -121,136 +125,129 @@ document.getElementById('errorModalClose').addEventListener('click', function ()
 });
 
 
-
-
-
 document.getElementById('upload-file').addEventListener('click', function () {
-    const fileInput = document.getElementById('uploadFileInput');
-    // if (fileInput.files.length > 0) {
-    //     // send_files(fileInput.files);
-    // } else {
-        // trigger the file input as if the user clicked it
     document.getElementById('uploadFileInput').click();
-    //}
-});
-
-// check if the preview files were clicked, if so, remove them, show the upload-file button and clear the file input
-document.getElementById('preview-files').addEventListener('click', function (event) {
-    if (event.target.classList.contains('file-delete-icon')) {
-        let index = event.target.getAttribute('data-index');
-        pastedFiles.splice(index, 1);
-        event.target.parentNode.remove();
-
-        if (pastedFiles.length === 0) {
-            document.getElementById('files-preview').style.display = 'none';
-            document.getElementById('upload-file').style.display = 'block';
-            document.querySelector('.icon-container-right').style.right = '25px';
-        }
-    }
-});
-
-// check if files were uploaded
-document.getElementById('uploadFileInput').addEventListener('change', function () {
-    if (this.files.length > 0) {
-        handleFiles(this.files);
-    }
 });
 
 function handleFiles(files) {
-    // Check if the total size of all files is less than 20MB
+    // Check if the total size of all files is less than 200MB
     let totalSize = 0;
     for (let i = 0; i < files.length; i++) {
         totalSize += files[i].size;
     }
     if (totalSize > 200000000) {
         showErrorModal('The total size of the files is too large, max 200MB!');
-        // clear the file input
-        document.getElementById('uploadFileInput').value = '';
         return;
     }
 
-    // Clear the previous preview
-    document.getElementById('preview-files').innerHTML = '';
-
+    let textFiles = [];
+    let nonTextFiles = [];
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (file.type.startsWith('text/') || file.name.match(/\.(txt|html|css|js|cs)$/i)) {
-            // Handle text files
-            let reader = new FileReader();
-            reader.onload = function (event) {
-                showTextFileModal(file, event.target.result);
-            };
-            reader.readAsText(file);
-        }else if (file.type.startsWith('image/')) {
-            // create a new FileReader object
-            let reader = new FileReader();
-            reader.onload = function (event) {
-                // create a new Image object
-                let img = new Image();
-                img.onload = function () {
-                    // Apply CSS constraints to get thumbnail size
-                    let thumbnailWidth = Math.min(100, img.width);
-                    let thumbnailHeight = Math.min(36, img.height);
-
-                    // Preserve aspect ratio
-                    if (img.width > 100 || img.height > 36) {
-                        let ratio = Math.min(100 / img.width, 36 / img.height);
-                        thumbnailWidth = img.width * ratio;
-                        thumbnailHeight = img.height * ratio;
-                    }
-
-                    console.log(`Thumbnail size: ${thumbnailWidth} x ${thumbnailHeight}`);
-                    document.querySelector('.icon-container-right').style.right = (thumbnailWidth + 45) + 'px';
-
-                    // Create a preview element for the image
-                    let preview = document.createElement('div');
-                    preview.className = 'file-preview';
-                    preview.innerHTML = `<img src="${event.target.result}" alt="${file.name}" width="${thumbnailWidth}" height="${thumbnailHeight}">`;
-                    document.getElementById('preview-files').appendChild(preview);
-                    // Add delete icon and tooltip
-                    let deleteIcon = document.createElement('i');
-                    deleteIcon.className = 'fas fa-times-circle file-delete-icon';
-                    deleteIcon.setAttribute('data-index', i);
-                    deleteIcon.setAttribute('title', 'Delete');
-                    preview.appendChild(deleteIcon);
-                };
-                // Set image src to the result of FileReader
-                img.src = event.target.result;
-            };
-            // Read the image file as a data URL
-            reader.readAsDataURL(file);
+            textFiles.push(file);
         } else {
-            // Create a preview element for non-image files
-            let preview = document.createElement('div');
-            preview.className = 'file-preview';
-            preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
-            document.getElementById('preview-files').appendChild(preview);
-            // Add delete icon and tooltip
-            let deleteIcon = document.createElement('i');
-            deleteIcon.className = 'fas fa-times-circle file-delete-icon';
-            deleteIcon.setAttribute('data-index', i);
-            deleteIcon.setAttribute('title', 'Delete');
-            preview.appendChild(deleteIcon);
+            nonTextFiles.push(file);
         }
     }
-
-    // Show the file-preview
-    document.getElementById('files-preview').style.display = 'flex';
-    document.getElementById('files-preview').style.justifyContent = 'center';
-    // Hide the upload-file button
-    // document.getElementById('upload-file').style.display = 'none';
-
-    let fileWrapper = document.querySelector('.file-wrapper');
-    fileWrapper.addEventListener('mouseover', function () {
-        this.querySelector('.hover-text').style.display = 'block';
-    });
-    fileWrapper.addEventListener('mouseout', function () {
-        this.querySelector('.hover-text').style.display = 'none';
-    });
-
-    // Store the files for later use
-    pastedFiles = Array.from(files);
+    if (textFiles.length > 0) {
+        showTextFileModal(textFiles);
+    }
+    if (nonTextFiles.length > 0) {
+        for (let i = 0; i < nonTextFiles.length; i++) {
+            const file = nonTextFiles[i];
+            pastedFiles.push(file);
+            createFilePreview(file, pastedFiles.length - 1);
+        }
+        // Show the file-preview
+        document.getElementById('files-preview').style.display = 'flex';
+        document.getElementById('files-preview').style.justifyContent = 'center';
+    }
 }
+
+function createFilePreview(file, index) {
+    let preview = document.createElement('div');
+    preview.className = 'file-preview';
+
+    if (file.type.startsWith('image/') && file.type !== 'image/tiff') {
+        let reader = new FileReader();
+        reader.onload = function (event) {
+            let img = new Image();
+            img.onload = function () {
+                let thumbnailWidth = Math.min(100, img.width);
+                let thumbnailHeight = Math.min(36, img.height);
+
+                if (img.width > 100 || img.height > 36) {
+                    let ratio = Math.min(100 / img.width, 36 / img.height);
+                    thumbnailWidth = img.width * ratio;
+                    thumbnailHeight = img.height * ratio;
+                }
+
+                preview.innerHTML = `<img src="${event.target.result}" alt="${file.name}" width="${thumbnailWidth}" height="${thumbnailHeight}">`;
+                addDeleteIcon(preview, file, index);
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    } else if (file.type.startsWith('image/tiff')) {
+        preview.innerHTML = `<i class="fas fa-file-image"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    } else if (file.type.startsWith('video/')) {
+        preview.innerHTML = `<i class="fas fa-file-video"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    } else if (file.type.startsWith('text/')) {
+        preview.innerHTML = `<i class="fas fa-file-alt"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    } else if (file.type.startsWith('audio/')) {
+        preview.innerHTML = `<i class="fas fa-file-audio"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    } else if (file.type.startsWith('application/pdf')) {
+        preview.innerHTML = `<i class="fas fa-file-pdf"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    } else {
+        preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
+        addDeleteIcon(preview, file, index);
+    }
+
+    document.getElementById('preview-files').appendChild(preview);
+}
+
+function addDeleteIcon(preview, file, index) {
+    let deleteIcon = document.createElement('i');
+    deleteIcon.className = 'fas fa-times-circle file-delete-icon';
+    deleteIcon.setAttribute('title', 'Delete');
+    deleteIcon.addEventListener('click', function () {
+        if (index >= 0 && index < pastedFiles.length) {
+            pastedFiles.splice(index, 1);
+            preview.remove();
+
+            // Update the indices of the remaining files
+            let previews = document.querySelectorAll('.file-preview');
+            previews.forEach((preview, i) => {
+                let deleteIcon = preview.querySelector('.file-delete-icon');
+                deleteIcon.removeEventListener('click', deleteIcon.onclick);
+                addDeleteIcon(preview, pastedFiles[i], i);
+            });
+
+            if (pastedFiles.length === 0) {
+                document.getElementById('files-preview').style.display = 'none';
+            } else {
+                document.getElementById('files-preview').style.display = 'flex';
+            }
+        } else {
+            console.log('Invalid file index');
+        }
+    });
+    preview.appendChild(deleteIcon);
+}
+
+// check if files were uploaded
+document.getElementById('uploadFileInput').addEventListener('change', function () {
+    if (this.files.length > 0) {
+        handleFiles(this.files);
+        resetFileInput();
+    }
+});
 
 window.addEventListener('paste', function (event) {
     // check if there are files in the clipboard
@@ -297,14 +294,18 @@ document.getElementById('message').addEventListener('keydown', function (e) {
 });
 
 // function to handle the logout button click
-document.getElementById('logout-button').addEventListener('click', async function (event) {
-    event.preventDefault();
-    try {
-        await logout();
-    } catch (error) {
-        console.error('Logout failed: ', error);
-    }
-});
+const logoutButton = document.getElementById('logout-button');
+
+if (logoutButton) {
+    logoutButton.addEventListener('click', async function (event) {
+        event.preventDefault();
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Logout failed: ', error);
+        }
+    });
+}
 
 document.getElementById('record').addEventListener('click', function () {
     // Initialize the default CSS box shadow
@@ -379,7 +380,7 @@ document.getElementById('record').addEventListener('click', function () {
                         document.getElementById('message').style.boxShadow = `0 0 ${10 + average}px ${boxShadowColor}`;
                     }
 
-                    if(mediaRecorder && mediaRecorder.state == "recording") {
+                    if (mediaRecorder && mediaRecorder.state == "recording") {
                         requestAnimationFrame(update);
                     } else {
                         // Reset the glow around the message div
@@ -473,24 +474,8 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
 });
 
-document.getElementById('messages').addEventListener('click', function(e) {
-    if (e.target.classList.contains('debug') || e.target.parentNode.classList.contains('debug')) {
-        var expandableContent = e.target.querySelector('.expandable-content') || e.target.parentNode.querySelector('.expandable-content');
-        var messageDebug = e.target.closest('.message.debug');
-        if (expandableContent && messageDebug) {
-            if (expandableContent.style.display === 'none') {
-                expandableContent.style.display = 'block';
-                messageDebug.classList.add('active');
-            } else {
-                expandableContent.style.display = 'none';
-                messageDebug.classList.remove('active');
-            }
-        }
-    }
-});
 
-
-document.getElementById('messages').addEventListener('scroll', function() {
+document.getElementById('messages').addEventListener('scroll', function () {
     var messagesContainer = this;
     if (isUserAtBottom(messagesContainer)) {
         hideNewMessageIndicator();
@@ -543,20 +528,41 @@ function applyTooltips(selector) {
 }
 
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    setupScrollObserver();
+    hljs.highlightAll();
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");
+    const cancelEmailButton = document.getElementById('cancel-email');
+    const hiddenIdField = document.getElementById('emailId');
+
+    // load the chatPadding from local storage
+    const chatPadding = localStorage.getItem("chatPadding");
+    if (chatPadding) {
+        set_chat_padding(chatPadding);
+    }
 
     if (currentTheme) {
         document.body.classList.add(currentTheme);
     }
 
+    document.getElementById('send-email').addEventListener('click', sendCurrentEmail);
+
+
+    document.getElementById('cancel-email').addEventListener('click', function () {
+        $('#googleConfModal').modal('hide');
+    });
+
+    cancelEmailButton.addEventListener('click', function () {
+        $('#googleConfModal').modal('hide');
+    });
+
     themeToggle.addEventListener('click', () => {
         document.body.classList.toggle('dark-theme');
         localStorage.setItem('theme', document.body.classList.contains('dark-theme') ? 'dark-theme' : '');
     });
-    // Hacky way, this still shows the animation when the page loads
+
     if (tabsState === "open") {
         openTabs();
     } else if (tabsState === "closed") {
@@ -564,7 +570,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Event delegation for copy button
-    document.body.addEventListener('click', function(e) {
+    document.body.addEventListener('click', function (e) {
         if (e.target && e.target.className.includes('copy-button')) {
             var div = e.target.closest('.bubble');
             copyToClipboard(div);
@@ -572,13 +578,20 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Event delegation for regenerate button
-    document.body.addEventListener('click', function(e) {
+    document.body.addEventListener('click', function (e) {
         if (e.target && e.target.className.includes('regenerate-button')) {
             var div = e.target.closest('.bubble');
             regenerateResponse(div);
         }
     });
     applyTooltips('[data-tooltip]');
+
+    window.addEventListener('resize', function () {
+        closeAllDropdowns();
+    });
+
+    // Event delegation for exact search checkbox
+    document.getElementById('exactSearchCheckbox').addEventListener('change', debouncedChatSearch);
 
 });
 
@@ -594,4 +607,97 @@ function toggleTabs() {
     } else {
         openTabs();
     }
+}
+
+function showTextFileModal(files) {
+    let modalHtml = `
+        <div class="modal fade textFileModal" id="textFileModal">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Text Files</h5>
+                        <button type="button" class="close btn btn-default" data-dismiss="modal">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Choose an option for each text file:</p>
+                        <ul id="textFileList"></ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="close btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    let modalElement = document.createElement('div');
+    modalElement.innerHTML = modalHtml;
+    document.body.appendChild(modalElement);
+
+    let modal = document.getElementById('textFileModal');
+    let textFileList = document.getElementById('textFileList');
+
+    let processedFilesCount = 0;  // Counter for processed files
+
+    files.forEach((file, index) => {
+        let listItem = document.createElement('li');
+        listItem.className = 'file-list-item';
+        listItem.innerHTML = `
+            <div class="file-name">${file.name}</div>
+            <div class="button-group">
+                <button class="includeTextBtn btn btn-primary" data-index="${index}">Include as Text</button>
+                <button class="uploadTextBtn btn btn-secondary" data-index="${index}">Upload as File</button>
+            </div>
+        `;
+        textFileList.appendChild(listItem);
+    });
+
+    let checkCloseModal = function () {
+        if (processedFilesCount >= files.length) {
+            $(modal).modal('hide');
+        }
+    };
+
+    let closeModal = function () {
+        $(modal).modal('hide');
+    };
+
+    $('.close, .btn-secondary').on('click', closeModal);
+
+    $(modal).on('hidden.bs.modal', function () {
+        $('.close, .btn-secondary').off('click', closeModal);
+        modalElement.remove();
+    });
+
+    $(modal).modal('show');
+
+    $('.includeTextBtn').on('click', function () {
+        let index = $(this).data('index');
+        let file = files[index];
+        let reader = new FileReader();
+        reader.onload = function (event) {
+            let inputText = `${file.name}\n\n${event.target.result}\n\n`;
+            document.getElementById('message').value += inputText;
+            // Trigger the input event on the message textarea
+            message.dispatchEvent(new Event('input'));
+        };
+        reader.readAsText(file);
+        $(this).prop('disabled', true);
+        $(this).siblings('.uploadTextBtn').prop('disabled', true);
+        processedFilesCount++;
+        checkCloseModal();
+    });
+
+    $('.uploadTextBtn').on('click', function () {
+        let index = $(this).data('index');
+        let file = files[index];
+        pastedFiles.push(file);
+        createFilePreview(file, pastedFiles.length - 1);
+        document.getElementById('files-preview').style.display = 'flex';
+        document.getElementById('files-preview').style.justifyContent = 'center';
+        $(this).prop('disabled', true);
+        $(this).siblings('.includeTextBtn').prop('disabled', true);
+        processedFilesCount++;
+        checkCloseModal();
+    });
 }

@@ -1,5 +1,6 @@
 from typing import Union, Dict, Any, OrderedDict
 from pydantic import BaseModel, Field, validator
+from datetime import datetime
 
 from configuration_page import configuration_meta
 
@@ -95,6 +96,11 @@ class editSettings(BaseModel):
     value: Union[str, int, bool, None]
 
 
+class emailMessage(BaseModel):
+    username: str
+    draft_id: str
+
+
 class AsciiColors:
     HEADER = "\033[95m"
     BLUE = "\033[94m"
@@ -158,3 +164,10 @@ class ConfigurationData(BaseModel):
         if field.required and (v is None or v == ""):
             raise ValueError(f"{field.name} is required and cannot be empty")
         return v
+
+
+class TimeTravelMessage(BaseModel):
+    prompt: str
+    timestamp: datetime
+    chat_id: str
+    display_name: str

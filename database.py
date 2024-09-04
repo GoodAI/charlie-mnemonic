@@ -548,3 +548,38 @@ class Database:
         """Add the whisper usage for the given username to the statistics table."""
         result = self.update_token_usage(username, voice_usage=cost)
         return result
+
+    def purge_user_by_username(self, username: str) -> bool:
+        try:
+            user_id = self.users_dao.get_user_id(username)
+            if not user_id:
+                logger.debug(f"User {username} not found.")
+                return False
+
+            logger.debug(f"Purging data for user_id: {user_id}")
+
+            # Delete related data in chat_tabs
+            self.cursor.execute("DELETE FROM chat_tabs WHERE user_id = %s", (user_id,))
+            chat_tabs_deleted = self.cursor.rowcount
+            logger.debug(f"Deleted {chat_tabs_deleted} chat_tabs entries.")
+
+            # Delete related data in daily_stats
+            self.cursor.execute(
+                "DELETE FROM daily_stats WHERE user_id = %s", (user_id,)
+            )
+            daily_stats_deleted = self.cursor.rowcount
+            logger.debug(f"Deleted {daily_stats_deleted} daily_stats entries.")
+
+            # Delete related data in statistics
+            self.cursor.execute("DELETE FROM statistics WHERE user_id = %s", (user_id,))
+            statistics_deleted = self.cursor.rowcount
+            logger.debug(f"Deleted {statistics_deleted} statistics entries.")
+
+            # Commit the changes
+            self.conn.commit()
+            logger.debug("Purge committed successfully.")
+            return True
+        except psycopg2.Error as e:
+            self.conn.rollback()
+            logger.error(f"Error during purge: {e}")
+            raise e

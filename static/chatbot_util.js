@@ -31,51 +31,74 @@ function copyCodeToClipboard(btn) {
     }, 1000);
 };
 
-function copyToClipboard(btn) {
-    // Ensure the button is correctly passed and exists in the DOM
-    if (!btn || !btn.closest) {
-        console.error('copyToClipboard was called with an invalid element or the element is not in the DOM');
+function copyToClipboard(event) {    
+    if (!event.target) {
         return;
     }
-
-    // Navigate up to the parent '.bubble' div
-    var bubbleDiv = btn.closest('.bubble');
+    // Find the closest .bubble ancestor
+    var bubbleDiv = event.target.closest('.bubble');
     if (!bubbleDiv) {
-        console.error('Failed to find the .bubble parent element.');
+        console.warn('Failed to find the .bubble parent element.');
         return;
     }
+    
 
-    // Find the '.markdown' div within the '.bubble' div
-    var markdownDiv = bubbleDiv.querySelector('.markdown');
-    if (!markdownDiv) {
-        console.error('Failed to find the .markdown element within the bubble.');
-        return;
+    // Clone the bubble content
+    var contentToCopy = bubbleDiv.cloneNode(true);
+
+    // Remove the bottom buttons container
+    var bottomButtons = contentToCopy.querySelector('.bottom-buttons-container');
+    if (bottomButtons) {
+        bottomButtons.remove();
     }
 
-    // Get the text content you want to copy
-    var textToCopy = markdownDiv.innerText;
+    // Function to get text content, preserving line breaks
+    function getTextContent(element) {
+        let text = '';
+        for (let node of element.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.nodeName === 'BR' || node.nodeName === 'P' || node.nodeName === 'DIV') {
+                    text += '\n';
+                }
+                text += getTextContent(node);
+            }
+        }
+        return text;
+    }
 
-    var textarea = document.createElement('textarea');
-    textarea.textContent = textToCopy;
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    document.body.removeChild(textarea);
+    // Get the text content
+    var textToCopy = getTextContent(contentToCopy).trim();
 
-    // Display overlay message
+    // Use the Clipboard API to copy the text
+    navigator.clipboard.writeText(textToCopy).then(function() {
+        console.log('Copying to clipboard was successful!');
+        showCopyFeedback();
+    }, function(err) {
+        console.error('Could not copy text: ', err);
+    });
+}
+
+function showCopyFeedback() {
     var overlay = document.getElementById('overlay');
     if (overlay) {
-        overlay.textContent = 'Message copied to clipboard';
+        overlay.textContent = 'Copied to clipboard';
         overlay.classList.add('active');
         setTimeout(function () {
             overlay.classList.remove('active');
-        }, 1000);
+        }, 2000);
     } else {
         console.error('Overlay element not found');
     }
 }
 
-
+// Use event delegation
+document.addEventListener('click', function(event) {
+    if (event.target.classList.contains('copy-button')) {
+        copyToClipboard(event);
+    }
+});
 
 var renderer = new marked.Renderer();
 
@@ -169,6 +192,12 @@ function closeAuth() {
     $('#googleAuthModal').modal('hide');
 }
 
+function closeConf() {
+    // close googleAuthModal
+    $('#googleConfModal').modal('hide');
+
+}
+
 function openTabs() {
     const toggle = document.getElementById("toggle-chat-tabs");
     toggle.classList.remove("closed");
@@ -196,7 +225,7 @@ function closeTabs() {
     document.getElementById("sideNav").classList.remove("open");
     const container = document.getElementById("chat-container");
     container.classList.remove("open");
-    
+
     localStorage.setItem("tabsState", "closed");
 
     setTimeout(() => {
@@ -209,7 +238,7 @@ function closeTabs() {
 function updateCounterDiv(message_length, tokens_used, max_message_tokens, cost) {
     const countDiv = document.getElementById("tokenCount");
     let tokensColor = tokens_used > max_message_tokens ? "<span style='color: red;'>" : "<span>";
-    
+
     countDiv.innerHTML = `Characters: ${message_length}, tokens: ${tokensColor}${tokens_used}</span>/${max_message_tokens}, cost: $${cost.toFixed(4)}`;
 }
 
@@ -226,64 +255,80 @@ function getUuidFromMessage(messageElement) {
     return messageElement.dataset.uuid;
 }
 
-function showTextFileModal(file, fileContent) {
-    // Create the modal HTML
-    let modalHtml = `
-        <div class="modal" id="textFileModal">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Text File: ${file.name}</h5>
-                        <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Choose an option for the text file:</p>
-                        <button id="includeTextBtn">Include in Input</button>
-                        <button id="uploadTextBtn">Upload as File</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+function debounce(func, delay) {
+    let timeoutId;
+    return function () {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(context, args), delay);
+    };
+}
+
+function set_chat_padding(width) {
+    const messages = document.getElementById("messages");
+    messages.style.padding = `20px ${width}vw`;
+    // save the padding in local storage
+    localStorage.setItem("chatPadding", width);
+}
+
+function scrollToBottom(force = false) {
+    const messagesContainer = document.getElementById('messages');
+    if (force || isUserAtBottom(messagesContainer)) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        hideNewMessageIndicator();
+    } else {
+        showNewMessageIndicator();
+    }
+}
+
+function setupScrollObserver() {
+    const messagesContainer = document.getElementById('messages');
+    const observer = new MutationObserver((mutations) => {
+        let shouldScroll = false;
+        mutations.forEach((mutation) => {
+            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                shouldScroll = true;
+            } else if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                shouldScroll = true;
+            }
+        });
+        if (shouldScroll) {
+            scrollToBottom();
+        }
+    });
+
+    observer.observe(messagesContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['style']
+    });
+}
+
+function showNotification(message, type = 'info') {
+    const notificationContainer = document.getElementById('notification-container');
+    if (!notificationContainer) {
+        const container = document.createElement('div');
+        container.id = 'notification-container';
+        container.style.position = 'fixed';
+        container.style.top = '20px';
+        container.style.right = '20px';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show`;
+    notification.role = 'alert';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
 
-    // Append the modal to the body
-    document.body.innerHTML += modalHtml;
+    document.getElementById('notification-container').appendChild(notification);
 
-    // Get references to the modal and buttons
-    let modal = document.getElementById('textFileModal');
-    let includeTextBtn = document.getElementById('includeTextBtn');
-    let uploadTextBtn = document.getElementById('uploadTextBtn');
-
-    // Show the modal
-    $(modal).modal('show');
-
-    // Handle the "Include in Input" button click
-    includeTextBtn.onclick = function () {
-        let inputText = `${file.name}\n\n${fileContent}`;
-        document.getElementById('message').value += inputText;
-        $(modal).modal('hide');
-    };
-
-    // Handle the "Upload as File" button click
-    uploadTextBtn.onclick = function () {
-        // Add the file to the pastedFiles array
-        pastedFiles.push(new File([fileContent], file.name));
-        $(modal).modal('hide');
-        // Create a preview element for non-image files
-        let preview = document.createElement('div');
-        preview.className = 'file-preview';
-        preview.innerHTML = `<i class="fas fa-file"></i><span>${file.name}</span>`;
-        document.getElementById('preview-files').appendChild(preview);
-        // Add delete icon and tooltip
-        let deleteIcon = document.createElement('i');
-        deleteIcon.className = 'fas fa-times-circle file-delete-icon';
-        deleteIcon.setAttribute('data-index', i);
-        deleteIcon.setAttribute('title', 'Delete');
-        preview.appendChild(deleteIcon);
-    };
-
-    // Remove the modal from the DOM when hidden
-    $(modal).on('hidden.bs.modal', function () {
-        modal.remove();
-    });
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
 }

@@ -2,6 +2,17 @@ var currentActiveTab = 1;
 var categoryValues;
 
 var tempFullChunk = '';
+
+var showDebug = false;
+
+const modelMaxTokens = {
+    'gpt-4o': 4096,
+    'gpt-4o-mini': 16384,
+    'gpt-4-turbo': 4096,
+    'claude-3-5-sonnet-20240620': 8192,
+    'claude-3-opus-20240229': 4096
+};
+
 // populate the settings menu
 function populateSettingsMenu(settings) {
     var settingsMenu = document.getElementById("SidenavAddons");
@@ -11,15 +22,23 @@ function populateSettingsMenu(settings) {
         settingsMenu.firstChild.remove();
     }
 
-    var tabs = ['Addons', 'Data', 'General Settings', 'User Data', 'Memory Configuration'];
+    var tabs = [
+        { name: 'General', icon: 'fas fa-cog' },
+        { name: 'Chat', icon: 'fas fa-comments' },
+        { name: 'Addons', icon: 'fas fa-puzzle-piece' },
+        { name: 'Audio', icon: 'fas fa-volume-up' },
+        { name: 'User Data', icon: 'fas fa-user' },
+        { name: 'Memory', icon: 'fas fa-memory' }
+    ];
     var tabNav = createTabNav(tabs);
     settingsMenu.appendChild(tabNav);
 
-    settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab1'));
-    settingsMenu.appendChild(createDataTabContent(settings.audio, 'tab2'));
-    settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab3'));
-    settingsMenu.appendChild(createUserDataTabContent('tab4'));
-    settingsMenu.appendChild(createMemoryTabContent('tab5'));
+    settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab1'));
+    settingsMenu.appendChild(createChatSettingsTabContent(settings, 'tab2'));
+    settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab3'));
+    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4'));
+    settingsMenu.appendChild(createUserDataTabContent('tab5'));
+    settingsMenu.appendChild(createMemoryTabContent('tab6'));
 
     var maxRange = settings.memory.max_tokens;
     var minRange = settings.memory.min_tokens;
@@ -59,12 +78,12 @@ function createTabNav(tabs) {
     tabs.forEach((tab, index) => {
         var tabLink = document.createElement('a');
         tabLink.href = '#';
-        tabLink.textContent = tab;
+        tabLink.innerHTML = `<i class="${tab.icon}"></i> ${tab.name}`;
         tabLink.onclick = function (e) {
             e.preventDefault();
             switchTab(index + 1);
         };
-        
+
         var listItem = document.createElement('li');
         listItem.className = 'nav-item';
         listItem.appendChild(tabLink);
@@ -93,17 +112,17 @@ function createAddonsTabContent(addons, tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Addons';
+    h3.innerHTML = '<i class="fas fa-puzzle-piece"></i> Addons';
     tabContent.appendChild(h3);
     // todo: don't hardcode the addon descriptions
     var addon_descriptions = [
         {
-          name: 'get_current_weather',
-          description: 'Get the current weather in a location'
+            name: 'get_current_weather',
+            description: 'Get the current weather in a location'
         },
         {
-          name: 'get_search_results',
-          description: 'Get 5 search results from google or youtube'
+            name: 'get_search_results',
+            description: 'Get 5 search results from google or youtube'
         },
         {
             name: 'run_python_code',
@@ -133,8 +152,7 @@ function createAddonsTabContent(addons, tabId) {
             name: 'google_search',
             description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
         }
-        
-      ];
+    ];
 
     for (let addon in addons) {
         if (addons.hasOwnProperty(addon)) {
@@ -156,13 +174,13 @@ function createAddonsTabContent(addons, tabId) {
     return tabContent;
 }
 
-function createDataTabContent(audio, tabId) {
+function createAudioTabContent(audio, tabId) {
     var tabContent = document.createElement('div');
     tabContent.id = tabId;
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Audio';
+    h3.innerHTML = '<i class="fas fa-volume-up"></i> Audio';
     tabContent.appendChild(h3);
 
     for (let audioItem in audio) {
@@ -191,7 +209,7 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     // Populate language settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Language';
+    h3.innerHTML = '<i class="fas fa-language"></i> Language';
     tabContent.appendChild(h3);
 
     var languageItem = document.createElement('select');
@@ -209,7 +227,7 @@ function createGeneralSettingsTabContent(settings, tabId) {
 
     // Populate Display Name settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Display Name';
+    h3.innerHTML = '<i class="fas fa-user"></i> Display Name';
     tabContent.appendChild(h3);
 
     var displayNameItem = document.createElement('textarea');
@@ -221,9 +239,100 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(displayNameItem);
 
-    // Populate System Prompt settings
+    // Populate timezone settings
     h3 = document.createElement('h3');
-    h3.textContent = 'System Prompt';
+    h3.innerHTML = '<i class="fas fa-globe"></i> Timezone';
+    tabContent.appendChild(h3);
+
+    var timezoneItem = document.createElement('select');
+    timezoneItem.id = 'timezone';
+    timezoneItem.name = 'timezone';
+    var timezones = [
+        'Auto',
+        'UTC-12',
+        'UTC-11',
+        'UTC-10',
+        'UTC-9',
+        'UTC-8',
+        'UTC-7',
+        'UTC-6',
+        'UTC-5',
+        'UTC-4',
+        'UTC-3',
+        'UTC-2',
+        'UTC-1',
+        'UTC',
+        'UTC+1',
+        'UTC+2',
+        'UTC+3',
+        'UTC+4',
+        'UTC+5',
+        'UTC+6',
+        'UTC+7',
+        'UTC+8',
+        'UTC+9',
+        'UTC+10',
+        'UTC+11',
+        'UTC+12',
+    ];
+    timezones.forEach(function (timezone) {
+        var option = document.createElement('option');
+        option.value = timezone;
+        option.text = timezone;
+        timezoneItem.appendChild(option);
+    });
+
+    // Detect user's timezone if settings.timezone.timezone is set to "auto"
+    if (settings.timezone && settings.timezone.timezone === 'auto') {
+        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        var utcOffset = new Date().getTimezoneOffset() / -60;
+        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+        timezoneItem.value = utcOffsetString;
+    } else {
+        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
+    }
+
+    timezoneItem.onchange = function (e) {
+        if (e.target.value === 'Auto') {
+            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            var utcOffset = new Date().getTimezoneOffset() / -60;
+            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
+            edit_status('timezone', 'timezone', utcOffsetString);
+        } else {
+            edit_status('timezone', 'timezone', e.target.value);
+        }
+    }
+    tabContent.appendChild(timezoneItem);
+
+    // add slider for chat Spacing
+    h3 = document.createElement('h3');
+    h3.innerHTML = '<i class="fas fa-arrows-alt-h"></i> Chat Spacing';
+    tabContent.appendChild(h3);
+
+    var chatPaddingItem = document.createElement('input');
+    chatPaddingItem.type = 'range';
+    chatPaddingItem.min = 5;
+    chatPaddingItem.max = 25;
+    chatPaddingItem.step = 1;
+    // get the current chat padding from local storage
+    var chatPadding = localStorage.getItem('chatPadding') || 10;
+    chatPaddingItem.value = chatPadding;
+    chatPaddingItem.oninput = function (e) {
+        set_chat_padding(e.target.value);
+    }
+    tabContent.appendChild(chatPaddingItem);
+
+    return tabContent;
+}
+
+function createChatSettingsTabContent(settings, tabId) {
+    var tabContent = document.createElement('div');
+    tabContent.id = tabId;
+    tabContent.className = 'tab-content';
+
+    // Populate System Prompt settings
+    var h3 = document.createElement('h3');
+    h3.innerHTML = '<i class="fas fa-cogs"></i> System Prompt';
     tabContent.appendChild(h3);
 
     var systemPromptContainer = document.createElement('div');
@@ -309,10 +418,9 @@ function createGeneralSettingsTabContent(settings, tabId) {
         }
     };
 
-
     // Other settings
     h3 = document.createElement('h3');
-    h3.textContent = 'Other settings';
+    h3.innerHTML = '<i class="fas fa-sliders-h"></i> Other settings';
     tabContent.appendChild(h3);
 
     // Populate verbose settings
@@ -326,82 +434,155 @@ function createGeneralSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
-    // Populate timezone settings
-    h3 = document.createElement('h3');
-    h3.textContent = 'Timezone';
-    tabContent.appendChild(h3);
+     // Populate chat model choice settings
+     h3 = document.createElement('h3');
+     h3.innerHTML = '<i class="fas fa-robot"></i> Chat Model';
+     tabContent.appendChild(h3);
+     var chatModelItem = document.createElement('select');
+     chatModelItem.id = 'chatModel';
+     chatModelItem.name = 'chatModel';
+     
+     Object.keys(modelMaxTokens).forEach(function (chatModel) {
+         var option = document.createElement('option');
+         option.value = chatModel;
+         option.text = `${chatModel} (Max ${modelMaxTokens[chatModel]} tokens)`;
+         chatModelItem.appendChild(option);
+     });
+     
+     chatModelItem.value = settings.active_model.active_model;
+     chatModelItem.onchange = function (e) {
+         updateModelAndTokens(e.target.value);
+     }
+ 
+     tabContent.appendChild(chatModelItem);
+ 
+     return tabContent;
+ }
+ 
+ function updateModelAndTokens(newModel) {
+    const newModelMaxTokens = modelMaxTokens[newModel];
+    const currentSettings = settings.memory;
+    const currentOutput = currentSettings.output;
 
-    var timezoneItem = document.createElement('select');
-    timezoneItem.id = 'timezone';
-    timezoneItem.name = 'timezone';
-    var timezones = [
-        'Auto',
-        'UTC-12',
-        'UTC-11',
-        'UTC-10',
-        'UTC-9',
-        'UTC-8',
-        'UTC-7',
-        'UTC-6',
-        'UTC-5',
-        'UTC-4',
-        'UTC-3',
-        'UTC-2',
-        'UTC-1',
-        'UTC',
-        'UTC+1',
-        'UTC+2',
-        'UTC+3',
-        'UTC+4',
-        'UTC+5',
-        'UTC+6',
-        'UTC+7',
-        'UTC+8',
-        'UTC+9',
-        'UTC+10',
-        'UTC+11',
-        'UTC+12',
-    ];
-    timezones.forEach(function (timezone) {
-        var option = document.createElement('option');
-        option.value = timezone;
-        option.text = timezone;
-        timezoneItem.appendChild(option);
-    });
+    // Set the new output to the minimum of the new model's max tokens and the current max_tokens
+    const newOutput = Math.min(newModelMaxTokens, currentSettings.max_tokens);
 
-    // Detect user's timezone if settings.timezone.timezone is set to "auto"
-    if (settings.timezone && settings.timezone.timezone === 'auto') {
-        var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        var utcOffset = new Date().getTimezoneOffset() / -60;
-        var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
-        timezoneItem.value = utcOffsetString;
-    } else {
-        timezoneItem.value = settings.timezone ? settings.timezone.timezone : 'UTC';
+    // Calculate the scaling factor for non-output tokens
+    const nonOutputTokens = currentSettings.max_tokens - currentOutput;
+    const remainingTokens = currentSettings.max_tokens - newOutput;
+    const scalingFactor = remainingTokens / nonOutputTokens;
+
+    // Calculate new values while maintaining proportions for non-output tokens
+    let newSettings = {
+        functions: Math.round(currentSettings.functions * scalingFactor),
+        ltm1: Math.round(currentSettings.ltm1 * scalingFactor),
+        ltm2: Math.round(currentSettings.ltm2 * scalingFactor),
+        episodic: Math.round(currentSettings.episodic * scalingFactor),
+        recent: Math.round(currentSettings.recent * scalingFactor),
+        notes: Math.round(currentSettings.notes * scalingFactor),
+        input: Math.round(currentSettings.input * scalingFactor),
+        output: newOutput,
+        max_tokens: currentSettings.max_tokens, // Keep the original max_tokens
+        min_tokens: currentSettings.min_tokens
+    };
+
+    // Ensure the sum of all values (except max_tokens and min_tokens) equals the original max_tokens
+    let totalTokens = Object.values(newSettings).reduce((sum, value) => sum + value, 0) - newSettings.max_tokens - newSettings.min_tokens;
+    
+    if (totalTokens !== currentSettings.max_tokens) {
+        const difference = currentSettings.max_tokens - totalTokens;
+        newSettings.input += difference; // Adjust the input to make up the difference
     }
 
-    timezoneItem.onchange = function (e) {
-        if (e.target.value === 'Auto') {
-            var userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            var utcOffset = new Date().getTimezoneOffset() / -60;
-            var utcOffsetString = 'UTC' + (utcOffset >= 0 ? '+' : '') + utcOffset;
-            edit_status('timezone', 'timezone', utcOffsetString);
-        } else {
-            edit_status('timezone', 'timezone', e.target.value);
+    // Ensure no value is negative
+    for (let key in newSettings) {
+        if (key !== 'max_tokens' && key !== 'min_tokens') {
+            newSettings[key] = Math.max(0, newSettings[key]);
         }
     }
-    tabContent.appendChild(timezoneItem);
-    // Populate chain of thought settings (disabled for now)
-    // var cotItem = document.createElement('a');
-    // cotItem.href = "#";
-    // var status = settings.cot_enabled.cot_enabled ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-    // cotItem.innerHTML = 'Chain of thought (experimental): ' + status;
-    // cotItem.onclick = function (e) {
-    //     e.preventDefault();
-    //     edit_status('cot_enabled', 'cot_enabled', !settings.cot_enabled.cot_enabled);
-    // }
-    // tabContent.appendChild(cotItem);
 
-    return tabContent;
+    // Update the settings
+    settings.memory = newSettings;
+
+    // Update the slider
+    updateMemorySlider(newSettings);
+
+    // Save the new configuration
+    saveMemoryConfiguration(newSettings);
+
+    // Update the model in settings
+    edit_status('active_model', 'active_model', newModel);
+
+    // Show notification
+    showNotification(`Model changed to ${newModel}. Memory configuration adjusted accordingly.`, 'info');
+}
+
+function updateMemorySlider(memorySettings) {
+    const slider = document.getElementById('slider');
+    if (slider && slider.noUiSlider) {
+        const maxTokens = memorySettings.max_tokens;
+        const values = [
+            memorySettings.functions / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1) / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1 + memorySettings.ltm2) / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1 + memorySettings.ltm2 + memorySettings.episodic) / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1 + memorySettings.ltm2 + memorySettings.episodic + memorySettings.recent) / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1 + memorySettings.ltm2 + memorySettings.episodic + memorySettings.recent + memorySettings.notes) / maxTokens,
+            (memorySettings.functions + memorySettings.ltm1 + memorySettings.ltm2 + memorySettings.episodic + memorySettings.recent + memorySettings.notes + memorySettings.input) / maxTokens,
+            1
+        ];
+        
+        // Set the slider values without triggering the 'update' event
+        slider.noUiSlider.set(values, false);
+    }
+
+    // Update the displayed values
+    updateDisplayedValuesM(memorySettings);
+}
+
+function updateDisplayedValuesM(memorySettings) {
+    var maxTokens = memorySettings.max_tokens;
+    var categories = ['Functions', 'LTM 1', 'LTM 2', 'Episodic Memory', 'Recent Messages', 'Notes', 'Input', 'Output'];
+    var values = [
+        memorySettings.functions,
+        memorySettings.ltm1,
+        memorySettings.ltm2,
+        memorySettings.episodic,
+        memorySettings.recent,
+        memorySettings.notes,
+        memorySettings.input,
+        memorySettings.output
+    ];
+
+    categories.forEach((cat, index) => {
+        var spanId = `value-${cat.toLowerCase().replace(' ', '')}`;
+        var span = document.getElementById(spanId);
+        if (span) {
+            var percentage = (values[index] / maxTokens) * 100;
+            span.textContent = `${percentage.toFixed(2)}% (${values[index]})`;
+        }
+    });
+}
+
+function saveMemoryConfiguration(memorySettings) {
+    fetch(API_URL + '/update_settings/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            category: 'memory',
+            setting: memorySettings,
+            username: user_name
+        }),
+        credentials: 'include'
+    })
+    .then(response => response.json())
+    .then(data => {
+        setSettings(data);
+        updateDisplayedValuesM(data.memory);
+    })
+    .catch(console.error);
 }
 
 function createUserDataTabContent(tabId) {
@@ -410,17 +591,17 @@ function createUserDataTabContent(tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'User Data';
+    h3.innerHTML = '<i class="fas fa-user-cog"></i> User Data';
     tabContent.appendChild(h3);
 
     var saveDataBtn = document.createElement('button');
     saveDataBtn.id = 'saveDataBtn';
-    saveDataBtn.textContent = 'Save Data';
+    saveDataBtn.innerHTML = '<i class="fas fa-save"></i> Save Data';
     tabContent.appendChild(saveDataBtn);
 
     var deleteDataBtn = document.createElement('button');
     deleteDataBtn.id = 'deleteDataBtn';
-    deleteDataBtn.textContent = 'Delete Data';
+    deleteDataBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Data';
     tabContent.appendChild(deleteDataBtn);
 
     var uploadDataInput = document.createElement('input');
@@ -430,10 +611,9 @@ function createUserDataTabContent(tabId) {
 
     var uploadDataBtn = document.createElement('button');
     uploadDataBtn.id = 'uploadDataBtn';
-    uploadDataBtn.textContent = 'Upload Data';
+    uploadDataBtn.innerHTML = '<i class="fas fa-upload"></i> Upload Data';
     tabContent.appendChild(uploadDataBtn);
 
-    
     saveDataBtn.addEventListener('click', save_user_data);
     deleteDataBtn.addEventListener('click', delete_user_data);
     uploadDataBtn.addEventListener('click', function () {
@@ -452,7 +632,7 @@ function createMemoryTabContent(tabId) {
     tabContent.className = 'tab-content';
 
     var h3 = document.createElement('h3');
-    h3.textContent = 'Memory Configuration';
+    h3.innerHTML = '<i class="fas fa-memory"></i> Memory Configuration';
     tabContent.appendChild(h3);
 
     var maxTokensLabel = document.createElement('label');
@@ -496,33 +676,38 @@ function createMemoryTabContent(tabId) {
     tabContent.appendChild(container);
 
     var resetButton = document.createElement('button');
-    resetButton.textContent = 'Reset to Default';
+    resetButton.innerHTML = '<i class="fas fa-undo"></i> Reset to Default';
     resetButton.onclick = function () {
-        var defaultValues = [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0];
+        var maxTokens = parseInt("128000");
+        maxTokensDropdown.value = maxTokens;
+        var defaultValues = [0.050, 0.070, 0.090, 0.110, 0.130, 0.150, 0.970, 1.000];
         slider.noUiSlider.set(defaultValues);
     };
     tabContent.appendChild(resetButton);
 
     var saveButton = document.createElement('button');
-    saveButton.textContent = 'Save Memory Configuration';
-    saveButton.onclick = saveMemoryConfiguration;
+    saveButton.innerHTML = '<i class="fas fa-save"></i> Save Memory Configuration';
+    saveButton.onclick = saveMemoryConfigurationSlider;
     tabContent.appendChild(saveButton);
 
     noUiSlider.create(slider, {
-        start: [0.05, 0.15, 0.30, 0.35, 0.45, 0.60, 0.75, 1.0],
+        start: [0.050, 0.070, 0.090, 0.110, 0.130, 0.150, 0.970, 1.000],
         connect: true,
         range: {
-            'min': 0,
-            'max': 1
+            'min': 0.000,
+            'max': 1.000
         },
-        step: 0.01,
+        format: {
+            to: (v) => parseFloat(v).toFixed(4),
+            from: (v) => parseFloat(v).toFixed(4)
+        }
     });
 
-    var updateDisplayedValues = function() {
+    var updateDisplayedValues = function () {
         var maxTokens = parseInt(maxTokensDropdown.value);
         var values = slider.noUiSlider.get();
         var values = values.map(Number);
-        categoryValues = values.map(function(value, index, array) {
+        categoryValues = values.map(function (value, index, array) {
             return index === 0 ? value * 100 : (value - array[index - 1]) * 100;
         });
         var percentages = categoryValues.map(value => value / 100);
@@ -532,7 +717,7 @@ function createMemoryTabContent(tabId) {
             var spanId = `value-${cat.toLowerCase().replace(' ', '')}`;
             var span = document.getElementById(spanId);
             if (span) {
-                span.textContent = `${(percentages[index] * 100).toFixed(2)}% (${tokenValues[index]})`;
+                span.textContent = `${(percentages[index] * 100).toFixed(3)}% (${tokenValues[index]})`;
             }
         });
     };
@@ -545,7 +730,7 @@ function createMemoryTabContent(tabId) {
     return tabContent;
 }
 
-function saveMemoryConfiguration() {
+function saveMemoryConfigurationSlider() {
     const overlay = document.getElementById('overlay_msg');
     const overlayMessage = document.getElementById('overlay-message');
     overlayMessage.textContent = "Updating Settings...";
@@ -635,6 +820,13 @@ function setSettings(newSettings) {
         display_name = newSettings.display_name;
         document.getElementById('username').innerHTML = 'Display Name: <a href="/profile" target="_blank">' + display_name + '</a>';
         settings = newSettings;
+
+        // Update the memory settings
+        if (newSettings.memory) {
+            settings.memory = newSettings.memory;
+            updateMemorySlider(newSettings.memory);
+        }
+
         populateSettingsMenu(settings);
         handleAudioSettings(newSettings);
 
@@ -771,7 +963,7 @@ function removePlayButtonsAndAudioFromMessages() {
 }
 
 
-function showErrorMessage(message, instant) {
+function showMessage(message, type, instant) {
     var timestamp = new Date().toLocaleTimeString();
     var content = message;
     var tempchild = document.getElementById('messages').lastChild;
@@ -791,7 +983,7 @@ function showErrorMessage(message, instant) {
     var chatMessage = document.createElement('div');
     if (instant) {
         chatMessage.innerHTML = `
-            <div class="message warning">
+            <div class="message ${type}">
                 <span class="timestamp">${timestamp}</span>
                 <div class="bubble">
                     ${message}
@@ -799,21 +991,32 @@ function showErrorMessage(message, instant) {
             </div>
         `;
     } else {
-        chatMessage.innerHTML = `
-            <div class="message error">
-                <span class="timestamp">${timestamp}</span>
-                <div class="bubble">
-                    <div class="expandable" onclick="this.classList.toggle('expanded')">
-                        <div class="title">Error:<div class="arrow"></div></div>
+        if (type === 'error') {
+            chatMessage.innerHTML = `
+                <div class="message error">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
+                        <div class="expandable" onclick="this.classList.toggle('expanded')">
+                            <div class="title">Error:<div class="arrow"></div></div>
+                            ${message}
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            chatMessage.innerHTML = `
+                <div class="message ${type}">
+                    <span class="timestamp">${timestamp}</span>
+                    <div class="bubble">
                         ${message}
                     </div>
                 </div>
-            </div>
-        `;
+            `;
+        }
     }
     document.getElementById('messages').appendChild(chatMessage);
 
-    // enable the send  and record button again
+    // enable the send and record button again
     canSend = true;
     canRecord = true;
     isWaiting = false;
@@ -821,8 +1024,9 @@ function showErrorMessage(message, instant) {
     canSendMessage();
     document.getElementById('message').placeholder = 'Type a message...';
     // Auto-scroll to the bottom of the chat
-    document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+    setTimeout(() => scrollToBottom(), 10);
 };
+
 
 function try_reconnect(socket, username) {
     // try to reconnect to the socket
@@ -843,16 +1047,12 @@ function handleDebugMessage(msg) {
     let debugContentElementId = `debugContent${debugNumber}`;
     let objDiv = document.getElementById(debugContentElementId);
 
-    let isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-
     let debugMessage = document.createElement('p');
     debugMessage.style.color = color;
     debugMessage.innerHTML = message;
     objDiv.appendChild(debugMessage);
 
-    if (isNearBottom) {
-        objDiv.scrollTop = objDiv.scrollHeight;
-    }
+    setTimeout(() => scrollToBottom(), 10);
 }
 
 function handleUsage(msg) {
@@ -869,10 +1069,6 @@ function handleDailyUsage(msg) {
     dailyLimit.innerHTML = '';
     dailyLimit.innerHTML += '<p>Daily limit: $' + msg.daily_usage.daily_cost.toFixed(5) + '/$' + daily_limit + '</p>';
 
-}
-
-function handleAuthMessage(msg) {
-    console.log('2 auth message received:', msg);
 }
 
 function handlePlanMessage(msg) {
@@ -911,14 +1107,7 @@ function handlePlanMessage(msg) {
     var botMessageElement = document.createElement('div');
     botMessageElement.innerHTML = botMessage;
     document.getElementById('messages').appendChild(botMessageElement);
-
-    var messagesContainer = document.getElementById('messages');
-    if (isUserAtBottom(messagesContainer)) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        hideNewMessageIndicator();
-    } else {
-        showNewMessageIndicator();
-    }
+    setTimeout(() => scrollToBottom(), 10);
     content = '';
     tempReceived = '';
     tempFormatted = '';
@@ -933,12 +1122,12 @@ function handleFunctionCall(msg) {
             // Ensure arguments are stringified if it's an object
             var argsStr = typeof msg.message.arguments === 'string' ? msg.message.arguments : JSON.stringify(msg.message.arguments);
             var args = parseComplexJson(argsStr);
-    
+
             var callDetails = {
                 "Function": addon,
                 "Arguments": args
             };
-    
+
             updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
         } catch (error) {
             console.error('Error parsing JSON:', error);
@@ -1011,7 +1200,7 @@ function handleTabDescription(msg) {
     var dots = document.createElement('div');
     dots.className = 'chat-tab-dots';
     dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-    dots.onclick = function(event) {
+    dots.onclick = function (event) {
         event.stopPropagation();
         showDropdown(this, tabId);
     };
@@ -1051,10 +1240,16 @@ async function handleCancelMessage(msg) {
     resetState();
 }
 
-function addBottomButtons(div) {
+function addBottomButtons(div, model) {
     var buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'bottom-buttons-container';
-
+    // check if the settings exist
+    if (!settings) {
+        return;
+    }
+    if (showDebug === true) {
+        console.log(settings);
+    }
     // Check the settings to see if we need to add the audio play button
     if (settings.audio.voice_output) {
         var playButtonWrapper = document.createElement('div');
@@ -1065,7 +1260,7 @@ function addBottomButtons(div) {
         var playButton = document.createElement('i');
         playButton.className = 'fas fa-play play-button';
         playButton.title = 'Play';
-        playButton.onclick = function() {
+        playButton.onclick = function () {
             playButtonHandler(playButton);
         };
 
@@ -1083,12 +1278,37 @@ function addBottomButtons(div) {
     var copyButton = document.createElement('i');
     copyButton.className = 'fas fa-copy copy-button';
     copyButton.title = 'Copy';
-    copyButton.onclick = function() {
+    copyButton.onclick = function () {
         copyToClipboard(div);
     };
 
     copyButtonLink.appendChild(copyButton);
     copyButtonWrapper.appendChild(copyButtonLink);
+
+    // Create a model indicator button
+    var modelButtonWrapper = document.createElement('div');
+    modelButtonWrapper.className = 'model-button-wrapper';
+    var modelButtonLink = document.createElement('a');
+    modelButtonLink.href = '#';
+    var modelTooltip = model ? model : 'Unknown Model';
+    modelButtonLink.setAttribute('data-tooltip', modelTooltip);
+    var modelButton = document.createElement('i');
+    
+    if (model) {
+        // Set icon based on the model
+        if (model.toLowerCase().includes('gpt')) {
+            modelButton.className = 'fas fa-robot model-button';
+        } else if (model.toLowerCase().includes('claude')) {
+            modelButton.className = 'fas fa-brain model-button';
+        } else {
+            modelButton.className = 'fas fa-microchip model-button';
+        }
+    } else {
+        modelButton.className = 'fas fa-question model-button';
+    }
+
+    modelButtonLink.appendChild(modelButton);
+    modelButtonWrapper.appendChild(modelButtonLink);
 
     // // Create a regenerate button with the same structure and styling as the play button
     // var regenerateButtonWrapper = document.createElement('div');
@@ -1108,6 +1328,7 @@ function addBottomButtons(div) {
 
     // Append the button wrappers to the container
     buttonsContainer.appendChild(copyButtonWrapper);
+    buttonsContainer.appendChild(modelButtonWrapper);
     // buttonsContainer.appendChild(regenerateButtonWrapper);
 
     // Append the buttons container to the div
@@ -1116,6 +1337,7 @@ function addBottomButtons(div) {
 
 async function handleStopMessage(msg) {
     var target_chat_id = msg.chat_id;
+    resetDebugBubble();
     // check if the current active tab is the same as the target chat id
     var chatTabs = document.getElementById('chat-tabs-container');
     var activeTab = chatTabs.querySelector('.active');
@@ -1132,6 +1354,9 @@ async function handleStopMessage(msg) {
 
         // Appending the new chunk to the existing content of the last message
         lastMessage.innerHTML = parseAndFormatMessage(tempFullChunk);
+        
+        // Apply highlighting to the entire message
+        applyHighlighting(lastMessage);
     }
 
     // Function to remove the typing indicator
@@ -1142,98 +1367,193 @@ async function handleStopMessage(msg) {
         }
     }
 
+    function applyHighlighting(element) {
+        element.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+            // Force a re-highlight after a short delay
+            setTimeout(() => hljs.highlightElement(block), 100);
+        });
+    }
+
     // add bottom buttons to the last message
     var lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
-        addBottomButtons(lastMessage);
+        addBottomButtons(lastMessage, msg.model);
     }
-    // if (settings.audio.voice_output) {
-    //     var playButtonCode = '<div class="play-button-wrapper"><a href="#" data-tooltip="Play Audio"><i class="fas fa-play play-button"></i></a></div>';
-    //     var lastMessage = document.querySelector('.last-message .bubble');
-    //     if (lastMessage) {
-    //         lastMessage.innerHTML += playButtonCode;
-    //     }
-    //     var playButtons = document.querySelectorAll('.play-button');
-    //     var playButton = playButtons[playButtons.length - 1];
-    //     playButton.addEventListener('click', async function () {
-    //         this.classList.remove('fa-play');
-    //         this.classList.add('fa-spinner');
-    //         var audioSrc = await request_audio(this);
-    //         var audioElement = document.createElement('audio');
-    //         audioElement.controls = true;
-    //         audioElement.innerHTML = `<source src="${audioSrc}" type="audio/mp3">Your browser does not support the audio element.`;
-            
-    //         var anchorTag = this.closest('.bubble').querySelector('a[data-tooltip="Play Audio"]');
-    //         this.closest('.bubble').appendChild(audioElement);
-    //         if (anchorTag) {
-    //             anchorTag.remove();
-    //         }
-    //     });
-    //     applyTooltips('[data-tooltip]');
-    // }
-    
+
     tempFullChunk = '';
     applyTooltips('[data-tooltip]');
     resetState();
+    setTimeout(() => scrollToBottom(), 50);
 }
 
+let codeBlockOpen = false;
+let executeCodeOpen = false;
+let currentLanguage = '';
+
 function handleChunkMessage(msg) {
-    // check if the last message is a chunk message or a debug message
-    var target_chat_id = msg.chat_id;
-    // check if the current active tab is the same as the target chat id
-    var chatTabs = document.getElementById('chat-tabs-container');
-    var activeTab = chatTabs.querySelector('.active');
-    var current_chat_id = activeTab.id.replace('chat-tab-', '');
-    if (current_chat_id != target_chat_id) {
-        // if not, do nothing
+    const target_chat_id = msg.chat_id;
+    const chatTabs = document.getElementById('chat-tabs-container');
+    const activeTab = chatTabs.querySelector('.active');
+    const current_chat_id = activeTab.id.replace('chat-tab-', '');
+
+    if (current_chat_id !== target_chat_id) {
         return;
     }
 
-    var timestamp = new Date().toLocaleTimeString();
-    var chunkContent = msg.chunk_message;
+    const timestamp = new Date().toLocaleTimeString();
+    const chunkContent = msg.chunk_message;
     tempFullChunk += chunkContent;
 
-    // remove the spinner from the last message
-    var tempchild = document.getElementById('messages').lastChild;
+    const tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
-        var spinner = tempchild.querySelector('.spinner');
-        if (spinner != null) {
+        const spinner = tempchild.querySelector('.spinner');
+        if (spinner) {
             spinner.remove();
-            document.getElementById('messages').lastChild.remove();
+            tempchild.remove();
         }
     }
 
-    var lastMessage = document.querySelector('.last-message .bubble');
+    const lastMessage = document.querySelector('.last-message .bubble');
     if (lastMessage) {
-        // Appending the new chunk to the existing content of the last message
-        var tempcontent = tempFullChunk;
-        lastMessage.innerHTML = parseAndFormatMessage(tempcontent, true);
-
+        lastMessage.innerHTML = parseAndFormatStreamingMessage(tempFullChunk);
+        highlightCodeBlocks(lastMessage);
     } else {
-        // If there is no last message, create a new message element for the chunk
-        var chatMessage = `
-            <div class="message bot last-message">
-                <span class="timestamp">${timestamp}</span>
-                <div class="bubble">${chunkContent + createTypingIndicator()}</div>
-            </div>
-        `;
+        const chatMessage = createNewChatMessage(timestamp, parseAndFormatStreamingMessage(chunkContent));
+        document.getElementById('messages').appendChild(chatMessage);
+        highlightCodeBlocks(chatMessage);
+    }
 
-        var chatMessageElement = document.createElement('div');
-        chatMessageElement.innerHTML = chatMessage;
-        document.getElementById('messages').appendChild(chatMessageElement);
-    }
-    //resetState();
-    function createTypingIndicator() {
-        return '<div class="typing-indicator"><div class="dot"></div></div>';
-    }
-    // Auto-scroll to the bottom of the chat
-    var messagesContainer = document.getElementById('messages');
-    if (isUserAtBottom(messagesContainer)) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        hideNewMessageIndicator();
+    setTimeout(() => scrollToBottom(), 10);
+}
+
+function parseAndFormatStreamingMessage(content) {
+    let formattedContent = content;
+
+    // Handle <execute_code> tags
+    formattedContent = formattedContent.replace(/<execute_code>/g, (match) => {
+        executeCodeOpen = true;
+        currentLanguage = 'python';
+        return '<pre><code class="language-python">';
+    });
+
+    formattedContent = formattedContent.replace(/<\/execute_code>/g, (match) => {
+        executeCodeOpen = false;
+        currentLanguage = '';
+        return '</code></pre>';
+    });
+
+    // Handle regular code blocks
+    formattedContent = formattedContent.replace(/```(\w+)?/g, (match, language) => {
+        if (codeBlockOpen) {
+            codeBlockOpen = false;
+            currentLanguage = '';
+            return '</code></pre>';
+        } else {
+            codeBlockOpen = true;
+            currentLanguage = language || '';
+            const languageClass = language ? `language-${language}` : '';
+            return `<pre><code class="${languageClass}">`;
+        }
+    });
+
+    // Handle inline code
+    formattedContent = formattedContent.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Apply Markdown formatting
+    formattedContent = marked(formattedContent);
+
+    // Add typing indicator if we're in the middle of a code block
+    if (codeBlockOpen || executeCodeOpen) {
+        formattedContent += '<span class="typing-code-indicator">...</span>';
     } else {
-        showNewMessageIndicator();
+        formattedContent += createTypingIndicator();
     }
+
+    return formattedContent;
+}
+
+function highlightCodeBlocks(element) {
+    element.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+        // Force a re-highlight after a short delay
+        setTimeout(() => hljs.highlightElement(block), 100);
+    });
+}
+
+function createNewChatMessage(timestamp, content) {
+    const chatMessageElement = document.createElement('div');
+    chatMessageElement.innerHTML = `
+        <div class="message bot last-message">
+            <span class="timestamp">${timestamp}</span>
+            <div class="bubble">${content}</div>
+        </div>
+    `;
+    return chatMessageElement;
+}
+
+function createTypingIndicator() {
+    return '<div class="typing-indicator"><div class="dot"></div></div>';
+}
+
+function parseAndFormatMessage(content, isStreaming = false) {
+    let formattedContent = content;
+
+    // Handle <execute_code> tags
+    formattedContent = formattedContent.replace(/<execute_code>([\s\S]*?)<\/execute_code>/g, (match, code) => {
+        return '```python\n' + code.trim() + '\n```';
+    });
+
+    // Extract code blocks and replace with placeholders
+    let codeBlocks = [];
+    formattedContent = formattedContent.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+        let id = codeBlocks.length;
+        codeBlocks.push({ language, code });
+        return `\n<CODE_BLOCK_${id}>\n`;
+    });
+
+    // Apply Markdown formatting
+    formattedContent = marked(formattedContent);
+
+    // Restore code blocks with syntax highlighting
+    formattedContent = formattedContent.replace(/<CODE_BLOCK_(\d+)>/g, (match, id) => {
+        let { language, code } = codeBlocks[id];
+        const languageClass = language ? `language-${language}` : '';
+        return `<div class="language">${language || 'code'}</div>
+                <button class="copy-btn" onclick="copyCodeToClipboard(this)">Copy</button>
+                <pre><code class="${languageClass}">${escape_Html(code.trim())}</code></pre>`;
+    });
+    // apply syntax highlighting to the code blocks
+    formattedContent = applyHighlighting(formattedContent);
+
+    // Handle inline code
+    formattedContent = formattedContent.replace(/<code>([^<]+)<\/code>/g, (match, code) => {
+        return `<code>${escape_Html(code)}</code>`;
+    });
+
+    if (isStreaming) {
+        formattedContent += createTypingIndicator();
+    }
+
+    return formattedContent;
+}
+
+function applyHighlighting(content) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    tempDiv.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+    });
+    return tempDiv.innerHTML;
+}
+
+function escape_Html(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
 
@@ -1273,8 +1593,7 @@ function handleRateLimit(msg) {
     const myToast = new bootstrap.Toast(toastEl, { delay: 10000 });
     toastContainer.appendChild(toastEl);
     myToast.show();
-}  
-
+}
 function handleRelations(msg) {
     var tempchild = document.getElementById('messages').lastChild;
     if (tempchild && tempchild.querySelector) {
@@ -1301,65 +1620,123 @@ function handleNoteTaking(msg) {
     updateOrCreateDebugBubble("exploring notes...", timestamp, msg);
 }
 
+let lastDebugBubble = null;
+
 function updateOrCreateDebugBubble(message, timestamp, msg) {
     var messagesContainer = document.getElementById('messages');
-    var lastMessageWrapper = messagesContainer.lastElementChild;
-    var lastMessage = lastMessageWrapper ? lastMessageWrapper.firstElementChild : null;
-    var isLastDebug = lastMessage && lastMessage.classList.contains('debug');
+    var formattedMsgContent = formatDebugContent(msg);
 
-    var formattedMsgContent = '';
-    for (var key in msg) {
-        if (msg.hasOwnProperty(key)) {
-            // Selectively display keys
-            if (["input", "created_new_memory", "active_brain", "error", "Function", "Arguments", "Response"].includes(key)) {
-                formattedMsgContent += `<b>${key}:</b> `;
-
-                if (key === 'active_brain' && typeof msg[key] === 'object') {
-                    // Summarize the contents of active_brain
-                    formattedMsgContent += 'Query Categories: ' + Object.keys(msg[key]).length + '<br/>';
-                } else {
-                    // Format other keys normally
-                    formattedMsgContent += `${formatContent(msg[key])}<br/>`;
-                }
-            }
-        }
-    }
-    var expandableContent = `<div class="expandable-content" style="display: none;">${formattedMsgContent}</div>`;
-
-    if (isLastDebug) {
+    if (lastDebugBubble) {
         // Update existing debug bubble
-        let typewriterText = lastMessage.querySelector('.typewriter-text');
+        let typewriterText = lastDebugBubble.querySelector('.typewriter-text');
         if (typewriterText) {
             typewriterText.textContent = message;
-            typewriterText.classList.remove('typewriter-text'); // Remove class
-            void typewriterText.offsetWidth; // Trigger reflow
-            typewriterText.classList.add('typewriter-text'); // Add class back
         }
-        var expandableContentElement = lastMessageWrapper.querySelector('.expandable-content');
+        var expandableContentElement = lastDebugBubble.querySelector('.expandable-content');
         if (expandableContentElement) {
-            expandableContentElement.innerHTML += formattedMsgContent; // Append new data
-        } else {
-            lastMessageWrapper.innerHTML += expandableContent;
+            expandableContentElement.innerHTML += formattedMsgContent;
         }
-
     } else {
         // Create new debug bubble
-        let botMessage = `
+        let debugMessage = `
             <div class="message debug">
                 <span class="timestamp">${timestamp}</span>
                 <div class="bubble">
-                    <div class="typewriter-container">
-                        <div class="loading-icon"></div>
-                        <div class="typewriter-text">${message}</div>
+                    <div class="debug-header">
+                        <div class="typewriter-container">
+                            <div class="loading-icon"></div>
+                            <div class="typewriter-text">${escapeHtml(message)}</div>
+                        </div>
+                        <button class="toggle-expand" onclick="toggleDebugExpand(this)">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
                     </div>
+                    <div class="expandable-content">${formattedMsgContent}</div>
                 </div>
             </div>`;
-        let botMessageWrapper = document.createElement('div');
-        botMessageWrapper.innerHTML = botMessage + expandableContent;
-        messagesContainer.appendChild(botMessageWrapper);
+        let debugMessageWrapper = document.createElement('div');
+        debugMessageWrapper.innerHTML = debugMessage;
+        lastDebugBubble = debugMessageWrapper.firstElementChild;
+        messagesContainer.appendChild(lastDebugBubble);
+        setTimeout(() => scrollToBottom(), 10);
     }
 }
 
+function formatDebugContent(msg) {
+    let formattedContent = '<div class="debug-content">';
+    const categories = {
+        'Memory': ['input', 'created_new_memory', 'active_brain', 'results_list_before_token_check', 'results_list_after_token_check', 'result_string', 'token_count'],
+        'Notes': ['actions', 'content', 'message', 'timestamp', 'final_message', 'note_taking_query', 'files_content_string'],
+        'Function Call': ['Function', 'Arguments'],
+        'Function Response': ['Response']
+    };
+
+    for (let category in categories) {
+        let categoryContent = '';
+        for (let key of categories[category]) {
+            if (msg.hasOwnProperty(key)) {
+                if (showDebug === true) {
+                    console.log('key:', key, 'value:', msg[key]);
+                }
+                categoryContent += `
+                    <div class="debug-item">
+                        <span class="debug-key">${escapeHtml(key)}:</span>
+                        <span class="debug-value">${formatValue(msg[key])}</span>
+                    </div>`;
+            }
+        }
+        if (categoryContent) {
+            formattedContent += `
+                <div class="debug-category">
+                    <div class="debug-category-header" onclick="toggleCategory(this)">
+                        <i class="fas fa-chevron-right"></i> ${category}
+                    </div>
+                    <div class="debug-category-content" style="display: none;">
+                        ${categoryContent}
+                    </div>
+                </div>`;
+        }
+    }
+    formattedContent += '</div>';
+    return formattedContent;
+}
+
+function formatValue(value) {
+    if (typeof value === 'object') {
+        return `<pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+    } else {
+        return escapeHtml(value.toString());
+    }
+}
+
+function toggleDebugExpand(button) {
+    const bubble = button.closest('.bubble');
+    bubble.classList.toggle('expanded');
+    button.querySelector('i').classList.toggle('fa-chevron-down');
+    button.querySelector('i').classList.toggle('fa-chevron-up');
+}
+
+function toggleCategory(header) {
+    const content = header.nextElementSibling;
+    const icon = header.querySelector('i');
+    if (content.style.display === 'none') {
+        content.style.display = 'block';
+        icon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+    } else {
+        content.style.display = 'none';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+    }
+}
+
+function resetDebugBubble() {
+    if (lastDebugBubble) {
+        const loadingIcon = lastDebugBubble.querySelector('.loading-icon');
+        if (loadingIcon) {
+            loadingIcon.remove();
+        }
+    }
+    lastDebugBubble = null;
+}
 
 function formatContent(value) {
     if (typeof value === 'object') {
@@ -1371,28 +1748,38 @@ function formatContent(value) {
             let formattedObjContent = '';
             for (let key in value) {
                 if (value.hasOwnProperty(key)) {
-                    formattedObjContent += `<b>${key}:</b> ${formatContent(value[key])}<br/>`;
+                    formattedObjContent += `<b>${escapeHtml(key)}:</b> ${formatContent(value[key])}<br/>`;
                 }
             }
             return formattedObjContent;
         }
     } else {
         // Format non-object values (string, number, boolean)
-        return value.toString();
+        return escapeHtml(value.toString());
     }
 }
 
 function formatSubContent(subKey, subContent) {
-    var result = `<b>${subKey}:</b> `;
+    var result = `<b>${escapeHtml(subKey)}:</b> `;
     if (Array.isArray(subContent)) {
         result += subContent.map(item => formatContent(item)).join('<br/>');
     } else if (typeof subContent === 'object') {
-        result += JSON.stringify(subContent, null, 2).replace(/\n/g, '<br/>');
+        result += escapeHtml(JSON.stringify(subContent, null, 2)).replace(/\n/g, '<br/>');
     } else {
-        result += subContent;
+        result += escapeHtml(subContent);
     }
     return result + '<br/>';
 }
+
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 
 async function get_chat_tabs(username) {
     try {
@@ -1418,11 +1805,11 @@ async function get_chat_tabs(username) {
         }
 
         populateChatTabs(tabs_data);
-        
+
 
     } catch (error) {
         console.error('Failed to send message: ', error);
-        showErrorMessage('Failed to send message: ' + error);
+        showMessage('Failed to send message: ' + error, "error", false);
     }
 }
 
@@ -1450,14 +1837,14 @@ async function setChat(id) {
 // The purpose of this function is to conform to the standard UUID format (8-4-4-4-12), 
 // where the 13th character (represented by ‘y’) is always 8, 9, A, or B.
 const uuid = () => {
-	return `CLANGxxx-xxxx-xxxx-yxxx-${Date.now().toString(16)}`.replace(
-		/[xy]/g,
-		function(c) {
-			var r = (Math.random() * 16) | 0,
-				v = c == "x" ? r : (r & 0x3) | 0x8;
-			return v.toString(16);
-		}
-	);
+    return `CLANGxxx-xxxx-xxxx-yxxx-${Date.now().toString(16)}`.replace(
+        /[xy]/g,
+        function (c) {
+            var r = (Math.random() * 16) | 0,
+                v = c == "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+        }
+    );
 };
 
 function addChatTab(id) {
@@ -1475,7 +1862,7 @@ function addChatTab(id) {
     var dots = document.createElement('div');
     dots.className = 'chat-tab-dots';
     dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-    dots.onclick = function(event) {
+    dots.onclick = function (event) {
         event.stopPropagation();
         showDropdown(this, id);
     };
@@ -1484,7 +1871,7 @@ function addChatTab(id) {
     newTab.appendChild(dots);
 
     // Set the onclick function for the new tab
-    newTab.onclick = function() {
+    newTab.onclick = function () {
         setChat(id);
     };
 
@@ -1497,33 +1884,33 @@ function addChatTab(id) {
 
 function shareChat(chat_id) {
     var chatContent = document.getElementById('messages').innerHTML;
-    
+
     // Create the modal elements
     var backdrop = document.createElement('div');
     backdrop.className = 'modal-backdrop';
     var modalContent = document.createElement('div');
     modalContent.className = 'share-modal-content';
-    
+
     // Set the inner HTML of the modal content
     modalContent.innerHTML = `<h3>This function is a WIP, your shared conversation would look like this (only active tab is currently displayed):</h3>${chatContent}`;
-    
+
     // Append the modal content to the backdrop and then the backdrop to the modal container
     backdrop.appendChild(modalContent);
     document.getElementById('share-modal-container').appendChild(backdrop);
-    
+
     // Show the modal
     backdrop.style.display = 'block';
-    
+
     // Close the modal when clicking on the backdrop
-    backdrop.addEventListener('click', function(event) {
-      if (event.target === backdrop) {
-        backdrop.style.display = 'none';
-        backdrop.remove();
-      }
+    backdrop.addEventListener('click', function (event) {
+        if (event.target === backdrop) {
+            backdrop.style.display = 'none';
+            backdrop.remove();
+        }
     });
-  }
-  
-  
+}
+
+
 
 function editTabDescription(chat_id) {
     var tabButton = document.getElementById('chat-tab-' + chat_id);
@@ -1557,7 +1944,7 @@ function editTabDescription(chat_id) {
                 var dots = document.createElement('div');
                 dots.className = 'chat-tab-dots';
                 dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-                dots.onclick = function(event) {
+                dots.onclick = function (event) {
                     event.stopPropagation();
                     showDropdown(this, chat_id);
                 };
@@ -1577,7 +1964,7 @@ function deleteChatTab(chat_id) {
     }
 
     var newActiveTab = targetTab.nextElementSibling || targetTab.previousElementSibling;
-    
+
     // Remove the target tab
     chatTabs.removeChild(targetTab);
 
@@ -1595,7 +1982,6 @@ function deleteChatTab(chat_id) {
             // Select new active tab
             if (newActiveTab) {
                 var newActiveTabId = newActiveTab.id.replace('chat-tab-', '');
-                console.log('New active tab:', newActiveTabId);
                 setChat(newActiveTabId);
             } else {
                 addChatTab();
@@ -1626,155 +2012,195 @@ async function get_recent_messages(username, chat_id) {
         let currentMessage = '';
         let currentUser = '';
         let currentTimestamp = null;
+        let currentModel = '';
 
         data.forEach(message => {
             const uuid = message.metadata.uid;
             const text = message.document;
             const user = message.metadata.username;
             const timestamp = message.metadata.updated_at;
+            const message_model = message.metadata.model;
 
             // Check for UUID continuity
             if (uuid === currentUUID) {
                 currentMessage += '\n' + text;
             } else {
                 if (currentUUID !== null) {
-                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
+                    messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID, model: currentModel });
                 }
                 currentUUID = uuid;
                 currentMessage = text;
                 currentUser = user;
                 currentTimestamp = timestamp;
+                currentModel = message_model;
             }
         });
 
         // Add the last message if it exists
         if (currentUUID !== null) {
-            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID});
+            messages.push({ text: currentMessage, user: currentUser, timestamp: currentTimestamp, uuid: currentUUID, model: currentModel });
         }
 
         // Process and display the messages
         messages.forEach(message => {
-            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true, true, message.uuid);
+            addCustomMessage(message.text, message.user === 'user' ? 'user' : 'bot', false, true, message.timestamp, true, true, message.uuid, message.model);
         });
-
+        // call the tooltip function
+        applyTooltips('[data-tooltip]');
     } catch (error) {
         console.error('Failed to get messages: ', error);
-        showErrorMessage('Failed to get messages: ' + error);
+        showMessage('Failed to get messages: ' + error, "error", false);
     }
 }
-
 
 function get_settings(username) {
     var timestamp = new Date().toLocaleTimeString();
     prefix = production ? 'wss://' : 'ws://';
-    var socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
-
+    var socket;
     var reconnectInterval = null;
+    var pingInterval = null;
 
-    socket.onclose = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Disconnected';
-        connectionStatusElement.style.color = 'red';
-        // wait 2 seconds
-        setTimeout(function () {
-            // try to reconnect
-            try_reconnect(socket, username);
-        }, 2000);
-    };
+    function initializeSocket() {
+        socket = new WebSocket(prefix + document.domain + ':' + location.port + '/ws/' + username);
 
-    socket.onopen = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Connected';
-        connectionStatusElement.style.color = 'green';
-    };
-
-    socket.onerror = function () {
-        // Update the connection status in the widget
-        var connectionStatusElement = document.getElementById('connectionStatus');
-        connectionStatusElement.textContent = 'Error';
-        connectionStatusElement.style.color = 'orange';
-    };
-
-    socket.addEventListener('message', function (event) {
-        // TODO: proper parsing for all of the next messages
-        let msg = JSON.parse(event.data);
-
-        if (msg.debug) {
-            handleDebugMessage(msg);
-        }
-        else if (msg.functionresponse) {
-            handleFunctionResponse(msg);
-        }
-        else if (msg.type) {
-            if (msg.type == 'plan') {
-                handlePlanMessage(msg);
+        socket.onclose = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Disconnected';
+            connectionStatusElement.style.color = 'red';
+            // Attempt to reconnect every 2 seconds
+            if (!reconnectInterval) {
+                reconnectInterval = setInterval(function () {
+                    initializeSocket();
+                }, 2000);
             }
-            else if (msg.type == 'note_taking') {
-                handleNoteTaking(msg.content);
+            // Clear ping interval if the connection is closed
+            if (pingInterval) {
+                clearInterval(pingInterval);
+                pingInterval = null;
             }
-            else if (msg.type == 'relations') {
-                handleRelations(msg.content);
+        };
+
+        socket.onopen = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Connected';
+            connectionStatusElement.style.color = 'green';
+            // Clear the reconnection interval if it's running
+            if (reconnectInterval) {
+                clearInterval(reconnectInterval);
+                reconnectInterval = null;
             }
-            else if (msg.type == 'rate_limit') {
-                handleRateLimit(msg);
+            // Set a ping interval to keep the connection alive
+            if (!pingInterval) {
+                pingInterval = setInterval(function () {
+                    socket.send(JSON.stringify({ type: 'ping' }));
+                }, 5000);
             }
-        }
-        else if (msg.usage) {
-            handleUsage(msg);
-        }
-        else if (msg.daily_usage) {
-            handleDailyUsage(msg);
-        }
-        else if (msg.functioncall) {
-            handleFunctionCall(msg);
-        }
-        else if (msg.error) {
-            handleErrorMessage(msg);
-        }
-        else if (msg.chunk_message) {
-            handleChunkMessage(msg);
-        }
-        else if (msg.stop_message) {
-            handleStopMessage(msg);
-        }
-        else if (msg.cancel_message) {
-            console.log('cancel message received');
-            handleCancelMessage(msg);
-        }
-        else if (msg.tab_description) {
-            handleTabDescription(msg);
-        }
-        else if (msg.auth) {
-            console.log('1 auth message received: ', msg);
-            handleAuthMessage(msg);
-        }
+        };
+
+        socket.onerror = function () {
+            // Update the connection status in the widget
+            var connectionStatusElement = document.getElementById('connectionStatus');
+            connectionStatusElement.textContent = 'Error';
+            connectionStatusElement.style.color = 'orange';
+        };
+
+        socket.addEventListener('message', function (event) {
+            let msg;
+            try {
+                msg = JSON.parse(event.data);
+            } catch (e) {
+                console.error("Failed to parse message as JSON:", event.data);
+                return;
+            }
+
+            if (msg.type === 'pong') {
+                return;
+            }
+
+            if (msg.debug) {
+                handleDebugMessage(msg);
+            }
+            else if (msg.functionresponse) {
+                handleFunctionResponse(msg);
+            }
+            else if (msg.type) {
+                if (msg.type == 'plan') {
+                    handlePlanMessage(msg);
+                }
+                else if (msg.type == 'note_taking') {
+                    handleNoteTaking(msg.content);
+                }
+                else if (msg.type == 'relations') {
+                    handleRelations(msg.content);
+                }
+                else if (msg.type == 'rate_limit') {
+                    handleRateLimit(msg);
+                }
+                else if (msg.type == 'confirm_email') {
+                    handleConfirmMail(msg);
+                }
+            }
+            else if (msg.action == 'confirm_email') {
+                handleConfirmMail(msg);
+            }
+            else if (msg.usage) {
+                handleUsage(msg);
+            }
+            else if (msg.daily_usage) {
+                handleDailyUsage(msg);
+            }
+            else if (msg.functioncall) {
+                handleFunctionCall(msg);
+            }
+            else if (msg.error) {
+                handleErrorMessage(msg);
+            }
+            else if (msg.chunk_message) {
+                handleChunkMessage(msg);
+            }
+            else if (msg.stop_message) {
+                handleStopMessage(msg);
+            }
+            else if (msg.cancel_message) {
+                handleCancelMessage(msg);
+            }
+            else if (msg.tab_description) {
+                handleTabDescription(msg);
+            }
+            else if (msg.auth) {
+                handleAuthMessage(msg);
+            }
 
 
-        if (msg.debug1 !== undefined) {
-            var debug1 = msg.debug1.replace(/\n/g, '<br>');
-            var color1 = msg.color ? msg.color : 'white';
-            var objDiv = document.getElementById('debugContent1');
-            var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-            document.getElementById('debugContent1').innerHTML += '<p style="color:' + color1 + ';">' + debug1 + '</p>';
-            if (isNearBottom) {
-                objDiv.scrollTop = objDiv.scrollHeight;
+            if (msg.debug1 !== undefined) {
+                var debug1 = msg.debug1.replace(/\n/g, '<br>');
+                var color1 = msg.color ? msg.color : 'white';
+                var objDiv = document.getElementById('debugContent1');
+                var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                document.getElementById('debugContent1').innerHTML += '<p style="color:' + color1 + ';">' + debug1 + '</p>';
+                if (isNearBottom) {
+                    objDiv.scrollTop = objDiv.scrollHeight;
+                }
             }
-        }
-        if (msg.debug2 !== undefined) {
-            var debug2 = msg.debug2.replace(/\n/g, '<br>');
-            var color2 = msg.color ? msg.color : 'white';
-            var objDiv = document.getElementById('debugContent2');
-            var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
-            document.getElementById('debugContent2').innerHTML += '<p style="color:' + color2 + ';">' + debug2 + '</p>';
-            if (isNearBottom) {
-                objDiv.scrollTop = objDiv.scrollHeight;
+            if (msg.debug2 !== undefined) {
+                var debug2 = msg.debug2.replace(/\n/g, '<br>');
+                var color2 = msg.color ? msg.color : 'white';
+                var objDiv = document.getElementById('debugContent2');
+                var isNearBottom = objDiv.scrollHeight - objDiv.clientHeight - objDiv.scrollTop <= 50;
+                document.getElementById('debugContent2').innerHTML += '<p style="color:' + color2 + ';">' + debug2 + '</p>';
+                if (isNearBottom) {
+                    objDiv.scrollTop = objDiv.scrollHeight;
+                }
             }
-        }
-    });
+        });
+    }
 
-    // get the settings from the server
+    // Initial call to initialize the socket connection
+    initializeSocket();
+
+    // Get the settings from the server
     fetch(API_URL + '/load_settings/', {
         method: 'POST',
         headers: {
@@ -1790,8 +2216,8 @@ function get_settings(username) {
         .catch(error => {
             console.error('There has been a problem with your fetch operation:', error);
         });
+}
 
-};
 
 function showErrorModal(errorMessage) {
     var errorModal = document.getElementById('errorModal');
@@ -1824,16 +2250,16 @@ async function handleError(response) {
                 errorMessage = '';
                 throw new Error('401: Unauthorized');
             case 500:
-                showErrorMessage('500: Server Error');
+                showMessage('500: Server Error', "error", false);
                 throw new Error('500: Server Error');
             case 503:
-                showErrorMessage('503: Service Unavailable');
+                showMessage('503: Service Unavailable', "error", false);
                 throw new Error('503: Service Unavailable');
             case 504:
-                showErrorMessage('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
+                showMessage('504: Gateway Timeout: The server is taking too long to respond. Please try again later.', "error", false);
                 throw new Error('504: Gateway Timeout: The server is taking too long to respond. Please try again later.');
             default:
-                showErrorMessage('An error occurred. Please try again later. (Error ' + response.status + ')');
+                showMessage('An error occurred. Please try again later. (Error ' + response.status + ')', "error", false);
                 throw new Error('Network response was not ok: ' + response.status);
         }
     }
@@ -1872,14 +2298,14 @@ function formatTempReceived(tempReceived) {
     tempReceived = tempReceived.replace(/(`\s*`\s*`)/g, '```');
     if (count > 0) {
         if (count % 2 == 0) {
-            tempFormatted = marked(tempReceived);
+            tempFormatted = renderMarkdown(tempReceived);
         } else {
             tempReceived = tempReceived.replace('<div class="typing-indicator"><div class="dot"><\/div><\/div>', '');
             tempFormatted = tempReceived + '\n```';
-            tempFormatted = marked(tempFormatted);
+            tempFormatted = renderMarkdown(tempFormatted);
         }
     } else {
-        tempFormatted = marked(tempReceived);
+        tempFormatted = renderMarkdown(tempReceived);
     }
     return tempFormatted;
 }
@@ -1889,13 +2315,7 @@ function resetState() {
     tempFormatted = '';
     var lastMessage = document.querySelector('.last-message');
     if (lastMessage) {
-        var messagesContainer = document.getElementById('messages');
-        if (isUserAtBottom(messagesContainer)) {
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            hideNewMessageIndicator();
-        } else {
-            showNewMessageIndicator();
-        }
+        setTimeout(() => scrollToBottom(), 10);
     }
     content = '';
     canSend = true;
@@ -1906,17 +2326,128 @@ function resetState() {
     document.getElementById('message').placeholder = 'Type a message...';
 }
 
-// async function onResponse(msg) {
-//     var timestamp = new Date().toLocaleTimeString();
-//     msg = await parseMessage(msg);
-//     removeSpinner();
-//     tempReceived += msg.content;
-//     tempFormatted = formatTempReceived(tempReceived);
-//     await handleAvatar(settings, tempReceived);
-//     await handleAudio(settings, timestamp, tempFormatted, msg);
-//     resetState();
+const msg = {
+    "action": "send_message",
+    "content": {
+        "message": "Hello",
+        "chat_id": "1234"
+    }
+};
+// Function to handle the confirmation email
+function handleConfirmMail(msg) {
+    showConfirmationWindow(msg.content);
+}
 
-//     if (msg && msg.end && msg.end === 'true') {
-//         resetState();
-//     }
-// };
+let currentEmailIndex = 0;
+let emails = [];
+
+// Function to show the confirmation window
+function showConfirmationWindow(msgArray) {
+    // Store the array of emails
+    emails = msgArray;
+
+    // Reset the current email index
+    currentEmailIndex = 0;
+
+    // Show the first email
+    showEmail(currentEmailIndex);
+
+    // Show the modal
+    $('#googleConfModal').modal('show');
+}
+
+// Function to display an email based on index
+function showEmail(index) {
+    if (index < 0 || index >= emails.length) {
+        return;
+    }
+
+    const msg = emails[index];
+
+    // Set the confirmation message
+    document.getElementById('confirm-message').textContent = 'Are you sure you want to send this email?';
+
+    // Format and set the email details
+    const emailDetails = `
+        <b>To:</b> ${msg.to}<br>
+        <b>Subject:</b> ${msg.subject}<br>
+        <b>Body:</b> ${msg.body.replace(/\r?\n/g, '<br>')}<br>
+        <b>Attachments:</b> ${msg.attachments && msg.attachments.length > 0 ? msg.attachments.join(', ') : 'None'}
+    `;
+    document.getElementById('email-details').innerHTML = emailDetails;
+    document.getElementById('emailId').value = msg.draft_id;
+
+    // Enable/disable navigation buttons
+    document.getElementById('prev-email').disabled = index === 0;
+    document.getElementById('next-email').disabled = index === emails.length - 1;
+}
+
+// Function to show the previous email
+function showPreviousEmail() {
+    if (currentEmailIndex > 0) {
+        currentEmailIndex--;
+        showEmail(currentEmailIndex);
+    }
+}
+
+// Function to show the next email
+function showNextEmail() {
+    if (currentEmailIndex < emails.length - 1) {
+        currentEmailIndex++;
+        showEmail(currentEmailIndex);
+    }
+}
+
+// Function to send the current email
+async function sendCurrentEmail() {
+    if (currentEmailIndex < 0 || currentEmailIndex >= emails.length) {
+        return;
+    }
+
+    const msg = emails[currentEmailIndex];
+    if (showDebug === true) {
+        console.log('Sending email:', msg);
+    }
+    await sendMail(msg.draft_id);
+
+    // Remove the sent email from the list
+    emails.splice(currentEmailIndex, 1);
+
+    // Adjust the current index if necessary
+    if (currentEmailIndex >= emails.length) {
+        currentEmailIndex = emails.length - 1;
+    }
+
+    // Show the next email or close the modal if no emails are left
+    if (emails.length > 0) {
+        showEmail(currentEmailIndex);
+    } else {
+        $('#googleConfModal').modal('hide');
+    }
+}
+
+function sendMail(id) {
+    return new Promise((resolve, reject) => {
+        fetch(API_URL + '/send_email/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 'username': user_name, 'draft_id': id }),
+            credentials: 'include'
+        })
+            .then(handleError)
+            .then(data => {
+                if (showDebug === true) {
+                    console.log('Email sent:', data);
+                }
+                showMessage('Email sent successfully!', "success", true);
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('Failed to send email:', error);
+                showMessage('Failed to send email: ' + error, "error", true);
+                reject(error);
+            });
+    });
+}

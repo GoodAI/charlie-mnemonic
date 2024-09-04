@@ -7,6 +7,7 @@ import urllib.parse
 import zipfile
 from datetime import datetime
 from typing import List, Optional
+from agentmemory.helpers import chroma_collection_to_list
 from agentmemory.main import search_memory
 import llmcalls
 
@@ -48,6 +49,8 @@ from classes import (
     UserGoogle,
     generateAudioMessage,
     regenerateMessage,
+    emailMessage,
+    TimeTravelMessage,
 )
 from database import Database
 from memory import (
@@ -57,6 +60,7 @@ from memory import (
     get_memories,
     update_memory,
     delete_memory,
+    MemoryManager,
 )
 from simple_utils import get_root, convert_name
 from user_management.dao import UsersDAO, AdminControlsDAO
@@ -68,6 +72,7 @@ from utils import (
     SettingsManager,
     BrainProcessor,
     MessageParser,
+    queryRewrite,
 )
 
 logger = logs.Log("routes", "routes.log").get_logger()
@@ -166,23 +171,26 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     try:
         while True:
             data = await websocket.receive_text()
-            if data == "ping":
-                await websocket.send_text("pong")
+            if data == '{"type":"ping"}':
+                await websocket.send_text(json.dumps({"type": "pong"}))
             else:
-                # Send a response back to the client
-                await websocket.send_text(f"Received: {data}")
+                await websocket.send_text(
+                    json.dumps({"type": "message", "content": f"Received: {data}"})
+                )
     except WebSocketDisconnect:
         # Handle client disconnection
         if username in connections:
             del connections[username]
-        logger.debug(f"User {username} disconnected")
+        logger.debug(f"User {username} disconnected due to WebSocketDisconnect")
     except ConnectionResetError:
         # Handle client disconnection
-        del connections[username]
-        logger.debug(f"User {username} disconnected")
+        if username in connections:
+            del connections[username]
+        logger.debug(f"User {username} disconnected due to ConnectionResetError")
     except Exception as e:
         # Handle any other exceptions
-        del connections[username]
+        if username in connections:
+            del connections[username]
         logger.error(f"An error occurred with user {username}: {e}")
 
 
@@ -232,10 +240,12 @@ async def handle_get_settings(request: Request):
     if os.path.exists(os.path.join(USERS_DIR, "google_client_secret.json")):
         from gworkspace.google_auth import onEnable
 
-        auth_uri = await onEnable(username, USERS_DIR)
-        if auth_uri == "error":
-            settings["error"] = "Google client secret path not found"
-        settings["auth_uri"] = auth_uri
+        result = await onEnable(username, USERS_DIR)
+        if isinstance(result, dict) and "auth_uri" in result:
+            settings["auth_uri"] = result["auth_uri"]
+        elif isinstance(result, dict) and "error" in result:
+            settings["error"] = result["error"]
+
     return settings
 
 
@@ -337,8 +347,9 @@ async def handle_update_settings(request: Request, user: editSettings):
         from gworkspace.google_auth import onEnable
 
         auth_uri = await onEnable(username, USERS_DIR)
-        if auth_uri == "error":
-            settings["error"] = "Google client secret path not found"
+        if isinstance(auth_uri, dict) and "error" in auth_uri:
+            settings["error"] = auth_uri["error"]
+            settings["auth_uri"] = None
             # TODO: redirect to the configuration page
             settings["addons"]["calendar_addon"] = False
             settings["addons"]["gmail_addon"] = False
@@ -407,7 +418,8 @@ async def handle_message(request: Request, message: userMessage):
         # this logic is a bit weird when used as API
         else:
             chat_tabs_dao.update_created_at(user_id, message.chat_id)
-            message.chat_id = active_tab_data.chat_id
+            if active_tab_data is not None:
+                message.chat_id = active_tab_data.chat_id
     if not has_access or has_access == "false" or has_access == "False":
         logger.info(f"user {user.username} does not have access")
         raise HTTPException(
@@ -515,7 +527,7 @@ async def regenerate_response(request: Request, message: regenerateMessage):
 
 @router.post("/stop_streaming/", tags=[LOGIN_REQUIRED])
 async def stop_streaming(request: Request, user: UserName):
-    llmcalls.OpenAIResponser.user_pressed_stop(user.username)
+    llmcalls.user_pressed_stop(user.username)
     return {"message": "Streaming stopped successfully"}
 
 
@@ -654,13 +666,27 @@ async def handle_message_files(
         file_paths.append(file_path)
     # add the file paths to the prompt
     for file_path in file_paths:
-        if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".gif")):
+        if file_path.lower().endswith(
+            (
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".svg",
+                ".bmp",
+                ".webp",
+                ".jfif",
+                ".pjpeg",
+                ".pjp",
+                ".ico",
+            )
+        ):
             url_encoded_image = urllib.parse.quote(os.path.basename(file_path))
-            file_details += f'\n![image](data/{url_encoded_image} "image")'
+            file_details += f'\n![image](data/{url_encoded_image} "image")\n'
         else:
             url_encoded_file = urllib.parse.quote(os.path.basename(file_path))
             file_details += (
-                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})"
+                f"\n[data/{os.path.basename(file_path)}](data/{url_encoded_file})\n"
             )
     prompt = file_details + "<p>" + prompt + "</p>"
     result = MessageParser.add_file_paths_to_message(prompt, file_details)
@@ -1296,4 +1322,162 @@ async def sort_memories(
     return templates.TemplateResponse(
         "memory_table_body.html",
         {"request": request, "category": category, "memories": memories},
+    )
+
+
+# route to send a gmail email by id
+@router.post("/send_email/", tags=[LOGIN_REQUIRED])
+async def send_email(request: Request, message: emailMessage):
+    user = request.state.user
+    username = user.username
+    draft_id = message.draft_id
+    from addons.gmail_addon import send_email_by_id
+
+    response = send_email_by_id(draft_id, username)
+    return response
+
+
+@router.post("/search_chats/", tags=[LOGIN_REQUIRED])
+async def search_memories(
+    request: Request,
+    category: str = Form(...),
+    search_query: str = Form(...),
+    sort_by: str = Form(...),
+    sort_order: str = Form(...),
+    exact_match: bool = Form(False),
+):
+    username = request.state.user.username
+
+    memories = search_memory(
+        category,
+        search_query,
+        username=username,
+        n_results=100,
+        max_distance=1.4,
+        min_distance=0.0,
+        exact_match=exact_match,
+    )
+
+    # Sort the memories based on the selected sorting option and order
+    if sort_by == "created_at":
+        memories.sort(
+            key=lambda x: x["metadata"]["created_at"], reverse=sort_order == "desc"
+        )
+    elif sort_by == "distance" and not exact_match:
+        memories.sort(
+            key=lambda x: x.get("distance", 0.0), reverse=sort_order == "desc"
+        )
+    else:
+        memories.sort(key=lambda x: x["id"], reverse=sort_order == "desc")
+    settings = await SettingsManager.load_settings(USERS_DIR, username)
+    # get episodic memories
+    memory_manager = MemoryManager()
+    memory_manager.model_used = settings["active_model"]["active_model"]
+    episodic_memory = await memory_manager.get_episodic_memory(
+        search_query, username, search_query, 2560, settings=settings
+    )
+    # add the episodic memory to the memories if it exists
+    if episodic_memory:
+        # convert the query response to list and return
+        result_list = chroma_collection_to_list(episodic_memory)
+        memories.extend(result_list)
+
+    # Include the distance value in each memory object
+    for memory in memories:
+        if isinstance(memory, dict):
+            memory["distance"] = memory.get("distance", 0.0)
+            # get the title of the chat tab based on the chat_id
+            with ChatTabsDAO() as chat_tabs_dao:
+                chat_id = memory.get("metadata", {}).get("chat_id")
+                if chat_id:
+                    chat_title = chat_tabs_dao.get_tab_description(chat_id)
+                    memory["chat_title"] = chat_title
+        else:
+            print("memory is not a dict", memory)
+
+    rewritten = await queryRewrite(search_query, username, USERS_DIR, memories)
+
+    rewritten_memories = search_memory(
+        category,
+        rewritten,
+        username=username,
+        n_results=100,
+        max_distance=1.4,
+        min_distance=0.0,
+        exact_match=exact_match,
+    )
+
+    return JSONResponse(
+        content={
+            "category": category,
+            "memories": memories,
+            "rewritten": rewritten,
+            "rewritten_memories": rewritten_memories,
+        }
+    )
+
+
+@router.post(
+    "/time_travel_message/",
+    tags=["Messaging", LOGIN_REQUIRED],
+    summary="Send a message with a custom timestamp",
+    description="This endpoint allows you to send a message to the AI with a custom timestamp, enabling 'time travel' functionality.",
+    response_description="Returns the AI's response to the time-travelled message.",
+    responses={
+        200: {
+            "description": "AI responded successfully to time-travelled message",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "AI responded successfully to time-travelled message"
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Token is invalid",
+            "content": {
+                "application/json": {"example": {"detail": "Token is invalid"}}
+            },
+        },
+    },
+)
+async def handle_time_travel_message(request: Request, message: TimeTravelMessage):
+    user = request.state.user
+    settings = await SettingsManager.load_settings(USERS_DIR, user.username)
+    if count_tokens(message.prompt) > settings["memory"]["input"]:
+        raise HTTPException(status_code=400, detail="Prompt is too long")
+
+    with Database() as db, UsersDAO() as dao, ChatTabsDAO() as chat_tabs_dao, AdminControlsDAO() as admin_controls_dao:
+        total_tokens_used, total_cost = db.get_token_usage(user.username)
+        total_daily_tokens_used, total_daily_cost = db.get_token_usage(
+            user.username, True
+        )
+        display_name = dao.get_display_name(user.username)
+        daily_limit = admin_controls_dao.get_daily_limit()
+        has_access = dao.get_user_access(user.username)
+        user_id = dao.get_user_id(user.username)
+
+        if not has_access:
+            raise HTTPException(status_code=400, detail="You do not have access.")
+        if total_daily_cost >= daily_limit:
+            raise HTTPException(status_code=400, detail="You reached your daily limit.")
+
+        # Handle chat_id logic
+        if message.chat_id is None:
+            message.chat_id = "0"
+            chat_tabs_dao.insert_tab_data(
+                user_id, message.chat_id, "new chat", message.chat_id, True
+            )
+        else:
+            chat_tabs_dao.update_created_at(user_id, message.chat_id)
+
+    # Process the time-travelled message
+    return await process_message(
+        message.prompt,
+        user.username,
+        USERS_DIR,
+        message.display_name,
+        chat_id=message.chat_id,
+        timestamp=message.timestamp,
     )

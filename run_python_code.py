@@ -3,6 +3,7 @@ import docker
 from unidecode import unidecode
 import os
 from logs import Log
+from utils import convert_username
 
 description = """This addon allows you to execute python code in a non persistant terminal, When opening files be sure to open from /data/filename.
 Always include print statements to track the progress or path and name(s) of generated files.
@@ -35,15 +36,12 @@ async def run_python_code(content, pip_packages=[], previous_content="", usernam
 
 
 def sync_run_python_code(content, pip_packages=[], previous_content="", username=None):
+    # print(
+    #     f"trying to run python code: {content}\n\nwith pip packages: {pip_packages}\n\nfor user: {username}"
+    # )
     # convert the email to a name without special characters to name our container
-    # Convert non-ASCII characters to ASCII
-    name = unidecode(username)
-    # replace spaces and @ with underscores
-    name = name.replace(" ", "_")
-    name = name.replace("@", "_")
-    name = name.replace(".", "_")
-    # lowercase the name
-    username = name.lower()
+    if username:
+        username = convert_username(username)
 
     if previous_content != "":
         new_content = previous_content + "\n" + content

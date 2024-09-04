@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import json
 import os
 
 from fastapi import (
@@ -225,38 +226,77 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.close()
 
 
+from google_auth_oauthlib.flow import InstalledAppFlow
+from gworkspace.google_auth import SCOPES, get_redirect_uri
+
+
 @router.get("/oauth2callback")
 async def oauth2callback(request: Request):
-    username = request.query_params.get("username")
     code = request.query_params.get("code")
     if not code:
         return {"error": "Authorization code not found"}
 
-    # Process the code to obtain tokens
-    credentials = authenticate_user(code, username)
+    flow = InstalledAppFlow.from_client_secrets_file(
+        os.getenv("GOOGLE_CLIENT_SECRET_PATH"),
+        SCOPES,
+        redirect_uri=get_redirect_uri(),
+    )
+    flow.fetch_token(code=code)
+    creds = flow.credentials
 
-    # save credentials to the user's directory
+    # Save the credentials
+    print(f"State: {request.query_params.get('state')}")  # Debug print
+    username = get_username_from_state(request.query_params.get("state"))
+    print(f"Username: {username}")  # Debug print
     full_path = os.path.join("users", username, "token.json")
-    with open(full_path, "w") as f:
-        f.write(credentials.to_json())
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    with open(full_path, "w") as token:
+        token.write(creds.to_json())
 
-    # Redirect user to the main page
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
 
 
-from google_auth_oauthlib.flow import InstalledAppFlow
-from gworkspace.google_auth import SCOPES
-
-
-def authenticate_user(auth_code, username):
+def authenticate_user(auth_code):
     CREDENTIALS_PATH = (
         os.getenv("GOOGLE_CLIENT_SECRET_PATH") or "users/google_client_secret.json"
     )
     flow = InstalledAppFlow.from_client_secrets_file(
         CREDENTIALS_PATH,
         SCOPES,
-        redirect_uri="http://localhost:8002/oauth2callback?username=" + username,
+        redirect_uri=get_redirect_uri(),
     )
-    flow.fetch_token(code=auth_code)
+    # Add these parameters to ensure we always get a refresh token
+    flow.fetch_token(
+        code=auth_code,
+        # Include these additional parameters
+        prompt="consent",
+        access_type="offline",
+    )
     credentials = flow.credentials
     return credentials
+
+
+# Get the directory of the current script
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def get_state_file_path():
+    return os.path.join(os.getcwd(), "users", "state_store.json")
+
+
+def get_username_from_state(state):
+    file_path = get_state_file_path()
+    print(f"State file path: {file_path}")  # Debug print
+    if not os.path.exists(file_path):
+        print("State file does not exist")  # Debug print
+        return None
+    with open(file_path, "r") as f:
+        try:
+            data = json.load(f)
+            username = data.get(state)
+            print(f"State data: {data}")  # Debug print
+            print(f"Retrieved username for state {state}: {username}")  # Debug print
+            return username
+        except json.JSONDecodeError:
+            print("Failed to decode JSON in state file")  # Debug print
+            return None

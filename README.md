@@ -18,6 +18,10 @@ Read more [on our blog](https://www.goodai.com/introducing-charlie-mnemonic/)
 - WebSocket support for real-time communication.
 - Use local Ollama instance instead of OpenAI.
 
+## Stoic Mentor
+We’ve included a new personality, a stoic mentor.
+You can enable the Stoic Mentor personality by going to the Settings Menu and changing the system prompt to the ‘Stoic’ preset. The agent will be prompted to help you navigate through life, find clarity and resilience through thoughtful conversation. Your feedback to this new personality, and how it may be improved, is highly appreciated!
+
 ## Installation
 
 - How to install and run Charlie Mnemonic on [Windows](docs/WININSTALL.md), [Mac](docs/MACINSTALL.md) or [Linux](docs/LINUXINSTALL.md)

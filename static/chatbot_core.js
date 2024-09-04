@@ -40,36 +40,14 @@ function addUserMessage(message) {
     canSendMessage();
 }
 
-function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = false) {
-    // Replace multiple backticks with triple backticks
-    message = message.replace(/(`\s*`\s*`)/g, '```');
-    
-    // Count the number of triple backticks
-    var count = (message.match(/```/g) || []).length;
-
-    // If the count is odd, add an extra set of backticks to close the last code block
-    if (count % 2 !== 0) {
-        message += '\n```';
-    }
-    
-    // Apply Markdown formatting
-    message = marked(message);
-
-    // If outside of code block, add the typing indicator and replace newline characters
-    if (count % 2 === 0 && addIndicator) {
-        if (!replaceNewLines) {
-            message = message.replace(/\n/g, "");
-        }
-        else {
-            message = message.replace(/\n/g, "<br>");
-        }
-        message += '<span class="typing-indicator"><span class="dot"></span></span>';
-    }
-
-    return `<div class="markdown">${message}</div>`;
+// Custom function to replace <execute_code> and </execute_code>
+function replaceExecuteCodeBlocks(content) {
+    return content
+        .replace(/<execute_code>/g, '\n```python\n')
+        .replace(/<\/execute_code>/g, '\n```\n');
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null, model = null) {
     var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
 
     if (messageReplaced.endsWith('<br>')) {
@@ -87,15 +65,15 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
         lastMessage.classList.remove('last-message');
     }
     var uuidAttribute = uuid ? ' data-uuid="' + uuid + '"' : '';
-    
+
     var chatMessage = document.createElement('div');
     chatMessage.innerHTML = '<div class="message ' + user + ' last-message"><span class="timestamp">' + timestamp + '</span><div class="bubble"' + uuidAttribute + '>' + messageReplaced + '</div></div>';
-    
+
     if (addButtons && user === 'bot') {
         // add bottom buttons to the bubble
         var buttons = document.createElement('div');
         buttons.className = 'bottom-buttons-container';
-        addBottomButtons(buttons);
+        addBottomButtons(buttons, model);
         chatMessage.firstChild.querySelector('.bubble').appendChild(buttons);
     }
 
@@ -122,7 +100,7 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
 }
 
 function isUserAtBottom(container) {
-    const threshold = 50;
+    const threshold = 150;
     return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
 }
 
@@ -131,7 +109,7 @@ function showNewMessageIndicator() {
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'new-message-indicator';
-        indicator.innerHTML = '<button onclick="scrollToBottom()">New Messages ↓</button>';
+        indicator.innerHTML = '<button onclick="scrollToBottom(true)">New Messages ↓</button>';
         document.body.appendChild(indicator);
     }
     indicator.style.display = 'block';
@@ -143,13 +121,6 @@ function hideNewMessageIndicator() {
         indicator.style.display = 'none';
     }
 }
-
-function scrollToBottom() {
-    var messagesContainer = document.getElementById('messages');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    hideNewMessageIndicator();
-}
-
 
 function addExternalMessage(message) {
     var escaped_message = escapeHTML(message);
@@ -212,7 +183,7 @@ async function sendMessageToServer(message) {
 
     } catch (error) {
         console.error('Failed to send message: ', error);
-        showErrorMessage('Failed to send message: ' + error);
+        showMessage('Failed to send message: ' + error, "error", false);
     }
 }
 
@@ -230,7 +201,7 @@ async function regenerateResponse(div) {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ 'uuid': uuid, 'username': user_name, 'chat_id': chat_id}),
+            body: JSON.stringify({ 'uuid': uuid, 'username': user_name, 'chat_id': chat_id }),
             credentials: 'include'
         });
 
@@ -239,7 +210,7 @@ async function regenerateResponse(div) {
 
     } catch (error) {
         console.error('Failed to regenerate response: ', error);
-        showErrorMessage('Failed to regenerate response: ' + error);
+        showMessage('Failed to regenerate response: ' + error, "error", false);
     }
 }
 
@@ -249,7 +220,7 @@ async function request_audio(button) {
     var clonedBubbleContainer = bubbleContainer.cloneNode(true);
 
     var codeBlocks = clonedBubbleContainer.querySelectorAll('code[class^="language-"]');
-    codeBlocks.forEach(function(block) {
+    codeBlocks.forEach(function (block) {
         block.parentNode.removeChild(block);
     });
 
@@ -355,7 +326,7 @@ async function delete_user_data() {
 }
 
 async function upload_user_data(file) {
-    
+
     const overlay = document.getElementById('overlay_msg');
     const overlayMessage = document.getElementById('overlay-message');
     overlayMessage.textContent = "Uploading Data...";
@@ -373,9 +344,8 @@ async function upload_user_data(file) {
         if (response.ok) {
             const data = await response.json();
             overlayMessage.textContent = data.message;
-        } 
-        else
-        {
+        }
+        else {
             await handleError(response);
         }
         // Hide the overlay after a delay to let the user see the message
@@ -480,7 +450,7 @@ async function send_image(image_file, prompt) {
         reader.onloadend = function () {
             var base64data = reader.result;
             var fullmessage = '![image](' + base64data + ' "image")<p>' + message + '</p>';
-            fullmessage = marked(fullmessage);
+            fullmessage = renderMarkdown(fullmessage);
             addCustomMessage(fullmessage, 'user', true);
         }
 
@@ -525,7 +495,6 @@ async function send_image(image_file, prompt) {
 async function send_files(files, prompt) {
     try {
         var message = document.getElementById('message').value;
-        // if prompt is not empty, set the message to prompt
         if (prompt) {
             message = prompt;
         }
@@ -533,15 +502,19 @@ async function send_files(files, prompt) {
         var fullmessage = '';
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (file.type.startsWith('image/')) {
-                // convert the image to base64
+            if (file.type.startsWith('image/') &&
+                file.type !== 'image/tiff' && !file.name.endsWith('.tif') &&
+                (file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.jpeg') ||
+                    file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') ||
+                    file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') ||
+                    file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
                 var base64data = await getBase64(file);
-                fullmessage += '![' + file.name + '](' + base64data + ' "' + file.name + '")<p>' + message + '</p>';
+                fullmessage += `![${file.name}](${base64data} "${file.name}") <br>`;
             } else {
-                fullmessage += '[' + file.name + '](' + file.name + ')<p>' + message + '</p>';
+                fullmessage += `[data/${file.name}](data/${file.name}) <br>`;
             }
         }
-        fullmessage = marked(fullmessage);
+        fullmessage += `<p>${escapeHtml(message)}</p>`;
         addCustomMessage(fullmessage, 'user', true);
 
         var messagesContainer = document.getElementById('messages');
@@ -571,14 +544,26 @@ async function send_files(files, prompt) {
             body: formData,
             credentials: 'include'
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
 
     } catch (error) {
-        await handleError(error);
-        console.error('Failed to upload files: ', error);
+        console.error('Failed to upload files:', error);
+        showMessage(`Failed to upload files: ${error.message}`, "error", false);
+    } finally {
         overlay.style.display = 'none';
+        canRecord = true;
+        canSend = true;
+        isWaiting = false;
+        isRecording = false;
+        canSendMessage();
     }
 }
+
 
 function getBase64(file) {
     return new Promise((resolve, reject) => {
@@ -607,13 +592,12 @@ function send_audio(file) {
             // send the transcription to the server as user message
             // make sure the message is not empty
             if (data.transcription.trim() === '') {
-                showErrorMessage('Too low volume or no voice detected!', true);
+                showMessage('Too low volume or no voice detected!', "warning", true);
                 return;
             }
             // todo: add option toggle to send immediatly or send to text box first
-            const fileInput = document.getElementById('uploadFileInput');
-            if (fileInput.files.length > 0) {
-                send_files(fileInput.files, data.transcription);
+            if (pastedFiles.length > 0) {
+                send_files(pastedFiles, data.transcription);
                 document.getElementById('uploadFileInput').value = '';
                 document.getElementById('preview-files').innerHTML = '';
                 document.getElementById('files-preview').style.display = 'none';
@@ -621,13 +605,11 @@ function send_audio(file) {
                 pastedFiles = [];
                 document.getElementById('message').value = '';
             } else {
-                console.log('Sending audio transcription to server: ' + data.transcription);
                 sendMessageToServer(data.transcription);
             }
         })
         .catch(console.error);
 }
-
 
 
 // Show the username modal
@@ -908,9 +890,9 @@ function populateChatTabs(tabs_data) {
         if (tabs_data[i].chat_name.split(' ').length > 5) {
             newTab.innerText += '...';
         }
-        
+
         // Set the onclick function to the setChat function with the chat id as parameter
-        newTab.onclick = function() {
+        newTab.onclick = function () {
             setChat(tabs_data[i].chat_id);
         };
 
@@ -921,7 +903,7 @@ function populateChatTabs(tabs_data) {
         var dots = document.createElement('div');
         dots.className = 'chat-tab-dots';
         dots.innerHTML = '&nbsp;&#x22EE;&nbsp;';
-        dots.onclick = function(event) {
+        dots.onclick = function (event) {
             event.stopPropagation();
             showDropdown(this, tabs_data[i].chat_id);
         };
@@ -930,18 +912,24 @@ function populateChatTabs(tabs_data) {
 
         // Append the new tab to the chat tabs container
         chatTabs.appendChild(newTab);
-        
+
     }
-    
+
     setupDropdownMenus();
 }
 
+let currentChatId = null;
+let currentDotElement = null;
+
 function showDropdown(dotElement, chatId) {
-    // Close any already open dropdowns
     closeAllDropdowns();
+
+    currentChatId = chatId;
+    currentDotElement = dotElement;
 
     var dropdownMenu = document.createElement('div');
     dropdownMenu.className = 'dropdown-menu';
+    dropdownMenu.id = 'dropdown-menu';
     dropdownMenu.innerHTML = `<ul>
         <li onclick="shareChat('${chatId}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="15" height="15" style="fill: var(--chat-tab-dots-color);"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M246.6 9.4c-12.5-12.5-32.8-12.5-45.3 0l-128 128c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 109.3V320c0 17.7 14.3 32 32 32s32-14.3 32-32V109.3l73.4 73.4c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3l-128-128zM64 352c0-17.7-14.3-32-32-32s-32 14.3-32 32v64c0 53 43 96 96 96H352c53 0 96-43 96-96V352c0-17.7-14.3-32-32-32s-32 14.3-32 32v64c0 17.7-14.3 32-32 32H96c-17.7 0-32-14.3-32-32V352z"/></svg> Share</li>
         <li onClick="editTabDescription('${chatId}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" width="15" height="15" style="fill: var(--chat-tab-dots-color);"><!--!Font Awesome Free 6.5.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2024 Fonticons, Inc.--><path d="M471.6 21.7c-21.9-21.9-57.3-21.9-79.2 0L362.3 51.7l97.9 97.9 30.1-30.1c21.9-21.9 21.9-57.3 0-79.2L471.6 21.7zm-299.2 220c-6.1 6.1-10.8 13.6-13.5 21.9l-29.6 88.8c-2.9 8.6-.6 18.1 5.8 24.6s15.9 8.7 24.6 5.8l88.8-29.6c8.2-2.7 15.7-7.4 21.9-13.5L437.7 172.3 339.7 74.3 172.4 241.7zM96 64C43 64 0 107 0 160V416c0 53 43 96 96 96H352c53 0 96-43 96-96V320c0-17.7-14.3-32-32-32s-32 14.3-32 32v96c0 17.7-14.3 32-32 32H96c-17.7 0-32-14.3-32-32V160c0-17.7 14.3-32 32-32h96c17.7 0 32-14.3 32-32s-14.3-32-32-32H96z"/></svg> Rename</li>
@@ -956,23 +944,42 @@ function showDropdown(dotElement, chatId) {
     dropdownMenu.style.left = `${rect.left}px`;
     dropdownMenu.style.top = `${rect.bottom}px`;
     dropdownMenu.style.display = 'block';
+    positionDropdown(dropdownMenu, dotElement);
+}
+
+function positionDropdown(dropdownMenu, dotElement) {
+    var rect = dotElement.getBoundingClientRect();
+    dropdownMenu.style.position = 'absolute';
+    dropdownMenu.style.left = `${rect.left}px`;
+    dropdownMenu.style.top = `${rect.bottom}px`;
 }
 
 function closeAllDropdowns() {
     var dropdowns = document.querySelectorAll('.dropdown-menu');
-    dropdowns.forEach(function(dropdown) {
+    dropdowns.forEach(function (dropdown) {
         dropdown.remove();
     });
+    currentChatId = null;
+    currentDotElement = null;
 }
 
 // Ensure that clicking anywhere on the window closes the dropdown
-window.onclick = closeAllDropdowns;
+window.onclick = function (event) {
+    if (!event.target.matches('.chat-tab-dots')) {
+        closeAllDropdowns();
+    }
+};
 
 function setupDropdownMenus() {
-    window.addEventListener('click', function() {
+    window.addEventListener('click', function () {
         var dropdowns = document.querySelectorAll('.dropdown-menu');
-        dropdowns.forEach(function(dropdown) {
+        dropdowns.forEach(function (dropdown) {
             dropdown.style.display = 'none';
         });
     });
+}
+
+function resetFileInput() {
+    const fileInput = document.getElementById('uploadFileInput');
+    fileInput.value = '';
 }

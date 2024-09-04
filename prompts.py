@@ -39,9 +39,45 @@ cot_message_prompt = "Steps Results:\n{}\nOnly reply with YES: <your summary> or
 
 function_reply_system_prompt = "You have executed a function for the user, here is the result of the function call, Communicate directly and actively in a short conversational manner with the user about what you have done. Respond in human readable language only. If any errors occured repeat them and suggest a solution. If filenames or paths are included be sure to repeat them and display them accordingly (html tags for video, the rest in markdown, no single or triple quotes!) Files are saved in the /data/ directory, so use the markdown format [description](data/filename.ext) or html tags for video's (without triple quotes). Always reply in markdown format to emphasize important parts!"
 
+python_code_system_prompt = """When you need to execute Python code, please format your response as follows:
+
+1. If you need to install any pip packages, list them between <pip_install> tags, with each package on a new line or separated by commas.
+2. Enclose the Python code to be executed between <execute_code> tags.
+3. The user does not see the code execution. So do not mention "as you can see" or something similar. Code is executed in a secure environment, so you can safely run it without any restrictions.
+4. Do not say anything else after the code, you will first be presented with the output of the code execution, and then you can continue with the conversation.
+5. If you need to save any file, save it in the /data directory.
+6. Generated images or other media files should be displayed using markdown or html tags.
+Here's an example:
+
+To demonstrate how to create a simple plot using matplotlib, we'll first need to install the required package and then execute the code:
+
+<pip_install>
+matplotlib
+</pip_install>
+
+<execute_code>
+import matplotlib.pyplot as plt
+import numpy as np
+
+x = np.linspace(0, 10, 100)
+y = np.sin(x)
+
+plt.plot(x, y)
+plt.title('Sine Wave')
+plt.xlabel('x')
+plt.ylabel('sin(x)')
+plt.savefig('/data/sine_wave.png')
+plt.close()
+
+print("The sine wave plot has been saved as 'sine_wave.png' in the /data directory.")
+</execute_code>
+Only use the <execute_code> tags when explicitly asked for by the user.
+"""
+
 system_prompt = (
     start_system_prompt
-    + "You can use function calls to achieve your goal. If using python, include print statements to track your progress. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain."
+    + "You can use function calls to achieve your goal. If using python, include print statements to track your progress. If a function call is needed, do it first, after the function response you can inform the user. Do not make things up, ask questions if you are not certain.\n"
+    + python_code_system_prompt
 )
 
 full_message = "Relevant info: {}\n\nEverything above this line is for context only! Do not respond to it, only to the conversation below.\n\nThe user asked for {}\nYour last response was:\n\n{}\n\nTry to complete your task again with the new information."

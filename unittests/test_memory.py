@@ -232,7 +232,10 @@ class TestMemoryManager(unittest.TestCase):
 
         # Call the function and check the return value
         result = await self.memory_manager.process_episodic_memory(
-            "test_messages", username="test_user", all_messages="test_all_messages"
+            "test_messages",
+            username="test_user",
+            all_messages="test_all_messages",
+            settings={"filter_date": 1234567890},
         )
         self.assertEqual(
             result, ("1234567890 - test_memory (score: 0.1)\n", "test_memory")

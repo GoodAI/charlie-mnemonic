@@ -33,6 +33,7 @@ from typing import List, Dict, Any
 from datetime import datetime
 import pytz
 from tzlocal import get_localzone
+import traceback
 
 logger = logs.Log("utils", "utils.log").get_logger()
 
@@ -169,9 +170,9 @@ class MessageSender:
                         response_count=response_count,
                     )
         except Exception as e:
-            logger.exception(f"An error occurred: {e}")
+            logger.exception(f"An error occurred (utils): {e}")
             await MessageSender.send_message(
-                {"error": "An error occurred: " + str(e)}, "red", username
+                {"error": "An error occurred (utils): " + str(e)}, "red", username
             )
 
 
@@ -189,27 +190,22 @@ class AddonManager:
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "timezone": {"timezone": "Auto"},
+            "active_model": {"active_model": "gpt-4o"},
             "memory": {
-                "functions": 640,
-                "ltm1": 1200,
-                "ltm2": 1200,
-                "episodic": 400,
-                "recent": 880,
-                "notes": 1200,
-                "input": 1280,
-                "output": 1200,
-                "max_tokens": 8000,
+                "functions": 6400,
+                "ltm1": 2560,
+                "ltm2": 2560,
+                "episodic": 2560,
+                "recent": 2560,
+                "notes": 2560,
+                "input": 104960,
+                "output": 3840,
+                "max_tokens": 128000,
                 "min_tokens": 500,
             },
         }
 
-        name = unidecode(username)
-        # replace spaces and @ with underscores
-        name = name.replace(" ", "_")
-        name = name.replace("@", "_")
-        name = name.replace(".", "_")
-        # lowercase the name
-        data_username = name.lower()
+        data_username = convert_username(username)
 
         function_dict = {}
         function_metadata = []
@@ -404,7 +400,7 @@ class BrainProcessor:
 
     @staticmethod
     async def delete_recent_messages(user):
-        print(f"Deleting recent messages for {user} !!!WIP!!!")
+        print(f"Deleting recent messages for {user}")
 
 
 class MessageParser:
@@ -450,6 +446,8 @@ class MessageParser:
         username: str, chat_id: str, regenerator: bool = False, uuid: str = None
     ) -> List[Dict[str, Any]]:
         memory = _memory.MemoryManager()
+        settings = await SettingsManager.load_settings("users", username)
+        memory.model_used = settings["active_model"]["active_model"]
         recent_messages = await memory.get_most_recent_messages(
             "active_brain", username, chat_id=chat_id
         )
@@ -502,7 +500,7 @@ class MessageParser:
         # if arguments is a list, convert it to a dictionary
         if isinstance(arguments, list):
             # take the first element of the list for now, dirty fix
-            arguments = arguments[0]
+            arguments = arguments[0] if arguments else {}
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
@@ -535,10 +533,30 @@ class MessageParser:
                                 {"role": "user", "content": f"{message}"},
                             ]
                             response = None
-                            openai_response = llmcalls.OpenAIResponser(
-                                api_keys["openai"], default_params
+                            settings = await SettingsManager.load_settings(
+                                "users", username
                             )
-                            async for resp in openai_response.get_response(
+
+                            default_par = default_params
+                            default_par["max_tokens"] = settings.get("memory", {}).get(
+                                "output", 1000
+                            )
+                            default_par["model"] = settings.get("active_model").get(
+                                "active_model"
+                            )
+                            responder = llmcalls.get_responder(
+                                (
+                                    api_keys["openai"]
+                                    if settings.get("active_model")
+                                    .get("active_model")
+                                    .startswith("gpt")
+                                    else api_keys["anthropic"]
+                                ),
+                                settings.get("active_model").get("active_model"),
+                                default_par,
+                            )
+
+                            async for resp in responder.get_response(
                                 username,
                                 messages,
                                 stream=False,
@@ -644,6 +662,28 @@ class MessageParser:
                             function_response = MessageParser.handle_function_response(
                                 actual_function, converted_function_call_arguments
                             )
+                            confirm_email_responses = [
+                                response
+                                for response in function_response
+                                if "action" in response
+                                and response["action"] == "confirm_email"
+                            ]
+
+                            if confirm_email_responses:
+                                await MessageSender.send_message(
+                                    {
+                                        "type": "confirm_email",
+                                        "content": confirm_email_responses,
+                                    },
+                                    "blue",
+                                    username,
+                                )
+                                # add a message to the response
+                                function_response.append(
+                                    {
+                                        "note": "\nThe email has been prepared for the user. Ask the user to send or confirm the email themselves."
+                                    }
+                                )
                     else:
                         print(
                             f"Function {function_call_name} not found within the module."
@@ -733,6 +773,8 @@ class MessageParser:
                 with UsersDAO() as db:
                     display_name = db.get_display_name(username)
                 memory = _memory.MemoryManager()
+                settings = await SettingsManager.load_settings("active_brain", username)
+                memory.model_used = settings["active_model"]["active_model"]
                 await memory.process_incoming_memory_assistant(
                     "active_brain",
                     response["content"],
@@ -840,7 +882,23 @@ class SettingsManager:
     @staticmethod
     async def load_settings(users_dir, username):
         settings = {}
-        settings_file = os.path.join(users_dir, username, "settings.json")
+        settings_dir = os.path.join(users_dir, username)
+        settings_file = os.path.join(settings_dir, "settings.json")
+
+        # Make sure the directory exists
+        if not os.path.exists(settings_dir):
+            os.makedirs(settings_dir)
+
+        # Make sure the settings file exists
+        if not os.path.exists(settings_file):
+            with open(settings_file, "w") as f:
+                # Write default settings to the file
+                json.dump({}, f)
+
+        # Load addons
+        await AddonManager.load_addons(username, users_dir)
+
+        # Load settings
         with open(settings_file, "r") as f:
             settings = json.load(f)
 
@@ -853,25 +911,25 @@ class SettingsManager:
                     memory_settings.get("functions", 0.05) * max_tokens
                 )
                 memory_settings["ltm1"] = int(
-                    memory_settings.get("ltm1", 0.15) * max_tokens
+                    memory_settings.get("ltm1", 0.02) * max_tokens
                 )
                 memory_settings["ltm2"] = int(
-                    memory_settings.get("ltm2", 0.15) * max_tokens
+                    memory_settings.get("ltm2", 0.02) * max_tokens
                 )
                 memory_settings["episodic"] = int(
-                    memory_settings.get("episodic", 0.05) * max_tokens
+                    memory_settings.get("episodic", 0.02) * max_tokens
                 )
                 memory_settings["recent"] = int(
-                    memory_settings.get("recent", 0.10) * max_tokens
+                    memory_settings.get("recent", 0.02) * max_tokens
                 )
                 memory_settings["notes"] = int(
-                    memory_settings.get("notes", 0.15) * max_tokens
+                    memory_settings.get("notes", 0.02) * max_tokens
                 )
                 memory_settings["input"] = int(
-                    memory_settings.get("input", 0.15) * max_tokens
+                    memory_settings.get("input", 0.82) * max_tokens
                 )
                 memory_settings["output"] = int(
-                    memory_settings.get("output", 0.25) * max_tokens
+                    memory_settings.get("output", 0.03) * max_tokens
                 )
 
         return settings
@@ -881,7 +939,7 @@ class SettingsManager:
         settings = await SettingsManager().load_settings("users", username)
         timezone = settings.get("timezone", {}).get("timezone", "auto")
 
-        if timezone == "auto":
+        if timezone == "auto" or timezone == "Auto":
             # If the timezone is set to 'auto', use the local timezone
             user_tz = get_localzone()
         else:
@@ -890,12 +948,12 @@ class SettingsManager:
                 offset = timezone[3:]
                 if offset.startswith("+"):
                     offset = offset[1:]
-                offset_hours = int(offset)
+                offset_hours = float(offset)
                 user_tz = pytz.FixedOffset(offset_hours * 60)
             else:
                 user_tz = pytz.timezone(timezone)
 
-        current_date_time = datetime.now(user_tz).strftime("%d/%m/%Y %H:%M:%S")
+        current_date_time = datetime.now(user_tz).isoformat()
         return current_date_time
 
 
@@ -918,10 +976,11 @@ async def process_message(
     chat_id=None,
     regenerate=False,
     uuid=None,
+    timestamp=None,
 ):
     """Process the message and generate a response"""
     # reset the stopPressed variable
-    llmcalls.OpenAIResponser.reset_stop_stream(username)
+    llmcalls.reset_stop_stream(username)
     if display_name is None:
         display_name = username
 
@@ -930,25 +989,20 @@ async def process_message(
 
     # Retrieve memory settings
     memory_settings = settings.get("memory", {})
-
     # start prompt = 54 tokens + 200 reserved for an image description + 23 for the notes string
     token_usage = 500
     # Extract individual settings with defaults if not found
-    max_token_usage = max(memory_settings.get("max_tokens", 4000), 120000)
+    max_token_usage = min(memory_settings.get("max_tokens", 8000), 128000)
     remaining_tokens = max_token_usage - token_usage
 
     # Calculate token allocations based on percentages
-    tokens_active_brain = int(memory_settings.get("ltm1", 0.15) * max_token_usage)
-    tokens_cat_brain = int(memory_settings.get("ltm2", 0.15) * max_token_usage)
-    tokens_episodic_memory = int(
-        memory_settings.get("episodic", 0.05) * max_token_usage
-    )
-    tokens_recent_messages = int(memory_settings.get("recent", 0.10) * max_token_usage)
-    tokens_notes = int(memory_settings.get("notes", 0.15) * max_token_usage)
-    tokens_input = int(memory_settings.get("input", 0.15) * max_token_usage)
-    tokens_output = min(
-        int(memory_settings.get("output", 0.25) * max_token_usage), 4000
-    )
+    tokens_active_brain = int(memory_settings.get("ltm1", 500))
+    tokens_cat_brain = int(memory_settings.get("ltm2", 500))
+    tokens_episodic_memory = int(memory_settings.get("episodic", 250))
+    tokens_recent_messages = int(memory_settings.get("recent", 1000))
+    tokens_notes = int(memory_settings.get("notes", 750))
+    tokens_input = int(memory_settings.get("input", 1000))
+    tokens_output = min(int(memory_settings.get("output", 4000)), 4000)
 
     chat_history, chat_metadata, history_ids = [], [], []
     function_dict, function_metadata = await AddonManager.load_addons(
@@ -998,7 +1052,12 @@ async def process_message(
     else:
         last_messages_string = ""
 
-    all_messages = last_messages_string + "\n" + og_message
+    all_messages = (
+        last_messages_string
+        + "\n"
+        + og_message
+        + "\n Do not reply to any of the previous questions or messages! The chat above is for reference only. It is important to follow the previously given instructions and adhere to the required format and structure. Do not say anything else.\n"
+    )
 
     with ChatTabsDAO() as dao:
         needs_tab_description = dao.needs_tab_description(chat_id)
@@ -1007,13 +1066,25 @@ async def process_message(
         messages = [
             {
                 "role": "system",
-                "content": "You are a chat tab title generator. You will give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it!",
+                "content": "You are a chat tab title generator. You will give a very short description of the given conversation, keep it under 5 words. Do not answer the conversation, only give a title to it! Only reply with the title, nothing else!",
             },
             {"role": "user", "content": all_messages},
         ]
         response = "New Chat"
-        openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-        async for resp in openai_response.get_response(
+        default_par = default_params
+        default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+        default_par["model"] = settings.get("active_model").get("active_model")
+        responder = llmcalls.get_responder(
+            (
+                api_keys["openai"]
+                if settings.get("active_model").get("active_model").startswith("gpt")
+                else api_keys["anthropic"]
+            ),
+            settings.get("active_model").get("active_model"),
+            default_par,
+        )
+
+        async for resp in responder.get_response(
             username,
             messages,
             stream=False,
@@ -1042,6 +1113,9 @@ async def process_message(
 
     if regenerate is False:
         memory = _memory.MemoryManager()
+        memory.model_used = settings["active_model"]["active_model"]
+        # Use the provided timestamp instead of the current time
+        custom_metadata = {"created_at": timestamp.timestamp()} if timestamp else {}
         (
             kw_brain_string,
             token_usage_active_brain,
@@ -1055,6 +1129,8 @@ async def process_message(
             chat_id=chat_id,
             regenerate=regenerate,
             uid=uuid,
+            settings=settings,
+            custom_metadata=custom_metadata,
         )
 
         token_usage += token_usage_active_brain
@@ -1063,9 +1139,18 @@ async def process_message(
 
         if tokens_episodic_memory > 100:
             episodic_memory, timezone = await memory.process_episodic_memory(
-                og_message, username, all_messages, tokens_episodic_memory, verbose
+                og_message,
+                username,
+                all_messages,
+                tokens_episodic_memory,
+                verbose,
+                settings,
             )
-            if episodic_memory is None or episodic_memory == "":
+            if (
+                episodic_memory is None
+                or episodic_memory == ""
+                or episodic_memory == "none"
+            ):
                 episodic_memory_string = ""
             else:
                 episodic_memory_string = (
@@ -1073,7 +1158,6 @@ async def process_message(
                 )
         else:
             episodic_memory_string = ""
-
         episodic_memory_tokens = MessageParser.num_tokens_from_string(
             episodic_memory_string, "gpt-4"
         )
@@ -1087,7 +1171,7 @@ async def process_message(
                 token_usage_relevant_memory,
                 unique_results2,
             ) = await memory.process_incoming_memory(
-                None, og_message, username, tokens_cat_brain, verbose
+                None, og_message, username, tokens_cat_brain, verbose, settings
             )
             merged_results_dict = {
                 id: (document, distance, formatted_date)
@@ -1136,6 +1220,7 @@ async def process_message(
                 show=False,
                 verbose=verbose,
                 tokens_notes=tokens_notes,
+                settings=settings,
             )
 
             if notes is not None or notes != "":
@@ -1148,6 +1233,7 @@ async def process_message(
         notes_tokens = MessageParser.num_tokens_from_string(notes_string, "gpt-4")
         token_usage += notes_tokens
         remaining_tokens -= notes_tokens
+        logger.debug(f"5. remaining_tokens: {remaining_tokens}")
 
     if image_prompt is not None:
         image_prompt_injection = (
@@ -1196,6 +1282,7 @@ async def process_message(
         chat_id=chat_id,
         regenerate=regenerate,
         uid=uuid,
+        timestamp=timestamp,
     )
     response = MessageParser.extract_content(response)
     response = json.dumps({"content": response}, ensure_ascii=False)
@@ -1241,6 +1328,7 @@ async def generate_response(
     chat_id=None,
     regenerate=False,
     uid=None,
+    timestamp=None,
 ):
     function_dict, function_metadata = await AddonManager.load_addons(
         username, users_dir
@@ -1258,9 +1346,14 @@ async def generate_response(
     else:
         system_prompt = settings_system_prompt + "\n" + prompts.system_prompt
 
-    # add time in front of system prompt
-    current_date_time = await SettingsManager.get_current_date_time(username)
-    system_prompt = current_date_time + "\n" + system_prompt
+    # Modify the system prompt to include the custom timestamp
+    if timestamp:
+        custom_time = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+        system_prompt = f"Current date: {custom_time}\n" + system_prompt
+    else:
+        current_date_time = await SettingsManager.get_current_date_time(username)
+        system_prompt = current_date_time + "\n" + system_prompt
+
     messages = [
         {"role": "system", "content": system_prompt + "\n" + memory_message},
     ]
@@ -1281,8 +1374,20 @@ async def generate_response(
     #         prettyprint(f"System: {message['content']}", "green")
 
     response = ""
-    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-    async for resp in openai_response.get_response(
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if settings.get("active_model").get("active_model").startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        settings.get("active_model").get("active_model"),
+        default_par,
+    )
+
+    async for resp in responder.get_response(
         username,
         messages,
         stream=True,
@@ -1294,6 +1399,54 @@ async def generate_response(
         await MessageSender.send_debug(f"response: {response}", 1, "green", username)
 
     return response
+
+
+async def process_execute_python(
+    function_response,
+    message,
+    username,
+    chat_id=None,
+    full_response=None,
+):
+    settings = await SettingsManager.load_settings("users", username)
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if settings.get("active_model").get("active_model").startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        settings.get("active_model").get("active_model"),
+        default_par,
+    )
+    joined_message = "".join(message)
+    messages = [
+        {
+            "role": "user",
+            "content": f'This is an automated response:\nPrevious messages: {full_response}\nYou executed this: {joined_message}\nwith the following result: {function_response}\nUse this info to continue the conversation as if you executed the code and can see the output, do not mention I gave this information or say "Thank you for providing.." or similar. If files are generated, add a link in markdown format, for example [description](data/filename.ext) or html tags for videos (without triple quotes). Do not use sandbox:/ or similar prefixes for file paths.',
+        },
+    ]
+    # debug print the message, properly formatted
+    # for message in messages:
+    #     if message["role"] == "user":
+    #         prettyprint(f"User: {message['content']}", "blue")
+    #     elif message["role"] == "assistant":
+    #         prettyprint(f"Assistant: {message['content']}", "yellow")
+    #     else:
+    #         prettyprint(f"System: {message['content']}", "green")
+
+    async for resp in responder.get_response(
+        username,
+        messages,
+        stream=False,
+        chat_id=chat_id,
+        function_metadata=fakedata,
+        function_call="none",
+    ):
+        # print(f"function response (utils): {resp}\ntrace: {traceback.format_exc()}")
+        return resp
 
 
 async def process_function_reply(
@@ -1330,15 +1483,36 @@ async def process_function_reply(
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": f"{message}"},
-        {
-            "role": "function",
-            "name": function_call_name,
-            "content": str(function_response),
-        },
     ]
-
-    openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
-    async for resp in openai_response.get_response(
+    settings = await SettingsManager.load_settings(users_dir, username)
+    if settings.get("active_model").get("active_model").startswith("gpt"):
+        messages.append(
+            {
+                "role": "function",
+                "name": function_call_name,
+                "content": str(function_response),
+            },
+        )
+    else:
+        messages.append(
+            {
+                "role": "assistant",
+                "content": str(function_response),
+            }
+        )
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if settings.get("active_model").get("active_model").startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        settings.get("active_model").get("active_model"),
+        default_par,
+    )
+    async for resp in responder.get_response(
         username,
         messages,
         stream=True,
@@ -1347,3 +1521,138 @@ async def process_function_reply(
     ):
         second_response = resp
     return second_response
+
+
+async def queryRewrite(query, username, user_dir, memories):
+    # Get the notes from the user
+    notes_string = get_notes_as_string(user_dir, username)
+
+    # Format the memories
+    formatted_memories = [format_memory(memory) for memory in memories]
+
+    relevant_memories_string = "Relevant memories:\n" + "\n".join(formatted_memories)
+
+    current_date_time = await SettingsManager.get_current_date_time(username)
+    messages = [
+        {
+            "role": "system",
+            "content": f"Current date: {current_date_time}\nYou will get a query, notes and relevant memories. Your task is to reply with a rewritten query, if the query is about one of the relevant notes or memories, please include that in the rewritten query. Else just rewrite the query with a similar subject or synonym. For example, the user asks: what meals did you suggest to me yesterday? If the episodic memory includes details about for example a tortilla, you can rewrite the query to 'tortilla recipes'. Its important to keep this list short and concise, do not chat with ther user, only rewrite the query, nothing else!",
+        },
+        {
+            "role": "user",
+            "content": f"Notes: {notes_string}\n\nRelevant memories: {relevant_memories_string}\n\nQuery: {query}",
+        },
+    ]
+    settings = await SettingsManager.load_settings(user_dir, username)
+    default_par = default_params
+    default_par["max_tokens"] = settings.get("memory", {}).get("output", 1000)
+    default_par["model"] = settings.get("active_model").get("active_model")
+    responder = llmcalls.get_responder(
+        (
+            api_keys["openai"]
+            if settings.get("active_model").get("active_model").startswith("gpt")
+            else api_keys["anthropic"]
+        ),
+        settings.get("active_model").get("active_model"),
+        default_par,
+    )
+    async for resp in responder.get_response(
+        username,
+        messages,
+        stream=False,
+        function_metadata=fakedata,
+    ):
+        rewritten_query = resp
+
+    return rewritten_query
+
+
+def convert_username(username):
+    # Convert non-ASCII characters to ASCII
+    name = unidecode(username)
+    # replace spaces and @ with underscores
+    name = name.replace(" ", "_")
+    name = name.replace("@", "_")
+    name = name.replace(".", "_")
+    # lowercase the name
+    username = name.lower()
+    return username
+
+
+def get_notes_as_string(user_dir, username):
+    notes_dir = os.path.join(user_dir, username, "notes")
+    notes_string = ""
+
+    if not os.path.exists(notes_dir):
+        return notes_string
+
+    for filename in os.listdir(notes_dir):
+        file_path = os.path.join(notes_dir, filename)
+        if os.path.isfile(file_path):
+            with open(file_path, "r") as file:
+                notes_string += f"--- {filename} ---\n"
+                notes_string += file.read()
+                notes_string += "\n\n"
+
+    return notes_string.strip()
+
+
+def format_memory(memory):
+    date = datetime.fromtimestamp(memory["metadata"]["created_at"]).strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
+    user_type = memory["metadata"]["username"]
+    document = memory["document"]
+    distance = memory["distance"]
+    return f"({date}) [{user_type}]: {document} ({distance:.4f})"
+
+
+import re
+from typing import Tuple, List
+from run_python_code import run_python_code
+
+
+async def extract_and_execute_code(text: str, username: str) -> str:
+    pip_packages = extract_pip_packages(text)
+    code = extract_code(text)
+
+    if not code:
+        return "No code to execute."
+
+    result = await run_python_code(code, pip_packages, username=username)
+
+    return format_result(result)
+
+
+def extract_pip_packages(text: str) -> List[str]:
+    pip_match = re.search(r"<pip_install>(.*?)</pip_install>", text, re.DOTALL)
+    if pip_match:
+        # Extract the matched content and split it into lines
+        lines = pip_match.group(1).strip().split("\n")
+        # Exclude lines that start with a #
+        packages = [line.strip() for line in lines if not line.strip().startswith("#")]
+        # Split the remaining lines by commas
+        packages = ",".join(packages).split(",")
+        # Return the cleaned list of packages
+        return [pkg.strip() for pkg in packages if pkg.strip()]
+    return []
+
+
+def extract_code(text: str) -> str:
+    code_match = re.search(r"<execute_code>(.*?)</execute_code>", text, re.DOTALL)
+    if code_match:
+        return code_match.group(1).strip()
+    return ""
+
+
+def format_result(result: dict) -> str:
+    output = ""
+    if "pip" in result and result["pip"]:
+        output += f"Pip installation:\n{result['pip']}\n\n"
+    if "output" in result:
+        output += f"Code execution output:\n{result['output']}\n\n"
+    if "exit_code" in result and result["exit_code"] != "0":
+        output += f"Exit code: {result['exit_code']}\n"
+    if "error" in result:
+        output += f"Error: {result['error']}\n"
+    return output

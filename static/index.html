@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <title>GoodAI Agent {{ version }}</title>
+        <title>Charlie Mnemonic {{ version }} - by GoodAI</title>
         <link href='https://fonts.googleapis.com/css?family=Lexend'
               rel='stylesheet'>
         <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -82,30 +82,48 @@
         // create a new marked renderer to add lightbox to images
         var renderer = new marked.Renderer();
         renderer.image = function (href, title, text) {
+            // Extract the filename from the URL
+            var filename = href.split('/').pop();
+
+            // Use the filename as the fallback caption if title is null or undefined
+            var caption = title || filename;
+
             // display images with 250px width and lightbox js
-            return `<a href="${href}" data-lightbox="${text}" data-title="${title}"><img src="${href}" width="250px" alt="${text}"></a>`;
+            return `<a href="${href}" data-lightbox="${text}" data-title="${caption}"><img src="${href}" width="250px" alt="${text}"></a>`;
         };
         renderer.link = function (href, title, text) {
-        if (href.includes('youtube.com') || href.includes('youtu.be')) {
-            // Extract the video ID from the YouTube URL
-            var videoId = '';
-            if (href.includes('youtube.com')) {
-                videoId = href.split('v=')[1];
-                var ampersandPosition = videoId.indexOf('&');
-                if (ampersandPosition !== -1) {
-                    videoId = videoId.substring(0, ampersandPosition);
-                }
-            } else if (href.includes('youtu.be')) {
-                videoId = href.split('/').pop();
+            // Check if href is defined to avoid errors
+            if (typeof href === 'undefined') {
+                console.warn('href is undefined for link with text:', text);
+                return text; // Return just the text if href is undefined
             }
-            
-            // Create an iframe for the YouTube video
-            return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
-        } else {
-            // For non-YouTube links, use the default link rendering
-            return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
-        }
-};
+
+            if (href.includes('youtube.com') || href.includes('youtu.be')) {
+                // Extract the video ID from the YouTube URL
+                var videoId = '';
+                if (href.includes('youtube.com')) {
+                    videoId = href.split('v=')[1];
+                    if (videoId) {
+                        var ampersandPosition = videoId.indexOf('&');
+                        if (ampersandPosition !== -1) {
+                            videoId = videoId.substring(0, ampersandPosition);
+                        }
+                    }
+                } else if (href.includes('youtu.be')) {
+                    videoId = href.split('/').pop();
+                }
+
+                // Create an iframe for the YouTube video only if videoId is not empty
+                if (videoId) {
+                    return `<br><iframe width="280" height="157" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe><br>`;
+                } else {
+                    return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
+                }
+            } else {
+                // For non-YouTube links, use the default link rendering
+                return `<a target="_blank" href="${href}" title="${title}">${text}</a>`;
+            }
+        };
 
         // set the options for marked and a highlighter and copy button
         marked.setOptions({
@@ -116,6 +134,7 @@
             },
             renderer: renderer,
         });
+
         </script>
         <script src="chatbot.js?v={{version}}"></script>
     </head>
@@ -134,7 +153,7 @@
         <div class="toast-container position-fixed top-0 end-0 p-3"></div>
         <!-- Error Modal -->
         <div id="errorModal" class="modal fade">
-            <div class="modal-dialog modal-confirm">
+            <div class="modal-dialog modal-dialog-centered modal-confirm">
                 <div class="modal-content">
                     <div class="modal-header justify-content-center">
                         <div class="icon-box">
@@ -159,7 +178,7 @@
         </div>
         <!-- Login Modal -->
         <div class="modal" tabindex="-1" role="dialog" id="login-modal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Login</h5>
@@ -212,7 +231,7 @@
         </div>
         <!-- Register Modal -->
         <div class="modal" tabindex="-1" role="dialog" id="register-modal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Register a new account</h5>
@@ -269,7 +288,7 @@
                     <div class="modal-header">
                         <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeNav()">
@@ -277,9 +296,12 @@
                         </button>
                     </div>
                     <div class="modal-body">
-                        <button id="logout-button">Logout</button>
-                        <br>
-                        <button id="theme-toggle">Toggle Theme</button>
+                        {% if production %}
+                            <!-- only show logout if production is true -->
+                            <button id="logout-button" class="btn btn-default">Logout</button>
+                            <br>
+                        {% endif %}
+                        <button id="theme-toggle" class="btn btn-default">Toggle Theme</button>
                         <br>
                         <div id="SidenavAddons"></div>
                     </div>
@@ -294,12 +316,12 @@
         </div>
         <!-- Google Auth modal -->
         <div class="modal fade" tabindex="-1" role="dialog" id="googleAuthModal">
-            <div class="modal-dialog" role="document">
+            <div class="modal-dialog modal-dialog-centered" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Google Authentication</h5>
                         <button type="button"
-                                class="close"
+                                class="close btn btn-default"
                                 data-dismiss="modal"
                                 aria-label="Close"
                                 onclick="closeAuth()">
@@ -309,6 +331,76 @@
                     <div class="modal-body">
                         <p>Please click the link below to authenticate with Google:</p>
                         <a id="googleAuthLink" href="#">Authenticate with Google</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Chat Search modal -->
+        <div class="modal fade" tabindex="-1" role="dialog" id="chatSearchModal">
+            <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Search Chats</h5>
+                        <button type="button"
+                                class="close btn btn-default"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeChatSearch()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group">
+                            <input type="text"
+                                   id="searchInput"
+                                   class="form-control"
+                                   placeholder="Search..."
+                                   oninput="debouncedChatSearch()"
+                                   autocomplete="off">
+                            <div class="input-group-append">
+                                <span class="input-group-text" id="searchStatus">
+                                    <i class="fas fa-search"></i>
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
+                            <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
+                        </div>
+                        <div id="searchResults">
+                            <!-- Search results will be dynamically inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Google Confirmation modal -->
+        <div class="modal fade" tabindex="-1" role="dialog" id="googleConfModal">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmation</h5>
+                        <button type="button"
+                                class="close btn btn-default"
+                                data-dismiss="modal"
+                                aria-label="Close"
+                                onclick="closeConf()">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="email-navigation">
+                            <button id="prev-email"
+                                    class="btn btn-secondary"
+                                    onclick="showPreviousEmail()">Previous</button>
+                            <button id="next-email" class="btn btn-secondary" onclick="showNextEmail()">Next</button>
+                        </div>
+                        <p id="confirm-message">Are you sure you want to send this email?</p>
+                        <p id="email-details"></p>
+                        <input type="hidden" id="emailId" name="emailId" value="">
+                        <button id="send-email" class="btn btn-primary">Send</button>
+                        <button id="cancel-email" class="btn btn-secondary">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -335,20 +427,29 @@
         <!-- Side Navigation -->
         <div id="sideNav" class="sidenav">
             <div id="chat-buttons" class="chat-buttons">
-                <div id="chat-buttons" class="chat-buttons">
-                    <div id="control-buttons-container" class="control-buttons-container">
-                        <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
-                    </div>
-                    <div id="chat-tabs-container" class="chat-tabs-container">
-                        <div class="loader"></div>
-                    </div>
+                <div id="control-buttons-container" class="control-buttons-container">
+                    <button id="search-chats-input"
+                            class="control-tab"
+                            onclick="openChatSearch()">Search</button>
+                    <button id="add-tab" class="control-tab" onclick="addChatTab()">+ New tab</button>
+                </div>
+            </div>
+            <div id="chat-tabs-container-wrapper">
+                <div id="chat-tabs-container" class="chat-tabs-container">
+                    <div class="loader"></div>
                 </div>
             </div>
         </div>
         <!-- Placeholder for the share modal -->
         <div id="share-modal-container"></div>
-        <div class="main_title">GoodAI Agent {{ version }}</div>
-        <div class="sub_title">Personal assistant with long-term memory</div>
+        <div class="main_title">Charlie Mnemonic from GoodAI</div>
+        <div class="sub_title">
+            <i>Your personal assistant with long-term memory</i>
+        </div>
+        <div class="sub_title">
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 04/09/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+    target="_blank">Release Notes</a>
+        </div>
         <div id="overlay">
             <div class="text">Code copied to clipboard</div>
         </div>
@@ -373,11 +474,11 @@
                             <div id="messages"></div>
                             <div class="message-container">
                                 <!-- <div class="preset-text-container">
-                        <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
-                        <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
-                        <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
-                        <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
-                    </div> -->
+                                    <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
+                                </div> -->
                                 <div id="statsWindow" class="statsWindow">
                                     <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
                                     <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
@@ -398,48 +499,46 @@
                                                     onclick="openNav()">
                                                 <i class="fa fa-cog cogwheel"></i>
                                             </button>
-                                            <!-- <button id="debug" class="debug-button" data-tooltip="Debug window" onclick="event.stopPropagation(); openDebugNav()">
-                                                <i class="fas fa-terminal cogwheel"></i>
-                                            </button> -->
                                             <button id="view-memory"
                                                     class="view-memory-button"
                                                     data-tooltip="View Memory"
                                                     onclick="showMemoryExplorer()">
                                                 <i class="fas fa-microchip cogwheel"></i>
-                                            </div>
-                                            <textarea id="message"
-                                                      placeholder="Type a message..."
-                                                      rows="1"
-                                                      autofocus="autofocus"></textarea>
-                                            <div class="icon-container-right">
-                                                <input type="file" id="uploadFileInput" multiple hidden>
-                                                <button id="upload-file" class="upload-button" data-tooltip="Upload File">
-                                                    <i class="fa fa-paperclip cogwheel"></i>
-                                                </button>
-                                                <button id="record" class="record-button" data-tooltip="Start recording">
-                                                    <i class="fa fa-microphone"></i>
-                                                </button>
-                                                <button id="send" class="send-button" data-tooltip="Send">
-                                                    <i class="fa fa-paper-plane"></i>
-                                                </button>
-                                                <button id="stop"
-                                                        class="stop-button"
-                                                        data-tooltip="Stop"
-                                                        style="display: none"
-                                                        onclick="stopStream()">
-                                                    <i class="fa fa-stop"></i>
-                                                </button>
-                                            </div>
+                                            </button>
+                                        </div>
+                                        <textarea id="message"
+                                                  placeholder="Type a message..."
+                                                  rows="1"
+                                                  autofocus="autofocus"></textarea>
+                                        <div class="icon-container-right">
+                                            <input type="file" id="uploadFileInput" multiple hidden>
+                                            <button id="upload-file" class="upload-button" data-tooltip="Upload File">
+                                                <i class="fa fa-paperclip cogwheel"></i>
+                                            </button>
+                                            <button id="record" class="record-button" data-tooltip="Start recording">
+                                                <i class="fa fa-microphone"></i>
+                                            </button>
+                                            <button id="send" class="send-button" data-tooltip="Send">
+                                                <i class="fa fa-paper-plane"></i>
+                                            </button>
+                                            <button id="stop"
+                                                    class="stop-button"
+                                                    data-tooltip="Stop"
+                                                    style="display: none"
+                                                    onclick="stopStream()">
+                                                <i class="fa fa-stop"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            </table>
-        </body>
+                    </div>
+                </td>
+            </tr>
+        </table>
         <script src="chatbot_core.js?v={{version}}"></script>
         <script src="listeners.js?v={{version}}"></script>
+        <script src="chatsearch.js?v={{version}}"></script>
     </body>
 </html>

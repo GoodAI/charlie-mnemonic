@@ -20,6 +20,20 @@ fakedata = [
         "type": "function",
         "function": {
             "name": "none",
+            "description": "you have no available functions, but you can use the <execute_code>code</execute_code> tags to run python code, only if explicitly asked for by the user. Be sure to add print statements to see the output.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    }
+]
+
+fakedata_nothing = [
+    {
+        "type": "function",
+        "function": {
+            "name": "none",
             "description": "you have no available functions",
             "parameters": {
                 "type": "object",
@@ -35,6 +49,7 @@ def update_api_keys() -> Dict[str, Optional[str]]:
     api_keys.update(
         {
             "openai": os.getenv("OPENAI_API_KEY"),
+            "anthropic": os.getenv("ANTHROPIC_API_KEY"),
         }
     )
     return api_keys
@@ -52,9 +67,6 @@ SINGLE_USER_PASSWORD = os.environ.get("SINGLE_USER_PASSWORD", "admin")
 DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE = get_root("users/user.env")
 PRODUCTION = os.getenv("PRODUCTION", "false").lower() in ["true", "1", "yes"]
 USERS_DIR = "users"
-
-MEMORY_MODEL = os.environ.get("MEMORY_MODEL", default_params["model"])
-CHATGPT_MODEL = os.environ.get("CHATGPT_MODEL", default_params["model"])
 
 # not used for now, embedding model used in the ChromaDB files
 OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-davinci-003")

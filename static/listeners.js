@@ -43,8 +43,14 @@ function playButtonHandler(element) {
     }
     isGeneratingAudio = true;
 
+    // Remove tooltip immediately on button click
+    document.querySelectorAll('.dynamic-tooltip').forEach(tooltip => tooltip.remove());
+
     // remove the event listener to prevent multiple clicks
     element.removeEventListener('click', playButtonHandler);
+
+    // Ensure tooltip is removed
+    document.querySelectorAll('.tooltip').forEach(tooltip => tooltip.remove());
 
     // force the browser to reflow the DOM
     element.offsetWidth;
@@ -468,22 +474,6 @@ document.getElementById('register-form').addEventListener('submit', async functi
     }
 });
 
-document.getElementById('messages').addEventListener('click', function (e) {
-    if (e.target.classList.contains('debug') || e.target.parentNode.classList.contains('debug')) {
-        var expandableContent = e.target.querySelector('.expandable-content') || e.target.parentNode.querySelector('.expandable-content');
-        var messageDebug = e.target.closest('.message.debug');
-        if (expandableContent && messageDebug) {
-            if (expandableContent.style.display === 'none') {
-                expandableContent.style.display = 'block';
-                messageDebug.classList.add('active');
-            } else {
-                expandableContent.style.display = 'none';
-                messageDebug.classList.remove('active');
-            }
-        }
-    }
-});
-
 
 document.getElementById('messages').addEventListener('scroll', function () {
     var messagesContainer = this;
@@ -539,11 +529,19 @@ function applyTooltips(selector) {
 
 
 document.addEventListener('DOMContentLoaded', function () {
+    setupScrollObserver();
+    hljs.highlightAll();
     const themeToggle = document.getElementById('theme-toggle');
     const currentTheme = localStorage.getItem('theme') || '';
     const tabsState = localStorage.getItem("tabsState");
     const cancelEmailButton = document.getElementById('cancel-email');
     const hiddenIdField = document.getElementById('emailId');
+
+    // load the chatPadding from local storage
+    const chatPadding = localStorage.getItem("chatPadding");
+    if (chatPadding) {
+        set_chat_padding(chatPadding);
+    }
 
     if (currentTheme) {
         document.body.classList.add(currentTheme);

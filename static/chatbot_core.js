@@ -40,36 +40,14 @@ function addUserMessage(message) {
     canSendMessage();
 }
 
-function parseAndFormatMessage(message, addIndicator = false, replaceNewLines = false) {
-    // Replace multiple backticks with triple backticks
-    message = message.replace(/(`\s*`\s*`)/g, '```');
-
-    // Count the number of triple backticks
-    var count = (message.match(/```/g) || []).length;
-
-    // If the count is odd, add an extra set of backticks to close the last code block
-    if (count % 2 !== 0) {
-        message += '\n```';
-    }
-
-    // Apply Markdown formatting
-    message = marked(message);
-
-    // If outside of code block, add the typing indicator and replace newline characters
-    if (count % 2 === 0 && addIndicator) {
-        if (!replaceNewLines) {
-            message = message.replace(/\n/g, "");
-        }
-        else {
-            message = message.replace(/\n/g, "<br>");
-        }
-        message += '<span class="typing-indicator"><span class="dot"></span></span>';
-    }
-
-    return `<div class="markdown">${message}</div>`;
+// Custom function to replace <execute_code> and </execute_code>
+function replaceExecuteCodeBlocks(content) {
+    return content
+        .replace(/<execute_code>/g, '\n```python\n')
+        .replace(/<\/execute_code>/g, '\n```\n');
 }
 
-function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null) {
+function addCustomMessage(message, user, showLoading = false, replaceNewLines = false, timestamp = null, scroll = false, addButtons = false, uuid = null, model = null) {
     var messageReplaced = parseAndFormatMessage(message, false, replaceNewLines);
 
     if (messageReplaced.endsWith('<br>')) {
@@ -95,7 +73,7 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
         // add bottom buttons to the bubble
         var buttons = document.createElement('div');
         buttons.className = 'bottom-buttons-container';
-        addBottomButtons(buttons);
+        addBottomButtons(buttons, model);
         chatMessage.firstChild.querySelector('.bubble').appendChild(buttons);
     }
 
@@ -122,7 +100,7 @@ function addCustomMessage(message, user, showLoading = false, replaceNewLines = 
 }
 
 function isUserAtBottom(container) {
-    const threshold = 50;
+    const threshold = 150;
     return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
 }
 
@@ -131,7 +109,7 @@ function showNewMessageIndicator() {
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'new-message-indicator';
-        indicator.innerHTML = '<button onclick="scrollToBottom()">New Messages ↓</button>';
+        indicator.innerHTML = '<button onclick="scrollToBottom(true)">New Messages ↓</button>';
         document.body.appendChild(indicator);
     }
     indicator.style.display = 'block';
@@ -143,13 +121,6 @@ function hideNewMessageIndicator() {
         indicator.style.display = 'none';
     }
 }
-
-function scrollToBottom() {
-    var messagesContainer = document.getElementById('messages');
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    hideNewMessageIndicator();
-}
-
 
 function addExternalMessage(message) {
     var escaped_message = escapeHTML(message);
@@ -479,7 +450,7 @@ async function send_image(image_file, prompt) {
         reader.onloadend = function () {
             var base64data = reader.result;
             var fullmessage = '![image](' + base64data + ' "image")<p>' + message + '</p>';
-            fullmessage = marked(fullmessage);
+            fullmessage = renderMarkdown(fullmessage);
             addCustomMessage(fullmessage, 'user', true);
         }
 
@@ -524,7 +495,6 @@ async function send_image(image_file, prompt) {
 async function send_files(files, prompt) {
     try {
         var message = document.getElementById('message').value;
-        // if prompt is not empty, set the message to prompt
         if (prompt) {
             message = prompt;
         }
@@ -538,16 +508,13 @@ async function send_files(files, prompt) {
                     file.name.endsWith('.gif') || file.name.endsWith('.bmp') || file.name.endsWith('.webp') ||
                     file.name.endsWith('.svg') || file.name.endsWith('.ico') || file.name.endsWith('.jfif') ||
                     file.name.endsWith('.pjpeg') || file.name.endsWith('.pjp'))) {
-                // convert the image to base64
                 var base64data = await getBase64(file);
                 fullmessage += `![${file.name}](${base64data} "${file.name}") <br>`;
             } else {
                 fullmessage += `[data/${file.name}](data/${file.name}) <br>`;
-                // print debug info
             }
         }
-        fullmessage += `<p>${message}</p>`;
-        fullmessage = marked(fullmessage);
+        fullmessage += `<p>${escapeHtml(message)}</p>`;
         addCustomMessage(fullmessage, 'user', true);
 
         var messagesContainer = document.getElementById('messages');
@@ -577,12 +544,23 @@ async function send_files(files, prompt) {
             body: formData,
             credentials: 'include'
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
 
     } catch (error) {
-        await handleError(error);
-        console.error('Failed to upload files: ', error);
+        console.error('Failed to upload files:', error);
+        showMessage(`Failed to upload files: ${error.message}`, "error", false);
+    } finally {
         overlay.style.display = 'none';
+        canRecord = true;
+        canSend = true;
+        isWaiting = false;
+        isRecording = false;
+        canSendMessage();
     }
 }
 

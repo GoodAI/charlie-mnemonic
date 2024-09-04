@@ -357,16 +357,16 @@
                                    placeholder="Search..."
                                    oninput="debouncedChatSearch()"
                                    autocomplete="off">
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
-                                <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
-                            </div>
                             <div class="input-group-append">
                                 <span class="input-group-text" id="searchStatus">
                                     <i class="fas fa-search"></i>
                                     <i class="fas fa-spinner fa-spin"></i>
                                 </span>
                             </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="exactSearchCheckbox">
+                            <label class="form-check-label" for="exactSearchCheckbox">Exact match only</label>
                         </div>
                         <div id="searchResults">
                             <!-- Search results will be dynamically inserted here -->
@@ -447,7 +447,7 @@
             <i>Your personal assistant with long-term memory</i>
         </div>
         <div class="sub_title">
-            <b>Version:</b> {{ version }} | <b>Release date:</b> 06/08/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
+            <b>Version:</b> {{ version }} | <b>Release date:</b> 04/09/2024 | <a href="https://github.com/GoodAI/charlie-mnemonic/releases"
     target="_blank">Release Notes</a>
         </div>
         <div id="overlay">
@@ -474,11 +474,11 @@
                             <div id="messages"></div>
                             <div class="message-container">
                                 <!-- <div class="preset-text-container">
-                        <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
-                        <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
-                        <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
-                        <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
-                    </div> -->
+                                    <button class="preset-text-button" onclick="insertPresetText('Hi there')">Hi there</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('What can you do?')">What can you do?</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('How does your memory work?')">How does your memory work?</button>
+                                    <button class="preset-text-button" onclick="insertPresetText('What are you?')">What are you?</button>
+                                </div> -->
                                 <div id="statsWindow" class="statsWindow">
                                     <p id="tokenCount">Characters: 0, tokens: 0/1000, cost: $0.0000</p>
                                     <p id="dailyLimit">Daily limit: $0.0000/${{ daily_limit }}</p>
@@ -499,48 +499,46 @@
                                                     onclick="openNav()">
                                                 <i class="fa fa-cog cogwheel"></i>
                                             </button>
-                                            <!-- <button id="debug" class="debug-button" data-tooltip="Debug window" onclick="event.stopPropagation(); openDebugNav()">
-                                                <i class="fas fa-terminal cogwheel"></i>
-                                            </button> -->
                                             <button id="view-memory"
                                                     class="view-memory-button"
                                                     data-tooltip="View Memory"
                                                     onclick="showMemoryExplorer()">
                                                 <i class="fas fa-microchip cogwheel"></i>
-                                            </div>
-                                            <textarea id="message"
-                                                      placeholder="Type a message..."
-                                                      rows="1"
-                                                      autofocus="autofocus"></textarea>
-                                            <div class="icon-container-right">
-                                                <input type="file" id="uploadFileInput" multiple hidden>
-                                                <button id="upload-file" class="upload-button" data-tooltip="Upload File">
-                                                    <i class="fa fa-paperclip cogwheel"></i>
-                                                </button>
-                                                <button id="record" class="record-button" data-tooltip="Start recording">
-                                                    <i class="fa fa-microphone"></i>
-                                                </button>
-                                                <button id="send" class="send-button" data-tooltip="Send">
-                                                    <i class="fa fa-paper-plane"></i>
-                                                </button>
-                                                <button id="stop"
-                                                        class="stop-button"
-                                                        data-tooltip="Stop"
-                                                        style="display: none"
-                                                        onclick="stopStream()">
-                                                    <i class="fa fa-stop"></i>
-                                                </button>
-                                            </div>
+                                            </button>
+                                        </div>
+                                        <textarea id="message"
+                                                  placeholder="Type a message..."
+                                                  rows="1"
+                                                  autofocus="autofocus"></textarea>
+                                        <div class="icon-container-right">
+                                            <input type="file" id="uploadFileInput" multiple hidden>
+                                            <button id="upload-file" class="upload-button" data-tooltip="Upload File">
+                                                <i class="fa fa-paperclip cogwheel"></i>
+                                            </button>
+                                            <button id="record" class="record-button" data-tooltip="Start recording">
+                                                <i class="fa fa-microphone"></i>
+                                            </button>
+                                            <button id="send" class="send-button" data-tooltip="Send">
+                                                <i class="fa fa-paper-plane"></i>
+                                            </button>
+                                            <button id="stop"
+                                                    class="stop-button"
+                                                    data-tooltip="Stop"
+                                                    style="display: none"
+                                                    onclick="stopStream()">
+                                                <i class="fa fa-stop"></i>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            </table>
-            <script src="chatbot_core.js?v={{version}}"></script>
-            <script src="listeners.js?v={{version}}"></script>
-            <script src="chatsearch.js?v={{version}}"></script>
-        </body>
-    </html>
+                    </div>
+                </td>
+            </tr>
+        </table>
+        <script src="chatbot_core.js?v={{version}}"></script>
+        <script src="listeners.js?v={{version}}"></script>
+        <script src="chatsearch.js?v={{version}}"></script>
+    </body>
+</html>

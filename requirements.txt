@@ -109,7 +109,7 @@ Authlib==1.2.1
 unidecode==1.3.7
 moviepy==1.0.3
 decorator==4.4.2
-djlint==1.34.1
+djlint==1.35.2
 sqlalchemy==2.0.25
 ffprobe==0.5
 duckduckgo_search==5.1.0
@@ -118,3 +118,4 @@ google-auth-oauthlib==1.2.0
 google-api-python-client==2.125.0
 tzlocal==5.2
 pytz==2024.1
+anthropic

@@ -33,32 +33,24 @@ async def onEnable(username, users_dir):
     username = convert_username(username)
     charlie_mnemonic_user_dir = os.path.join(os.getcwd(), "users")
     full_path = os.path.join(charlie_mnemonic_user_dir, username, "token.json")
-    print(f"checking for token at {full_path} for {username}")  # Debug print
 
     if os.path.exists(full_path):
-        print(f"Token exists at {full_path} for {username}")  # Debug print
         try:
-            print(f"Reading credentials from {full_path}")  # Debug print
             creds = Credentials.from_authorized_user_file(full_path, SCOPES)
         except ValueError as e:
             print(f"Error reading credentials from {full_path}: {e}")
             creds = None
 
     if creds and creds.valid:
-        print(f"Credentials are valid for {username}")  # Debug print
         missing_scopes = set(SCOPES) - set(creds.scopes)
         if missing_scopes:
-            print(f"Missing scopes: {missing_scopes}")  # Debug print
             creds = None
         else:
             return None
 
     if not creds or not creds.valid:
-        print(f"Credentials are invalid for {username}")  # Debug print
         if creds and creds.expired and creds.refresh_token:
-            print(f"Credentials are expired for {username}")  # Debug print
             try:
-                print(f"Refreshing credentials for {username}")  # Debug print
                 creds.refresh(Request())
             except google.auth.exceptions.RefreshError as e:
                 print(f"Refresh error: {e}. Deleting token and re-authorizing.")
@@ -123,19 +115,14 @@ def store_state(state, username):
 
 def get_username_from_state(state):
     file_path = get_state_file_path()
-    print(f"State file path: {file_path}")  # Debug print
     if not os.path.exists(file_path):
-        print("State file does not exist")  # Debug print
         return None
     with open(file_path, "r") as f:
         try:
             data = json.load(f)
             username = data.get(state)
-            print(f"State data: {data}")  # Debug print
-            print(f"Retrieved username for state {state}: {username}")  # Debug print
             return username
         except json.JSONDecodeError:
-            print("Failed to decode JSON in state file")  # Debug print
             return None
 
 

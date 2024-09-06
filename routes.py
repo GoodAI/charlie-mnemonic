@@ -73,6 +73,7 @@ from utils import (
     BrainProcessor,
     MessageParser,
     queryRewrite,
+    get_available_models,
 )
 
 logger = logs.Log("routes", "routes.log").get_logger()
@@ -236,6 +237,7 @@ async def handle_get_settings(request: Request):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+    settings["available_models"] = get_available_models()
     # check if the google_client_secret.json exists in the users directory
     if os.path.exists(os.path.join(USERS_DIR, "google_client_secret.json")):
         from gworkspace.google_auth import onEnable
@@ -336,6 +338,7 @@ async def handle_update_settings(request: Request, user: editSettings):
     settings["usage"] = {"total_tokens": total_tokens_used, "total_cost": total_cost}
     settings["daily_usage"] = {"daily_cost": total_daily_cost}
     settings["display_name"] = display_name
+    settings["available_models"] = get_available_models()
 
     # check if the calendar_addon or gmail_addon is enabled
     if (
@@ -833,9 +836,6 @@ async def handle_generate_audio(request: Request, message: generateAudioMessage)
     audio_path = await AudioProcessor.generate_audio(
         message.prompt, user.username, USERS_DIR
     )
-
-    with Database() as db:
-        db.add_voice_usage(user.username, len(message.prompt))
     return FileResponse(audio_path, media_type="audio/wav")
 
 

@@ -178,8 +178,12 @@ function insertPresetText(text) {
 }
 
 function openNav() {
-    // open settings modal
     $('#settingsModal').modal('show');
+    $('#settingsModal').on('shown.bs.modal', function () {
+        if (settings.available_models) {
+            updateModelDropdown(settings.available_models, settings.active_model.active_model);
+        }
+    });
 }
 
 function closeNav() {

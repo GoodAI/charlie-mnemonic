@@ -6,11 +6,10 @@ from config import STATIC, CONFIGURATION_URL
 
 
 def is_configuration_missing(request: Request):
-    from configuration_page import configuration_meta_list
+    from configuration_page import configuration_meta_list, is_any_ai_available
 
-    for meta in configuration_meta_list:
-        if meta.is_valid and not meta.is_valid():
-            return True
+    if not is_any_ai_available():
+        return True
     return False
 
 
@@ -24,4 +23,6 @@ class RedirectToConfigurationMiddleware(BaseHTTPMiddleware):
             if is_configuration_missing(request):
                 return RedirectResponse(url=CONFIGURATION_URL)
 
-        return await call_next(request)
+        response = await call_next(request)
+
+        return response

@@ -456,9 +456,8 @@ class OpenAIResponser:
             input=text,
         ) as response:
             await response.stream_to_file(audio_path)
-            # calculate the cost of the audio, $0.006/minute
-            audio_duration = await utils.get_audio_duration(audio_path)
-            audio_cost = audio_duration * 0.006 / 60
+            # calculate the cost of the audio, $15.000 / 1M characters
+            audio_cost = len(text) / 1000000 * 15
             # add the cost of the audio to the user's token usage
             await utils.MessageSender.update_token_usage(
                 {"audio_cost": audio_cost}, username, True

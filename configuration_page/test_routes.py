@@ -67,7 +67,10 @@ def test_middleware_redirects_random_url(client):
 @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
 def test_update_configuration(client):
     dotenv.load_dotenv()
-    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
+    test_data = {
+        "OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value",
+        "ANTHROPIC_API_KEY": f"{TEST_KEY_PREFIX}new_anthropic_key",
+    }
 
     response = client.post(
         CONFIGURATION_URL,
@@ -77,6 +80,7 @@ def test_update_configuration(client):
     assert response.status_code == 200
     assert response.json() == {"message": "Configuration updated successfully"}
     assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
+    assert os.environ.get("ANTHROPIC_API_KEY") == f"{TEST_KEY_PREFIX}new_anthropic_key"
 
 
 def test_update_configuration_missing_required(client):
@@ -100,6 +104,90 @@ Json: {response.json()}
             }
         ]
     }
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+# This passes locally, but not in Github Actions
+def test_update_configuration_with_file(client, tmp_path):
+    test_data = {"OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value"}
+    google_client_secret_path = tmp_path / "google_client_secret.json"
+    google_client_secret_path.write_text("{}")
+
+    with open(google_client_secret_path, "rb") as f:
+        files = {"GOOGLE_CLIENT_SECRET_PATH": (google_client_secret_path.name, f)}
+        response = client.post(
+            CONFIGURATION_URL,
+            data=test_data,
+            files=files,
+        )
+        assert response.status_code == 200
+        assert response.json() == {"message": "Configuration updated successfully"}
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+def test_update_configuration_openai(client):
+    dotenv.load_dotenv()
+    test_data = {
+        "OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value",
+    }
+
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
+    print(response.json())
+    assert response.status_code == 200
+    assert response.json() == {"message": "Configuration updated successfully"}
+    assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+def test_update_configuration_anthropic(client):
+    dotenv.load_dotenv()
+    test_data = {
+        "ANTHROPIC_API_KEY": f"{TEST_KEY_PREFIX}new_anthropic_key",
+    }
+
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
+    print(response.json())
+    assert response.status_code == 200
+    assert response.json() == {"message": "Configuration updated successfully"}
+    assert os.environ.get("ANTHROPIC_API_KEY") == f"{TEST_KEY_PREFIX}new_anthropic_key"
+
+
+@pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")
+def test_update_configuration_both(client):
+    dotenv.load_dotenv()
+    test_data = {
+        "OPENAI_API_KEY": f"{TEST_KEY_PREFIX}new_key_value",
+        "ANTHROPIC_API_KEY": f"{TEST_KEY_PREFIX}new_anthropic_key",
+    }
+
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
+    print(response.json())
+    assert response.status_code == 200
+    assert response.json() == {"message": "Configuration updated successfully"}
+    assert openai.api_key == f"{TEST_KEY_PREFIX}new_key_value"
+    assert os.environ.get("ANTHROPIC_API_KEY") == f"{TEST_KEY_PREFIX}new_anthropic_key"
+
+
+def test_update_configuration_missing_both(client):
+    test_data = {"GOOGLE_CLIENT_SECRET_PATH": "some_path"}
+    response = client.post(
+        CONFIGURATION_URL,
+        data=test_data,
+    )
+    assert response.status_code == 400
+    assert (
+        "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided"
+        in response.json()["detail"]
+    )
 
 
 @pytest.mark.skipif(IN_GITHUB_ACTIONS, reason="Test doesn't work in Github Actions.")

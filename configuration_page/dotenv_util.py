@@ -3,17 +3,13 @@ from typing import Dict
 
 
 def update_dotenv_file(path: str, updates: Dict[str, str]) -> None:
-    """
-    Update the contents of a .env configuration file, preserving comments, empty lines, and order.
-
-    :param path: Path to the .env file
-    :param updates: Dictionary of variables and their new values
-    """
+    print(f"Entering update_dotenv_file with path: {path} and updates: {updates}")
     env_contents = ""
-    # Or crash instead, fail-fast?
     if os.path.exists(path):
         with open(path, "r") as f:
             env_contents = f.read()
+    else:
+        print(f"Creating new .env file at {path}")
 
     updated_contents = update_dotenv_contents(env_contents, updates)
 
@@ -22,13 +18,6 @@ def update_dotenv_file(path: str, updates: Dict[str, str]) -> None:
 
 
 def update_dotenv_contents(env_contents: str, updates: Dict[str, str]) -> str:
-    """
-    Update the contents of a .env configuration, preserving comments, empty lines, and order.
-
-    :param env_contents: String containing the contents of the .env file
-    :param updates: Dictionary of variables and their new values
-    :return: String with the updated .env contents
-    """
     updated_lines = []
     found_keys = set()
 
@@ -47,4 +36,6 @@ def update_dotenv_contents(env_contents: str, updates: Dict[str, str]) -> str:
     for key in new_keys:
         updated_lines.append(f"{key}={updates[key]}")
 
-    return "\n".join(updated_lines)
+    result = "\n".join(updated_lines)
+    print(f"Exiting update_dotenv_contents with result:\n{result}")
+    return result

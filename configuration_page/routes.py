@@ -41,8 +41,11 @@ async def update_configuration(
             filtered["ANTHROPIC_API_KEY"] = ANTHROPIC_API_KEY
 
         if not filtered:
-            raise ValueError(
-                "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided"
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided"
+                },
             )
 
         if GOOGLE_CLIENT_SECRET_PATH and GOOGLE_CLIENT_SECRET_PATH.size > 0:
@@ -54,9 +57,7 @@ async def update_configuration(
 
         modify_settings(filtered)
 
-        return JSONResponse(
-            content={"message": "Configuration updated successfully", "redirect": "/"}
-        )
+        return JSONResponse(content={"message": "Configuration updated successfully"})
     except Exception as e:
         print(f"Error in update_configuration: {str(e)}")
         return JSONResponse(status_code=400, content={"error": str(e)})

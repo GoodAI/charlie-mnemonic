@@ -21,7 +21,9 @@
     <body>
         <div class="container">
             <h1>System configuration</h1>
-            <p>Welcome to Charlie Mnemonic! Please enter the following information to start using it.</p>
+            <p>
+                Welcome to Charlie Mnemonic! Please enter the following information to start using it. Only 1 API key is required to continue.
+            </p>
             <div id="alert-wrap"></div>
             <form id="configuration-form"
                   method="post"
@@ -112,6 +114,10 @@ function success(message) {
     <span class="alert-message">${message}</span>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`
+    // redirect to the agent after 2 seconds
+    setTimeout(() => {
+        window.location.href = "/";
+    }, 2000);
 }
 
 function error(message) {

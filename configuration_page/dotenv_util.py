@@ -3,7 +3,6 @@ from typing import Dict
 
 
 def update_dotenv_file(path: str, updates: Dict[str, str]) -> None:
-    print(f"Entering update_dotenv_file with path: {path} and updates: {updates}")
     env_contents = ""
     if os.path.exists(path):
         with open(path, "r") as f:
@@ -37,5 +36,4 @@ def update_dotenv_contents(env_contents: str, updates: Dict[str, str]) -> str:
         updated_lines.append(f"{key}={updates[key]}")
 
     result = "\n".join(updated_lines)
-    print(f"Exiting update_dotenv_contents with result:\n{result}")
     return result

@@ -19,10 +19,9 @@ class RedirectToConfigurationMiddleware(BaseHTTPMiddleware):
             request.method == "GET"
             and not request.url.path.startswith(f"/{STATIC}/")
             and not request.url.path.startswith(CONFIGURATION_URL)
+            and is_configuration_missing(request)
         ):
-            if is_configuration_missing(request):
-                return RedirectResponse(url=CONFIGURATION_URL)
+            return RedirectResponse(url=CONFIGURATION_URL)
 
         response = await call_next(request)
-
         return response

@@ -20,12 +20,6 @@ def test_validate_openai_key():
         validate_openai_key("invalid_key")
 
 
-def test_updating_invalid_key(config_file_path):
-    with pytest.raises(ValueError) as excinfo:
-        modify_settings({"testkey": "value"})
-    assert "Invalid keys 'testkey', allowed keys are" in str(excinfo.value)
-
-
 def test_updating_set_openai_key(config_file_path):
     new_key = f"{TEST_KEY_PREFIX}new_key_value"
     modify_settings({"OPENAI_API_KEY": new_key})

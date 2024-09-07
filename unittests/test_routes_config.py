@@ -132,13 +132,13 @@ def test_missing_json_body(client, fake_openai_key):
 def test_redirect_on_missing_openai_key(client, no_openai_key):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.url.path == "/"
+    assert response.url.path == "/configuration/"
 
 
 def test_redirect_on_missing_openai_key_none(client, none_openai_key):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.url.path == "/"
+    assert response.url.path == "/configuration/"
 
 
 def test_no_redirect_openai_key(client, fake_openai_key):

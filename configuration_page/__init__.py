@@ -32,6 +32,7 @@ def is_any_ai_available():
 
 def update_openai_api_key(value: str):
     openai.api_key = value
+    os.environ["OPENAI_API_KEY"] = value
 
 
 def update_google_client_key(value: str):
@@ -58,6 +59,7 @@ def validate_openai_key(value: str):
 
 
 def update_anthropic_api_key(value: str):
+    Anthropic.api_key = value
     os.environ["ANTHROPIC_API_KEY"] = value
 
 
@@ -143,6 +145,8 @@ def modify_settings(settings: Dict[str, str], path: Optional[str] = None):
         meta = configuration_meta[key]
         if meta.update_callback:
             meta.update_callback(value)
+
+    reload_configuration()
 
     # Check AI availability after setting the environment variables
     is_any_ai_available()

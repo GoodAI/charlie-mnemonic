@@ -56,6 +56,9 @@ async def update_configuration(
             os.environ["GOOGLE_CLIENT_SECRET_PATH"] = file_path
 
         modify_settings(filtered)
+        from configuration_page import reload_configuration, update_api_keys
+
+        update_api_keys()
 
         return JSONResponse(content={"message": "Configuration updated successfully"})
     except Exception as e:

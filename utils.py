@@ -251,6 +251,14 @@ class AddonManager:
 
     @staticmethod
     async def load_addons(username, users_dir):
+        anthropic_api_key = api_keys.get("anthropic")
+        openai_api_key = api_keys.get("openai")
+        if anthropic_api_key:
+            active_model = "claude-3-opus-20240229"
+        elif openai_api_key:
+            active_model = "gpt-4o"
+        else:
+            active_model = "gpt-4o"
         default_settings = {
             "addons": {},
             "audio": {"voice_input": True, "voice_output": True},
@@ -260,7 +268,7 @@ class AddonManager:
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "timezone": {"timezone": "Auto"},
-            "active_model": {"active_model": "gpt-4o"},
+            "active_model": {"active_model": active_model},
             "memory": {
                 "functions": 6400,
                 "ltm1": 2560,

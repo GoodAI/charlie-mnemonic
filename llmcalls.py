@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import datetime
+import io
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import aiohttp
 import utils
+from PIL import Image
 
 from anthropic import AsyncAnthropic, APIStatusError, BadRequestError, RateLimitError
 from anthropic.types import ToolUseBlock, TextDelta
@@ -60,6 +62,91 @@ class ClaudeResponser:
                 collected_temp.append(full_content.split("</execute_code>")[-1])
                 return code_result
         return None
+
+    def resize_image(self, image_path, max_size_bytes=5 * 1024 * 1024):
+        """Resize the images because anthropic only allows max 5mb per file."""
+        with Image.open(image_path) as img:
+            img_format = img.format
+            img_byte_arr = io.BytesIO()
+
+            # Function to check base64 size
+            def check_size(img_bytes):
+                base64_size = len(base64.b64encode(img_bytes))
+                return base64_size <= max_size_bytes
+
+            # Initial save with original size
+            img.save(img_byte_arr, format=img_format)
+
+            if check_size(img_byte_arr.getvalue()):
+                return img_byte_arr.getvalue()
+
+            # If it's too big, start resizing
+            scale = 0.9
+            quality = 85
+
+            while not check_size(img_byte_arr.getvalue()):
+                img_byte_arr = io.BytesIO()
+                new_size = tuple(int(dim * scale) for dim in img.size)
+                resized_img = img.resize(new_size, Image.LANCZOS)
+
+                if img_format == "JPEG":
+                    resized_img.save(
+                        img_byte_arr, format=img_format, quality=quality, optimize=True
+                    )
+                else:
+                    resized_img.save(img_byte_arr, format=img_format, optimize=True)
+
+                scale *= 0.9
+                quality = max(quality - 5, 20)
+
+                # If we've reduced size significantly and it's still too big, convert to JPEG
+                if scale < 0.5 and img_format != "JPEG":
+                    img_format = "JPEG"
+                    resized_img = resized_img.convert("RGB")
+            # if the image is still too big, apply aggressive resize
+            if not check_size(img_byte_arr.getvalue()):
+                img_byte_arr = io.BytesIO()
+                img.thumbnail((800, 800), Image.LANCZOS)
+                img.save(img_byte_arr, format="JPEG", quality=50, optimize=True)
+                if not check_size(img_byte_arr.getvalue()):
+                    raise ValueError("Unable to resize image below 5MB limit")
+            return img_byte_arr.getvalue()
+
+    async def get_image_description(self, image_paths, prompt, username):
+        client = AsyncAnthropic(api_key=self.client.api_key)
+
+        content = []
+        for image_path in image_paths:
+            image_data = self.resize_image(image_path)
+            base64_image = base64.b64encode(image_data).decode("utf-8")
+            content.append(
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": f"image/{image_path.split('.')[-1].lower()}",
+                        "data": base64_image,
+                    },
+                }
+            )
+
+        content.append({"type": "text", "text": prompt})
+
+        try:
+            response = await client.messages.create(
+                model=self.model,
+                max_tokens=1000,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": content,
+                    }
+                ],
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Error in get_image_description: {e}")
+            return f"An error occurred while processing the image: {str(e)}"
 
     async def get_response(
         self,

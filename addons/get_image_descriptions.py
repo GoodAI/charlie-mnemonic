@@ -1,12 +1,9 @@
-import base64
 import os
-import openai
-import unidecode
 import config
-from llmcalls import OpenAIResponser
-from utils import convert_username
+from llmcalls import get_responder
+from utils import convert_username, SettingsManager
 
-description = "Get the descriptions of one or more images using the OpenAI Vision API, only use this for PNG, JPEG, and GIF and WEBP images."
+description = "Get the descriptions of one or more images using your vision capabilities, only use this for PNG, JPEG, GIF and WEBP images."
 parameters = {
     "type": "object",
     "properties": {
@@ -36,7 +33,16 @@ parameters = {
 
 
 async def get_image_descriptions(image_requests, username=None):
-    openai.api_key = config.api_keys["openai"]
+    settings = await SettingsManager.load_settings("users", username)
+    active_model = settings.get("active_model", {}).get("active_model", "gpt-4")
+
+    api_key = (
+        config.api_keys["openai"]
+        if active_model.startswith("gpt")
+        else config.api_keys["anthropic"]
+    )
+    responder = get_responder(api_key, active_model)
+
     results = []
     for request in image_requests:
         image_paths = request["image_paths"]
@@ -60,8 +66,7 @@ async def get_image_descriptions(image_requests, username=None):
             ]
 
         try:
-            openai_response = OpenAIResponser(config.api_keys["openai"])
-            resp = await openai_response.get_image_description(
+            resp = await responder.get_image_description(
                 image_paths=full_image_paths, prompt=prompt, username=username
             )
             results.append({"request": request, "description": resp})

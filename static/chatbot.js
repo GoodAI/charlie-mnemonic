@@ -36,7 +36,7 @@ function populateSettingsMenu(settings) {
     settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab1'));
     settingsMenu.appendChild(createChatSettingsTabContent(settings, 'tab2'));
     settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab3'));
-    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4'));
+    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4', settings.available_models));
     settingsMenu.appendChild(createUserDataTabContent('tab5'));
     settingsMenu.appendChild(createMemoryTabContent('tab6'));
 
@@ -176,7 +176,7 @@ function createAddonsTabContent(addons, tabId) {
     return tabContent;
 }
 
-function createAudioTabContent(audio, tabId) {
+function createAudioTabContent(audio, tabId, availableModels) {
     var tabContent = document.createElement('div');
     tabContent.id = tabId;
     tabContent.className = 'tab-content';
@@ -185,19 +185,30 @@ function createAudioTabContent(audio, tabId) {
     h3.innerHTML = '<i class="fas fa-volume-up"></i> Audio';
     tabContent.appendChild(h3);
 
-    for (let audioItem in audio) {
-        if (audio.hasOwnProperty(audioItem)) {
-            var menuItem = document.createElement('a');
-            menuItem.href = "#";
-            var status = audio[audioItem] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-            menuItem.innerHTML = audioItem + ": " + status;
-            menuItem.onclick = (function (audioItem) {
-                return function (e) {
-                    e.preventDefault();
-                    edit_status('audio', audioItem, !audio[audioItem]);
-                };
-            })(audioItem);
-            tabContent.appendChild(menuItem);
+    const hasOpenAIModel = availableModels.some(model => model.includes('gpt'));
+
+    if (!hasOpenAIModel) {
+        // Display message when no OpenAI API key is available
+        var messageDiv = document.createElement('div');
+        messageDiv.className = 'audio-settings-message';
+        messageDiv.textContent = 'An OpenAI API key is required for Text-to-Speech and Speech-to-Text functions.';
+        tabContent.appendChild(messageDiv);
+    } else {
+        // Create checkboxes for audio settings when OpenAI API key is available
+        for (let audioItem in audio) {
+            if (audio.hasOwnProperty(audioItem)) {
+                var menuItem = document.createElement('a');
+                menuItem.href = "#";
+                var status = audio[audioItem] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+                menuItem.innerHTML = audioItem + ": " + status;
+                menuItem.onclick = (function (audioItem) {
+                    return function (e) {
+                        e.preventDefault();
+                        edit_status('audio', audioItem, !audio[audioItem]);
+                    };
+                })(audioItem);
+                tabContent.appendChild(menuItem);
+            }
         }
     }
 
@@ -933,8 +944,10 @@ function showGoogleAuthModal(auth_uri) {
 }
 
 function handleAudioSettings(newSettings) {
+    const hasOpenAIModel = newSettings.available_models.some(model => model.includes('gpt'));
+
     // Handle voice input settings
-    if (newSettings.audio.voice_input) {
+    if (newSettings.audio.voice_input && hasOpenAIModel) {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(function (stream) {
                 $('#record').show();
@@ -949,7 +962,7 @@ function handleAudioSettings(newSettings) {
     }
 
     // Handle voice output settings
-    if (newSettings.audio.voice_output) {
+    if (newSettings.audio.voice_output && hasOpenAIModel) {
         addPlayButtonsToMessages();
     } else {
         removePlayButtonsAndAudioFromMessages();
@@ -1294,15 +1307,16 @@ async function handleCancelMessage(msg) {
 function addBottomButtons(div, model) {
     var buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'bottom-buttons-container';
+    
     // check if the settings exist
     if (!settings) {
         return;
     }
-    if (showDebug === true) {
-        console.log(settings);
-    }
+
+    const hasOpenAIModel = settings.available_models.some(model => model.includes('gpt'));
+
     // Check the settings to see if we need to add the audio play button
-    if (settings.audio.voice_output) {
+    if (settings.audio.voice_output && hasOpenAIModel) {
         var playButtonWrapper = document.createElement('div');
         playButtonWrapper.className = 'play-button-wrapper';
         var playButtonLink = document.createElement('a');
@@ -1318,6 +1332,10 @@ function addBottomButtons(div, model) {
         playButtonLink.appendChild(playButton);
         playButtonWrapper.appendChild(playButtonLink);
         buttonsContainer.appendChild(playButtonWrapper);
+    }
+
+    if (showDebug === true) {
+        console.log(settings);
     }
 
     // Create a copy button with the same structure and styling as the play button

@@ -35,6 +35,13 @@ let lastValidMessage = '';
 
 function playButtonHandler(element) {
     if (!element) return;
+
+    // Check if OpenAI models are available
+    if (!settings.available_models.some(model => model.includes('gpt'))) {
+        showNotification('Text-to-Speech is not available without an OpenAI API key.', 'warning');
+        return;
+    }
+
     element.classList.remove('fa-play');
     element.classList.add('fa-spinner');
 
@@ -308,6 +315,11 @@ if (logoutButton) {
 }
 
 document.getElementById('record').addEventListener('click', function () {
+    // Check if OpenAI models are available
+    if (!settings.available_models.some(model => model.includes('gpt'))) {
+        showNotification('Speech-to-Text is not available without an OpenAI API key.', 'warning');
+        return;
+    }
     // Initialize the default CSS box shadow
     var defaultBoxShadow = '0px 11px 35px 2px rgba(0, 0, 0, 0.20)';
     document.getElementById('message').style.boxShadow = defaultBoxShadow;

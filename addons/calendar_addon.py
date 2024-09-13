@@ -82,8 +82,10 @@ parameters = {
     "required": ["action"],
 }
 
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
-def calendar_addon(
+
+async def calendar_addon(
     action,
     max_results=10,
     time_min=None,
@@ -113,7 +115,9 @@ def calendar_addon(
         )
 
     if not creds or not creds.valid:
+        print(f"Cal Credentials are invalid for {username}")  # Debug print
         if creds and creds.expired and creds.refresh_token:
+            print(f"Cal Credentials are expired for {username}")  # Debug print
             try:
                 creds.refresh(Request())
                 # Save the refreshed credentials
@@ -123,6 +127,10 @@ def calendar_addon(
                 return f"Error refreshing credentials: {str(e)}. Please run the 'onEnable' function."
         else:
             return "Credentials are missing or invalid. Please run the 'onEnable' function."
+
+    # Check if the required scope is present
+    if "https://www.googleapis.com/auth/calendar" not in creds.scopes:
+        return "Calendar scope is missing. Please run the 'onEnable' function to grant the necessary permissions."
 
     try:
         service = build("calendar", "v3", credentials=creds)

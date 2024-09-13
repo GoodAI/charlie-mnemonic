@@ -19,6 +19,15 @@ SCOPES = [
 os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
 
 
+SCOPES = [
+    "https://www.googleapis.com/auth/calendar",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/cse",
+]
+
+
 async def onEnable(username, users_dir):
     creds = None
     username = convert_username(username)
@@ -70,6 +79,10 @@ async def onEnable(username, users_dir):
             else:
                 return {"error": "Google client secret path not found"}
 
+    # Save the refreshed or new credentials
+    with open(full_path, "w") as token:
+        token.write(creds.to_json())
+
     return None
 
 
@@ -102,19 +115,14 @@ def store_state(state, username):
 
 def get_username_from_state(state):
     file_path = get_state_file_path()
-    print(f"State file path: {file_path}")  # Debug print
     if not os.path.exists(file_path):
-        print("State file does not exist")  # Debug print
         return None
     with open(file_path, "r") as f:
         try:
             data = json.load(f)
             username = data.get(state)
-            print(f"State data: {data}")  # Debug print
-            print(f"Retrieved username for state {state}: {username}")  # Debug print
             return username
         except json.JSONDecodeError:
-            print("Failed to decode JSON in state file")  # Debug print
             return None
 
 

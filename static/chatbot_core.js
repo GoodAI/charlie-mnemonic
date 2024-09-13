@@ -575,6 +575,12 @@ function getBase64(file) {
 }
 
 function send_audio(file) {
+    // Check if OpenAI models are available
+    if (!settings.available_models.some(model => model.includes('gpt'))) {
+        showNotification('Speech-to-Text is not available without an OpenAI API key.', 'warning');
+        return;
+    }
+    
     // Create a FormData object
     var formData = new FormData();
 

@@ -124,10 +124,16 @@ class ConfigurationData(BaseModel):
         ...,
         title="OpenAI API key",
         description="This key is used for general OpenAI API calls and is required for the agent to work.",
-        required=True,
+        required=False,
     )
 
-    # Google Client Secret JSON path
+    ANTHROPIC_API_KEY: str = Field(
+        ...,
+        title="Anthropic API key",
+        description="This key is used for Anthropic API calls and is required for the agent to work with Anthropic models.",
+        required=False,
+    )
+
     GOOGLE_CLIENT_SECRET_PATH: str = Field(
         None,
         title="Google Client Secret JSON path",
@@ -159,7 +165,13 @@ class ConfigurationData(BaseModel):
             )
         return OrderedDict(result)
 
-    @validator("OPENAI_API_KEY", "GOOGLE_CLIENT_SECRET_PATH", pre=True, always=True)
+    @validator(
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GOOGLE_CLIENT_SECRET_PATH",
+        pre=True,
+        always=True,
+    )
     def check_not_empty(cls, v, field):
         if field.required and (v is None or v == ""):
             raise ValueError(f"{field.name} is required and cannot be empty")

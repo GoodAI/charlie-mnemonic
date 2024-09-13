@@ -36,7 +36,7 @@ function populateSettingsMenu(settings) {
     settingsMenu.appendChild(createGeneralSettingsTabContent(settings, 'tab1'));
     settingsMenu.appendChild(createChatSettingsTabContent(settings, 'tab2'));
     settingsMenu.appendChild(createAddonsTabContent(settings.addons, 'tab3'));
-    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4'));
+    settingsMenu.appendChild(createAudioTabContent(settings.audio, 'tab4', settings.available_models));
     settingsMenu.appendChild(createUserDataTabContent('tab5'));
     settingsMenu.appendChild(createMemoryTabContent('tab6'));
 
@@ -61,7 +61,9 @@ function populateSettingsMenu(settings) {
     // Convert the start values to percentages
     var startPercentages = startValues.map(value => value / maxRange);
 
-    slider.noUiSlider.set(startPercentages);
+    if (slider && slider.noUiSlider) {
+        slider.noUiSlider.set(startPercentages);
+    }
 
     var categories = document.getElementsByClassName('category');
     for (var i = 0; i < categories.length; i++) {
@@ -174,7 +176,7 @@ function createAddonsTabContent(addons, tabId) {
     return tabContent;
 }
 
-function createAudioTabContent(audio, tabId) {
+function createAudioTabContent(audio, tabId, availableModels) {
     var tabContent = document.createElement('div');
     tabContent.id = tabId;
     tabContent.className = 'tab-content';
@@ -183,19 +185,30 @@ function createAudioTabContent(audio, tabId) {
     h3.innerHTML = '<i class="fas fa-volume-up"></i> Audio';
     tabContent.appendChild(h3);
 
-    for (let audioItem in audio) {
-        if (audio.hasOwnProperty(audioItem)) {
-            var menuItem = document.createElement('a');
-            menuItem.href = "#";
-            var status = audio[audioItem] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
-            menuItem.innerHTML = audioItem + ": " + status;
-            menuItem.onclick = (function (audioItem) {
-                return function (e) {
-                    e.preventDefault();
-                    edit_status('audio', audioItem, !audio[audioItem]);
-                };
-            })(audioItem);
-            tabContent.appendChild(menuItem);
+    const hasOpenAIModel = availableModels.some(model => model.includes('gpt'));
+
+    if (!hasOpenAIModel) {
+        // Display message when no OpenAI API key is available
+        var messageDiv = document.createElement('div');
+        messageDiv.className = 'audio-settings-message';
+        messageDiv.textContent = 'An OpenAI API key is required for Text-to-Speech and Speech-to-Text functions.';
+        tabContent.appendChild(messageDiv);
+    } else {
+        // Create checkboxes for audio settings when OpenAI API key is available
+        for (let audioItem in audio) {
+            if (audio.hasOwnProperty(audioItem)) {
+                var menuItem = document.createElement('a');
+                menuItem.href = "#";
+                var status = audio[audioItem] ? '<i class="fas fa-check-square"></i>' : '<i class="fas fa-square-full"></i>';
+                menuItem.innerHTML = audioItem + ": " + status;
+                menuItem.onclick = (function (audioItem) {
+                    return function (e) {
+                        e.preventDefault();
+                        edit_status('audio', audioItem, !audio[audioItem]);
+                    };
+                })(audioItem);
+                tabContent.appendChild(menuItem);
+            }
         }
     }
 
@@ -434,32 +447,38 @@ function createChatSettingsTabContent(settings, tabId) {
     }
     tabContent.appendChild(verboseItem);
 
-     // Populate chat model choice settings
-     h3 = document.createElement('h3');
-     h3.innerHTML = '<i class="fas fa-robot"></i> Chat Model';
-     tabContent.appendChild(h3);
-     var chatModelItem = document.createElement('select');
-     chatModelItem.id = 'chatModel';
-     chatModelItem.name = 'chatModel';
-     
-     Object.keys(modelMaxTokens).forEach(function (chatModel) {
-         var option = document.createElement('option');
-         option.value = chatModel;
-         option.text = `${chatModel} (Max ${modelMaxTokens[chatModel]} tokens)`;
-         chatModelItem.appendChild(option);
-     });
-     
-     chatModelItem.value = settings.active_model.active_model;
-     chatModelItem.onchange = function (e) {
-         updateModelAndTokens(e.target.value);
-     }
- 
-     tabContent.appendChild(chatModelItem);
- 
-     return tabContent;
- }
+    // Populate chat model choice settings
+    h3 = document.createElement('h3');
+    h3.innerHTML = '<i class="fas fa-robot"></i> Chat Model';
+    tabContent.appendChild(h3);
+    var chatModelItem = document.createElement('select');
+    chatModelItem.id = 'chatModel';
+    chatModelItem.name = 'chatModel';
+    
+    if (settings.available_models) {
+        settings.available_models.forEach(function (chatModel) {
+            var option = document.createElement('option');
+            option.value = chatModel;
+            option.text = `${chatModel} (Max ${modelMaxTokens[chatModel]} tokens)`;
+            chatModelItem.appendChild(option);
+        });
+    }
+    
+    chatModelItem.value = settings.active_model.active_model;
+    chatModelItem.onchange = function (e) {
+        updateModelAndTokens(e.target.value);
+    }
+
+    tabContent.appendChild(chatModelItem);
+
+    return tabContent;
+}
  
  function updateModelAndTokens(newModel) {
+    if (newModel === settings.active_model.active_model) {
+        return; // No change, exit early
+    }
+
     const newModelMaxTokens = modelMaxTokens[newModel];
     const currentSettings = settings.memory;
     const currentOutput = currentSettings.output;
@@ -511,6 +530,7 @@ function createChatSettingsTabContent(settings, tabId) {
     saveMemoryConfiguration(newSettings);
 
     // Update the model in settings
+    settings.active_model.active_model = newModel;
     edit_status('active_model', 'active_model', newModel);
 
     // Show notification
@@ -806,6 +826,30 @@ function edit_status(category, setting, value) {
         .catch(console.error);
 };
 
+function updateModelDropdown(availableModels, currentModel) {
+    const chatModelItem = document.getElementById('chatModel');
+    if (!chatModelItem) {
+        console.warn("Chat model dropdown not found in the DOM");
+        return;
+    }
+
+    chatModelItem.innerHTML = ''; // Clear existing options
+
+    availableModels.forEach(function (chatModel) {
+        var option = document.createElement('option');
+        option.value = chatModel;
+        option.text = `${chatModel} (Max ${modelMaxTokens[chatModel]} tokens)`;
+        chatModelItem.appendChild(option);
+    });
+
+    // Set the current model without triggering the onchange event
+    if (availableModels.includes(currentModel)) {
+        chatModelItem.value = currentModel;
+    } else if (availableModels.length > 0) {
+        chatModelItem.value = availableModels[0];
+    }
+}
+
 function setSettings(newSettings) {
     // import the settings and populate the settings menu
     const overlay = document.getElementById('overlay_msg');
@@ -837,27 +881,34 @@ function setSettings(newSettings) {
             handleDailyUsage(newSettings);
         }
 
+        // Store available models
+        if (newSettings.available_models && Array.isArray(newSettings.available_models)) {
+            settings.available_models = newSettings.available_models;
+        }
+
         // Update the system prompt settings
         if (newSettings.system_prompt) {
             var systemPromptSwitch = document.getElementById('system-prompt-switch');
             var systemPromptDropdown = document.getElementById('system-prompt-dropdown');
             var systemPromptTextarea = document.getElementById('system-prompt-textarea');
 
-            if (newSettings.system_prompt.system_prompt === 'None') {
-                systemPromptSwitch.checked = false;
-                systemPromptDropdown.disabled = true;
-                systemPromptTextarea.style.display = 'none';
-            } else {
-                systemPromptSwitch.checked = true;
-                systemPromptDropdown.disabled = false;
-
-                if (newSettings.system_prompt.system_prompt === 'stoic') {
-                    systemPromptDropdown.value = 'stoic';
+            if (systemPromptSwitch && systemPromptDropdown && systemPromptTextarea) {
+                if (newSettings.system_prompt.system_prompt === 'None') {
+                    systemPromptSwitch.checked = false;
+                    systemPromptDropdown.disabled = true;
                     systemPromptTextarea.style.display = 'none';
                 } else {
-                    systemPromptDropdown.value = 'custom';
-                    systemPromptTextarea.value = newSettings.system_prompt.system_prompt;
-                    systemPromptTextarea.style.display = 'block';
+                    systemPromptSwitch.checked = true;
+                    systemPromptDropdown.disabled = false;
+
+                    if (newSettings.system_prompt.system_prompt === 'stoic') {
+                        systemPromptDropdown.value = 'stoic';
+                        systemPromptTextarea.style.display = 'none';
+                    } else {
+                        systemPromptDropdown.value = 'custom';
+                        systemPromptTextarea.value = newSettings.system_prompt.system_prompt;
+                        systemPromptTextarea.style.display = 'block';
+                    }
                 }
             }
         }
@@ -883,7 +934,7 @@ function setSettings(newSettings) {
         showGoogleAuthModal(settings.auth_uri);
     }
     applyTooltips('[data-tooltip]');
-};
+}
 
 function showGoogleAuthModal(auth_uri) {
     var googleAuthModal = document.getElementById('googleAuthModal');
@@ -893,8 +944,10 @@ function showGoogleAuthModal(auth_uri) {
 }
 
 function handleAudioSettings(newSettings) {
+    const hasOpenAIModel = newSettings.available_models.some(model => model.includes('gpt'));
+
     // Handle voice input settings
-    if (newSettings.audio.voice_input) {
+    if (newSettings.audio.voice_input && hasOpenAIModel) {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(function (stream) {
                 $('#record').show();
@@ -909,7 +962,7 @@ function handleAudioSettings(newSettings) {
     }
 
     // Handle voice output settings
-    if (newSettings.audio.voice_output) {
+    if (newSettings.audio.voice_output && hasOpenAIModel) {
         addPlayButtonsToMessages();
     } else {
         removePlayButtonsAndAudioFromMessages();
@@ -1062,6 +1115,17 @@ function handleUsage(msg) {
     userStats.innerHTML += '<p>Lifetime: Tokens: ' + msg.usage.total_tokens + ', cost: $' + msg.usage.total_cost + '</p>';
 
 }
+
+function handleAudioCost(msg) {
+    // update the userStats with the new usage
+    var userStats = document.getElementById('userStats');
+    userStats.innerHTML = '';
+    // add the audio cost to the total cost
+    var totalCost = parseFloat(msg.audio_cost.total_cost) + parseFloat(msg.audio_cost.audio_cost);
+    userStats.innerHTML += '<p>Lifetime: Tokens: ' + msg.audio_cost.total_tokens + ', cost: $' + totalCost.toFixed(5) + '</p>';
+
+}
+
 
 function handleDailyUsage(msg) {
     // update the userStats with the new usage
@@ -1243,15 +1307,16 @@ async function handleCancelMessage(msg) {
 function addBottomButtons(div, model) {
     var buttonsContainer = document.createElement('div');
     buttonsContainer.className = 'bottom-buttons-container';
+    
     // check if the settings exist
     if (!settings) {
         return;
     }
-    if (showDebug === true) {
-        console.log(settings);
-    }
+
+    const hasOpenAIModel = settings.available_models.some(model => model.includes('gpt'));
+
     // Check the settings to see if we need to add the audio play button
-    if (settings.audio.voice_output) {
+    if (settings.audio.voice_output && hasOpenAIModel) {
         var playButtonWrapper = document.createElement('div');
         playButtonWrapper.className = 'play-button-wrapper';
         var playButtonLink = document.createElement('a');
@@ -1267,6 +1332,10 @@ function addBottomButtons(div, model) {
         playButtonLink.appendChild(playButton);
         playButtonWrapper.appendChild(playButtonLink);
         buttonsContainer.appendChild(playButtonWrapper);
+    }
+
+    if (showDebug === true) {
+        console.log(settings);
     }
 
     // Create a copy button with the same structure and styling as the play button
@@ -2147,6 +2216,9 @@ function get_settings(username) {
             }
             else if (msg.usage) {
                 handleUsage(msg);
+            }
+            else if (msg.audio_cost) {
+                handleAudioCost(msg);
             }
             else if (msg.daily_usage) {
                 handleDailyUsage(msg);

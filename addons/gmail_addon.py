@@ -129,6 +129,12 @@ parameters = {
     "required": ["action"],
 }
 
+GMAIL_SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
+
 
 def gmail_addon(
     action,
@@ -166,6 +172,10 @@ def gmail_addon(
                 return f"Error refreshing credentials: {str(e)}. Please run the 'onEnable' function."
         else:
             return "Credentials are missing or invalid. Please run the 'onEnable' function."
+
+    # Check if the required scope is present
+    if "https://www.googleapis.com/auth/gmail.modify" not in creds.scopes:
+        return "Gmail modify scope is missing. Please run the 'onEnable' function to grant the necessary permissions."
 
     try:
         service = build("gmail", "v1", credentials=creds)

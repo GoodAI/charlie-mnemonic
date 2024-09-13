@@ -7,27 +7,42 @@ from typing import Optional, Dict, Callable
 import openai
 from dotenv import load_dotenv
 from openai import AuthenticationError
+from anthropic import Anthropic
 
 from config import update_api_keys, DEFAULT_CLANG_SYSTEM_CONFIGURATION_FILE
 from configuration_page.dotenv_util import update_dotenv_contents, update_dotenv_file
 
+TEST_KEY_PREFIX = "test-token-"
+
+
+def is_openai_available():
+    return bool(os.environ.get("OPENAI_API_KEY"))
+
+
+def is_anthropic_available():
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+def is_any_ai_available():
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    result = bool(openai_key) or bool(anthropic_key)
+    return result
+
 
 def update_openai_api_key(value: str):
     openai.api_key = value
+    os.environ["OPENAI_API_KEY"] = value
 
 
 def update_google_client_key(value: str):
     os.environ["GOOGLE_CLIENT_SECRET_PATH"] = value
 
 
-TEST_KEY_PREFIX = "test-token-"
-
-
 def validate_google_client_key(value: str):
     if value.startswith(TEST_KEY_PREFIX):
         # when we see this prefix, we ignore the validator (used in tests)
         return
-    print("file path:", value)
     if not os.path.exists(value):
         raise ValueError("Google client secret file does not exist.")
 
@@ -41,6 +56,23 @@ def validate_openai_key(value: str):
         openai.models.list()
     except AuthenticationError as e:
         raise ValueError("Invalid OpenAI API key.") from e
+
+
+def update_anthropic_api_key(value: str):
+    Anthropic.api_key = value
+    os.environ["ANTHROPIC_API_KEY"] = value
+
+
+def validate_anthropic_key(value: str):
+    if value.startswith(TEST_KEY_PREFIX):
+        print("Test key detected, skipping validation")
+        return
+    try:
+        client = Anthropic(api_key=value)
+        token_count = client.count_tokens("Validating Anthropic API key")
+    except Exception as e:
+        print(f"Anthropic key validation failed: {str(e)}")
+        raise ValueError("Invalid Anthropic API key.") from e
 
 
 def reload_configuration():
@@ -71,12 +103,18 @@ configuration_meta_list = [
         key="OPENAI_API_KEY",
         update_callback=update_openai_api_key,
         validate_callback=validate_openai_key,
-        is_valid=lambda: openai.api_key and os.environ.get("OPENAI_API_KEY", None),
+        is_valid=is_openai_available,
     ),
     ConfigurationMeta(
         key="GOOGLE_CLIENT_SECRET_PATH",
         update_callback=update_google_client_key,
         input_type="file",
+    ),
+    ConfigurationMeta(
+        key="ANTHROPIC_API_KEY",
+        update_callback=update_anthropic_api_key,
+        validate_callback=validate_anthropic_key,
+        is_valid=is_anthropic_available,
     ),
 ]
 
@@ -100,7 +138,6 @@ def modify_settings(settings: Dict[str, str], path: Optional[str] = None):
         if key in settings and meta.validate_callback:
             meta.validate_callback(settings[key])
 
-    # TODO: callbacks for certain key updates (update API key in libraries where necessary)
     path = path or configuration_file()
     update_dotenv_file(path=path, updates=settings)
     for key, value in settings.items():
@@ -108,3 +145,8 @@ def modify_settings(settings: Dict[str, str], path: Optional[str] = None):
         meta = configuration_meta[key]
         if meta.update_callback:
             meta.update_callback(value)
+
+    reload_configuration()
+
+    # Check AI availability after setting the environment variables
+    is_any_ai_available()

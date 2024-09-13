@@ -55,15 +55,19 @@ def client():
 
 @pytest.fixture(autouse=True)
 def config_file_path():
-    tmp = tempfile.NamedTemporaryFile(delete=False)
-    os.environ["CLANG_SYSTEM_CONFIGURATION_FILE"] = tmp.name
-    return tmp.name
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        os.environ["CLANG_SYSTEM_CONFIGURATION_FILE"] = tmp.name
+        yield tmp.name
+    try:
+        os.unlink(tmp.name)
+    except PermissionError:
+        pass  # If we can't delete it now, it will be deleted on next run
 
 
 @pytest.fixture(autouse=False)
 def fake_openai_key():
-    openai.api_key = "accepted-fake-key"
-    os.environ["OPENAI_API_KEY"] = "accepted-fake-key"
+    openai.api_key = f"{TEST_KEY_PREFIX}accepted-fake-key"
+    os.environ["OPENAI_API_KEY"] = f"{TEST_KEY_PREFIX}accepted-fake-key"
     yield
 
 
@@ -88,22 +92,10 @@ def test_configuration_page_working(client, fake_openai_key):
 
 def test_updating_invalid_key(client, fake_openai_key):
     response = client.post(CONFIGURATION_URL, data={"testkey": "value"})
-    content = response.json()
-    assert (
-        response.status_code == 422
-    ), f"""
-    Expected 422, but was {response.status_code}
-    Content:
-    {content}
-    """
-    assert "detail" in content
-    assert content["detail"] == [
-        {
-            "loc": ["body", "OPENAI_API_KEY"],
-            "msg": "field required",
-            "type": "value_error.missing",
-        }
-    ]
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided"
+    }
 
 
 @pytest.mark.skipif(
@@ -131,32 +123,22 @@ OPENAI_API_KEY={TEST_KEY_PREFIX}value
 
 def test_missing_json_body(client, fake_openai_key):
     response = client.post(CONFIGURATION_URL)
-    content = response.json()
-    assert (
-        response.status_code == 422
-    ), f"""
-Expected 422, but was {response.status_code}
-Content:
-{content}
-"""
-    assert "detail" in content
-    assert content["detail"] == [
-        {
-            "loc": ["body", "OPENAI_API_KEY"],
-            "msg": "field required",
-            "type": "value_error.missing",
-        }
-    ]
+    assert response.status_code == 400
+    assert response.json() == {
+        "error": "Either OPENAI_API_KEY or ANTHROPIC_API_KEY must be provided"
+    }
 
 
 def test_redirect_on_missing_openai_key(client, no_openai_key):
     response = client.get("/")
-    assert response.url.path == CONFIGURATION_URL
+    assert response.status_code == 200
+    assert response.url.path == "/configuration/"
 
 
 def test_redirect_on_missing_openai_key_none(client, none_openai_key):
     response = client.get("/")
-    assert response.url.path == CONFIGURATION_URL
+    assert response.status_code == 200
+    assert response.url.path == "/configuration/"
 
 
 def test_no_redirect_openai_key(client, fake_openai_key):

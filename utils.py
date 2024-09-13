@@ -42,6 +42,29 @@ max_responses = 1
 COT_RETRIES = {}
 stopPressed = {}
 
+MODEL_COSTS = {
+    "gpt-4o": {
+        "input": 0.000005,  # $5.00 / 1M tokens
+        "output": 0.000015,  # $15.00 / 1M tokens
+    },
+    "gpt-4o-mini": {
+        "input": 0.00000015,  # $0.150 / 1M tokens
+        "output": 0.0000006,  # $0.600 / 1M tokens
+    },
+    "gpt-4-turbo": {
+        "input": 0.00001,  # $10.00 / 1M tokens
+        "output": 0.00003,  # $30.00 / 1M tokens
+    },
+    "claude-3-5-sonnet-20240620": {
+        "input": 0.000003,  # $3 / 1M tokens
+        "output": 0.000015,  # $15 / 1M tokens
+    },
+    "claude-3-opus-20240229": {
+        "input": 0.000015,  # $15 / 1M tokens
+        "output": 0.000075,  # $75 / 1M tokens
+    },
+}
+
 
 class MessageSender:
     """This class contains functions to send messages to the user"""
@@ -72,48 +95,91 @@ class MessageSender:
     async def update_token_usage(response, username, brain=False, elapsed=0):
         """Update the token usage in the database"""
         try:
-            if not isinstance(response, str) and hasattr(response, "usage"):
-                # Safely access attributes with default values
-                total_tokens_used = getattr(response.usage, "total_tokens", 0)
-                prompt_tokens = getattr(response.usage, "prompt_tokens", 0)
-                completion_tokens = getattr(response.usage, "completion_tokens", 0)
+            settings = await SettingsManager.load_settings("users", username)
+            current_model = settings["active_model"]["active_model"]
 
+            # if the response is audio_cost update the audio cost
+            if "audio_cost" in response:
+                audio_cost = response["audio_cost"]
+
+                total_cost = 0
+                # update the total cost with the whisper cost
                 with Database() as db:
-                    result = db.update_token_usage(
+                    db.add_whisper_usage(username, audio_cost)
+                    total_tokens_used, total_cost = db.get_token_usage(username)
+                await MessageSender.send_message(
+                    {
+                        "audio_cost": {
+                            "audio_cost": audio_cost,
+                            "total_cost": total_cost,
+                            "total_tokens": total_tokens_used,
+                        }
+                    },
+                    "red",
+                    username,
+                )
+                # we don't need to update the token usage for audio
+                return
+
+            elif hasattr(response, "usage"):
+                usage = response.usage
+                if hasattr(usage, "input_tokens") and hasattr(usage, "output_tokens"):
+                    # Claude structure
+                    total_tokens_used = usage.input_tokens + usage.output_tokens
+                    input_tokens = usage.input_tokens
+                    output_tokens = usage.output_tokens
+                elif hasattr(usage, "prompt_tokens") and hasattr(
+                    usage, "completion_tokens"
+                ):
+                    # OpenAI structure
+                    total_tokens_used = usage.total_tokens
+                    input_tokens = usage.prompt_tokens
+                    output_tokens = usage.completion_tokens
+                else:
+                    return
+            else:
+                return
+
+            with Database() as db:
+                result = db.update_token_usage(
+                    username,
+                    total_tokens_used=total_tokens_used,
+                    prompt_tokens=input_tokens,
+                    completion_tokens=output_tokens,
+                )
+                if result is not None:
+                    await MessageSender.send_debug(
+                        f"Last message: Input tokens: {input_tokens}, Output tokens: {output_tokens}\nTotal tokens used: {result[0]}, Input tokens: {result[1]}, Output tokens: {result[2]}",
+                        2,
+                        "red",
                         username,
-                        total_tokens_used=total_tokens_used,
-                        prompt_tokens=prompt_tokens,
-                        completion_tokens=completion_tokens,
                     )
-                    if result is not None:
-                        await MessageSender.send_debug(
-                            f"Last message: Prompt tokens: {response.usage.prompt_tokens}, Completion tokens: {response.usage.completion_tokens}\nTotal tokens used: {result[0]}, Prompt tokens: {result[1]}, Completion tokens: {result[2]}",
-                            2,
-                            "red",
-                            username,
-                        )
 
-                        prompt_cost = round(response.usage.prompt_tokens * 0.00001, 5)
-                        completion_cost = round(
-                            response.usage.completion_tokens * 0.00003, 5
-                        )
-                        this_message_total_cost = round(
-                            prompt_cost + completion_cost, 5
-                        )
+                    # Calculate costs based on the current model
+                    if current_model in MODEL_COSTS:
+                        model_cost = MODEL_COSTS[current_model]
+                        input_cost = round(input_tokens * model_cost["input"], 5)
+                        output_cost = round(output_tokens * model_cost["output"], 5)
+                    else:
+                        input_cost = round(input_tokens * 0.00001, 5)
+                        output_cost = round(output_tokens * 0.00003, 5)
 
-                        total_prompt_cost = round(result[1] * 0.00001, 5)
-                        total_completion_cost = round(result[2] * 0.00003, 5)
-                        total_cost = round(total_prompt_cost + total_completion_cost, 5)
-                        await MessageSender.send_message(
-                            {
-                                "usage": {
-                                    "total_tokens": result[0],
-                                    "total_cost": total_cost,
-                                }
-                            },
-                            "red",
-                            username,
-                        )
+                    this_message_total_cost = round(input_cost + output_cost, 5)
+
+                    total_input_cost = round(result[1] * model_cost["input"], 5)
+                    total_output_cost = round(result[2] * model_cost["output"], 5)
+                    total_cost = round(total_input_cost + total_output_cost, 5)
+
+                    await MessageSender.send_message(
+                        {
+                            "usage": {
+                                "total_tokens": result[0],
+                                "total_cost": total_cost,
+                            }
+                        },
+                        "red",
+                        username,
+                    )
 
                     daily_stats = db.get_daily_stats(username)
                     if daily_stats is not None:
@@ -125,20 +191,22 @@ class MessageSender:
                     await MessageSender.send_message(
                         {"daily_usage": {"daily_cost": spending_count}}, "red", username
                     )
+
                     # update the daily_stats table
                     if brain:
                         db.update_daily_stats_token_usage(
                             username,
-                            brain_tokens=response.usage.prompt_tokens,
+                            brain_tokens=input_tokens,
                             spending_count=this_message_total_cost,
                         )
                     else:
                         db.update_daily_stats_token_usage(
                             username,
-                            prompt_tokens=response.usage.prompt_tokens,
-                            generation_tokens=response.usage.completion_tokens,
+                            prompt_tokens=input_tokens,
+                            generation_tokens=output_tokens,
                             spending_count=this_message_total_cost,
                         )
+
                     current_stats_spending_count = (
                         db.get_statistic(username)["total_spending_count"] or 0
                     )
@@ -147,6 +215,7 @@ class MessageSender:
                     )
                     # update the statistics table
                     db.update_statistic(username, total_spending_count=spending_count)
+
                     # update the elapsed time
                     # get the total response time and response count from the database
                     stats = db.get_daily_stats(username)
@@ -169,6 +238,7 @@ class MessageSender:
                         average_response_time=average_response_time,
                         response_count=response_count,
                     )
+
         except Exception as e:
             logger.exception(f"An error occurred (utils): {e}")
             await MessageSender.send_message(
@@ -181,6 +251,14 @@ class AddonManager:
 
     @staticmethod
     async def load_addons(username, users_dir):
+        anthropic_api_key = api_keys.get("anthropic")
+        openai_api_key = api_keys.get("openai")
+        if anthropic_api_key:
+            active_model = "claude-3-opus-20240229"
+        elif openai_api_key:
+            active_model = "gpt-4o"
+        else:
+            active_model = "gpt-4o"
         default_settings = {
             "addons": {},
             "audio": {"voice_input": True, "voice_output": True},
@@ -190,7 +268,7 @@ class AddonManager:
             "cot_enabled": {"cot_enabled": False},
             "verbose": {"verbose": False},
             "timezone": {"timezone": "Auto"},
-            "active_model": {"active_model": "gpt-4o"},
+            "active_model": {"active_model": active_model},
             "memory": {
                 "functions": 6400,
                 "ltm1": 2560,
@@ -426,11 +504,11 @@ class MessageParser:
         return text
 
     @staticmethod
-    async def start_image_description(image_path, prompt, file_name):
+    async def start_image_description(image_path, prompt, file_name, username):
         """Get the description of an image using the OpenAI Vision API, asynchronously."""
         openai_response = llmcalls.OpenAIResponser(api_keys["openai"], default_params)
         resp = await openai_response.get_image_description(
-            image_path=image_path, prompt=prompt, filename=file_name
+            image_path=image_path, prompt=prompt, filename=file_name, username=username
         )
         result = prompts.image_description.format(prompt, file_name, resp)
         return result
@@ -1656,3 +1734,23 @@ def format_result(result: dict) -> str:
     if "error" in result:
         output += f"Error: {result['error']}\n"
     return output
+
+
+async def get_audio_duration(audio_path) -> int:
+    try:
+        audio = audio_segment.AudioSegment.from_file(audio_path)
+        return len(audio) / 1000
+    except Exception as e:
+        logger.error(f"Error getting audio duration: {e}")
+        return 0
+
+
+def get_available_models():
+    available_models = []
+    if os.environ.get("OPENAI_API_KEY"):
+        available_models.extend(["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"])
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        available_models.extend(
+            ["claude-3-5-sonnet-20240620", "claude-3-opus-20240229"]
+        )
+    return available_models

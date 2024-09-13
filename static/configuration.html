@@ -21,29 +21,51 @@
     <body>
         <div class="container">
             <h1>System configuration</h1>
-            <p>Welcome to Charlie Mnemonic! Please enter the following information to start using it.</p>
+            <p>
+                Welcome to Charlie Mnemonic! Please enter the following information to start using it. Only 1 API key is required to continue.
+            </p>
             <div id="alert-wrap"></div>
             <form id="configuration-form"
                   method="post"
                   action="/configuration/"
                   enctype="multipart/form-data">
-                {% for key, value in config.items() %}
-                    <div class="mb-3">
-                        <label for="field-{{ key }}" class="form-label">
-                            {{ value.title }}
-                            {% if value.required %}(required){% endif %}
-                        </label>
-                        <input id="field-{{ key }}"
-                               name="{{ key }}"
-                               value="{{ value.value }}"
-                               type="{{ value.input_type }}"
-                               autocomplete="off"
-                               class="form-control"
-                               {% if value.required %}required="required"{% endif %}
-                               aria-describedby="help-{{ key }}" />
-                        <div id="help-{{ key }}" class="form-text">{{ value.help_text|safe }}</div>
+                <div class="mb-3">
+                    <label for="field-OPENAI_API_KEY" class="form-label">OpenAI API Key</label>
+                    <input id="field-OPENAI_API_KEY"
+                           name="OPENAI_API_KEY"
+                           value="{{ config.OPENAI_API_KEY.value }}"
+                           type="password"
+                           autocomplete="off"
+                           class="form-control"
+                           aria-describedby="help-OPENAI_API_KEY" />
+                    <div id="help-OPENAI_API_KEY" class="form-text">
+                        Enter your OpenAI API key here. You can obtain one from <a href="https://platform.openai.com/account/api-keys" target="_blank">OpenAI's website</a>.
                     </div>
-                {% endfor %}
+                </div>
+                <div class="mb-3">
+                    <label for="field-ANTHROPIC_API_KEY" class="form-label">Anthropic API Key</label>
+                    <input id="field-ANTHROPIC_API_KEY"
+                           name="ANTHROPIC_API_KEY"
+                           value="{{ config.ANTHROPIC_API_KEY.value }}"
+                           type="password"
+                           autocomplete="off"
+                           class="form-control"
+                           aria-describedby="help-ANTHROPIC_API_KEY" />
+                    <div id="help-ANTHROPIC_API_KEY" class="form-text">
+                        Enter your Anthropic API key here. You can obtain one from <a href="https://console.anthropic.com/" target="_blank">Anthropic's website</a>.
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label for="field-GOOGLE_CLIENT_SECRET_PATH" class="form-label">Google Client Secret File</label>
+                    <input id="field-GOOGLE_CLIENT_SECRET_PATH"
+                           name="GOOGLE_CLIENT_SECRET_PATH"
+                           type="file"
+                           class="form-control"
+                           aria-describedby="help-GOOGLE_CLIENT_SECRET_PATH" />
+                    <div id="help-GOOGLE_CLIENT_SECRET_PATH" class="form-text">
+                        Upload your Google Client Secret JSON file here. <a href="#" data-bs-toggle="modal" data-bs-target="#guideModal">How to obtain this file?</a>
+                    </div>
+                </div>
                 <a class="btn btn-secondary" href="/">To the agent</a>
                 <button type="submit" class="btn btn-primary">Submit</button>
             </form>
@@ -92,6 +114,10 @@ function success(message) {
     <span class="alert-message">${message}</span>
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>`
+    // redirect to the agent after 2 seconds
+    setTimeout(() => {
+        window.location.href = "/";
+    }, 2000);
 }
 
 function error(message) {
@@ -104,25 +130,32 @@ function error(message) {
 async function updateConfiguration(event) {
     event.preventDefault();
     let formData = new FormData(this);
-    fetch(this.action, {
-        method: 'POST',
-        body: formData,
-    }).then(response => response.json().then(data => ({
-        ok: response.ok,
-        status: response.status,
-        body: data
-    }))).then(response => {
+    
+    // Check if at least one API key is provided
+    if (!formData.get('OPENAI_API_KEY') && !formData.get('ANTHROPIC_API_KEY')) {
+        error("Either OpenAI API Key or Anthropic API Key must be provided.");
+        return false;
+    }
+
+    try {
+        const response = await fetch(this.action, {
+            method: 'POST',
+            body: formData,
+        });
+
+        const data = await response.json();
+
         if (response.ok) {
-            success(response.body["message"]);
-            setTimeout(() => {
-                window.location.href = "/";
-            }, 1000);
+            success(data.message);
+            if (data.redirect) {
+                window.location.href = data.redirect;
+            }
         } else {
-            error(response.body["detail"]);
+            error(data.error || "An error occurred while updating the configuration.");
         }
-    }).catch((err) => {
-        error(err);
-    });
+    } catch (err) {
+        error("An error occurred: " + err.message);
+    }
 
     return false;
 }

@@ -8,7 +8,10 @@ from colorama import Fore, Style, init
 
 import llmcalls
 from config import api_keys, default_params
+from memory import MemoryManager
 from utils import MessageSender, SettingsManager, AddonManager
+import utils
+import memory as _memory
 
 # Initialize colorama
 init(autoreset=True)
@@ -107,6 +110,20 @@ async def chain_of_thought_addon(
     debug_print(f"Starting CoT process for input: {input}", Fore.CYAN)
     debug_print(f"Using model: {model}", Fore.CYAN)
 
+    # fetch the previous 10 messages from the chat
+    memory = _memory.MemoryManager()
+    recent_messages = await memory.get_most_recent_messages(
+        "active_brain", username, chat_id=chat_id, n_results=10
+    )
+
+    # we only need the document field, lets extract it and format it nicely as a string
+    recent_messages = [message["document"] for message in recent_messages]
+
+    # properly format the recent messages
+    formatted_messages = "\n".join(recent_messages)
+
+    debug_print(f"Recent messages: {recent_messages}", Fore.CYAN)
+
     # Generate the pipeline
     debug_print("Generating pipeline", Fore.YELLOW)
     pipeline_messages = [
@@ -120,7 +137,7 @@ For example: ["Step 1: Plan Project", "Step 2: Write base code to app.py with py
         },
         {
             "role": "user",
-            "content": f"Create a detailed plan for the following task: {input}",
+            "content": f"Previous messages in the context: {formatted_messages}\n\nCreate a detailed plan for the following task: {input}\n\nRemember to use as few steps as possible, preferably less than 10,  include filepaths, data or info, and separate each task or tool usage into a new step. For example, generating images and writing code should be 2 steps. It is important to put no additional text or comments before or after the JSON! Only output the JSON array.",
         },
     ]
 

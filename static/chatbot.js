@@ -9,6 +9,8 @@ const modelMaxTokens = {
     'gpt-4o': 4096,
     'gpt-4o-mini': 16384,
     'gpt-4-turbo': 4096,
+    'o1-mini': 65536,
+    'o1-preview': 32768,
     'claude-3-5-sonnet-20240620': 8192,
     'claude-3-opus-20240229': 4096
 };
@@ -153,6 +155,14 @@ function createAddonsTabContent(addons, tabId) {
         {
             name: 'google_search',
             description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
+        },
+        {
+            name: 'chain_of_thought_addon',
+            description: 'This addon implements a chain of thought process for executing complex tasks. It generates a plan, executes it step by step, and can use other enabled addons to complete the task.'
+        },
+        {
+            name: 'search_visual_history',
+            description: 'Search in your visual history (Charlie Recall) for screenshots and their descriptions. The results are semantic similar results.'
         }
     ];
 

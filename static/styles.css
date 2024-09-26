@@ -234,6 +234,7 @@ a {
 
 .chat-tabs-container {
     width: 100%;
+    height: 70vh;
 }
 
 
@@ -682,7 +683,7 @@ a {
     display: block;
     max-width: 100%;
     height: auto;
-    margin-bottom: 10px;
+    margin: 10px;
 }
 
 .bubble {

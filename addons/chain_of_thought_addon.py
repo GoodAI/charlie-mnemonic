@@ -19,6 +19,7 @@ init(autoreset=True)
 description = """
 This addon implements a chain of thought process for executing complex tasks. It generates a plan, executes it step by step, and can use other enabled addons to complete the task.
 Use this addon to break down complex tasks into actionable steps and execute them systematically. From research to code writing, this addon can help you complete a wide range of tasks.
+Use as many details as possible in the initial input to get the best results, because the chain of thought process does not see the user's recent messages or context.
 """
 
 parameters = {
@@ -110,19 +111,19 @@ async def chain_of_thought_addon(
     debug_print(f"Starting CoT process for input: {input}", Fore.CYAN)
     debug_print(f"Using model: {model}", Fore.CYAN)
 
-    # fetch the previous 10 messages from the chat
-    memory = _memory.MemoryManager()
-    recent_messages = await memory.get_most_recent_messages(
-        "active_brain", username, chat_id=chat_id, n_results=10
-    )
+    # # fetch the previous 10 messages from the chat
+    # memory = _memory.MemoryManager()
+    # recent_messages = await memory.get_most_recent_messages(
+    #     "active_brain", username, chat_id=chat_id, n_results=10
+    # )
 
-    # we only need the document field, lets extract it and format it nicely as a string
-    recent_messages = [message["document"] for message in recent_messages]
+    # # we only need the document field, lets extract it and format it nicely as a string
+    # recent_messages = [message["document"] for message in recent_messages]
 
-    # properly format the recent messages
-    formatted_messages = "\n".join(recent_messages)
+    # # properly format the recent messages
+    # formatted_messages = "\n".join(recent_messages)
 
-    debug_print(f"Recent messages: {recent_messages}", Fore.CYAN)
+    # debug_print(f"Recent messages: {recent_messages}", Fore.CYAN)
 
     # Generate the pipeline
     debug_print("Generating pipeline", Fore.YELLOW)
@@ -131,13 +132,13 @@ async def chain_of_thought_addon(
             "role": "system",
             "content": """You are a task planner. Given an input task, create a detailed plan with steps to complete the task.
 Each step should be concise and actionable. Format your response as a JSON array of strings, where each string is a step in the plan.
-You have addons and tools at your disposal, so only plan things you can actually execute. If part of the plan is to write to a file, mention to use Python to write files. Add paths to files if needed.
+You have addons and tools at your disposal, so only plan steps you can actually execute using these tools. If part of the plan is to write to a file, mention to use Python to write files. Be sure to add paths to files. Always work in the /data/ directory. If a file needs to be edited you should do this in 2 steps, read the file first, then edit.
 Use as few steps as possible, preferably less than 10, but separate each task or tool usage into a new step. For example, generating images and writing code should be 2 steps. It is important to put no additional text or comments before or after the JSON! Only output the JSON array.
 For example: ["Step 1: Plan Project", "Step 2: Write base code to app.py with python", "Step 3: Generate image", "Step 4: Verify images are generated", "Step 5: Make images transparent with Python", "Step 6: Replace code with new images, use python to write to file app.py", "Step 7: Verify the code has no placeholder code or ommisions", "Step 8: Review steps and present to user, include code and files/paths to files if needed"]""",
         },
         {
             "role": "user",
-            "content": f"Previous messages in the context: {formatted_messages}\n\nCreate a detailed plan for the following task: {input}\n\nRemember to use as few steps as possible, preferably less than 10,  include filepaths, data or info, and separate each task or tool usage into a new step. For example, generating images and writing code should be 2 steps. It is important to put no additional text or comments before or after the JSON! Only output the JSON array.",
+            "content": f"Create a detailed plan for the following task: {input}\n\nRemember to use as few steps as possible, preferably less than 10,  include filepaths, data or info, and separate each task or tool usage into a new step. For example, generating images and writing code should be 2 steps. It is important to put no additional text or comments before or after the JSON! Only output the JSON array.",
         },
     ]
 
@@ -203,7 +204,7 @@ For example: ["Step 1: Plan Project", "Step 2: Write base code to app.py with py
         # Adjust function metadata based on the current step to prevent misuse
         current_function_metadata = function_metadata.copy()
         if "generate_image" in [func["function"]["name"] for func in function_metadata]:
-            if "image" not in step.lower() and "graphic" not in step.lower():
+            if "image" not in str(step).lower() and "graphic" not in str(step).lower():
                 current_function_metadata = [
                     func
                     for func in function_metadata

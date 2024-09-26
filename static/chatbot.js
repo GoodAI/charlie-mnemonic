@@ -122,39 +122,39 @@ function createAddonsTabContent(addons, tabId) {
     var addon_descriptions = [
         {
             name: 'get_current_weather',
-            description: 'Get the current weather in a location'
+            description: 'Get the current weather in a location.'
         },
         {
             name: 'get_search_results',
-            description: 'Get 5 search results from google or youtube'
+            description: 'Get 5 search results from google or youtube.'
         },
         {
             name: 'run_python_code',
-            description: 'Run python code (dockerized)'
+            description: 'Run python code (dockerized).'
         },
         {
             name: 'visit_website',
-            description: 'Visit a website (simple requests only)'
+            description: 'Visit a website (simple requests only).'
         },
         {
             name: 'generate_image',
-            description: 'Generate an image with Dalle 3'
+            description: 'Generate an image with Dalle 3.'
         },
         {
             name: 'get_image_descriptions',
-            description: 'Get descriptions of uploaded images using OpenAI GPT-4o'
+            description: 'Get descriptions of uploaded images using OpenAI GPT-4o.'
         },
         {
             name: 'calendar_addon',
-            description: 'Google Calendar integration to add/edit/delete events'
+            description: 'Google Calendar integration to add/edit/delete events.'
         },
         {
             name: 'gmail_addon',
-            description: 'Gmail Integration to read/write/delete emails'
+            description: 'Gmail Integration to read/write/delete emails.'
         },
         {
             name: 'google_search',
-            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
+            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback.'
         },
         {
             name: 'chain_of_thought_addon',

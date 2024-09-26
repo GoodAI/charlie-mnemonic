@@ -1,21 +1,20 @@
 import datetime
 import os
 import time
+
 import logs
 
 logger = logs.Log("agentmemory", "agentmemory.log").get_logger()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
+from agentmemory.client import get_client
 from agentmemory.helpers import (
     chroma_collection_to_list,
     debug_log,
     flatten_arrays,
     get_include_types,
 )
-
-
-from agentmemory.client import get_client
 
 
 def create_memory(

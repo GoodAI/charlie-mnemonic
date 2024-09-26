@@ -2,6 +2,7 @@ import os
 import config
 from llmcalls import get_responder
 from utils import convert_username, SettingsManager
+import urllib.parse
 
 description = "Get the descriptions of one or more images using your vision capabilities, only use this for PNG, JPEG, GIF and WEBP images."
 parameters = {
@@ -55,13 +56,19 @@ async def get_image_descriptions(image_requests, username=None):
         if os.path.exists("/.dockerenv"):
             full_image_paths = [
                 os.path.join(
-                    "/app", "users", username, "data", os.path.basename(image_path)
+                    "/app",
+                    "users",
+                    username,
+                    "data",
+                    urllib.parse.unquote(os.path.basename(image_path)),
                 )
                 for image_path in image_paths
             ]
         else:
             full_image_paths = [
-                os.path.join(full_path, os.path.basename(image_path))
+                os.path.join(
+                    full_path, urllib.parse.unquote(os.path.basename(image_path))
+                )
                 for image_path in image_paths
             ]
 

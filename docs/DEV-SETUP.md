@@ -74,7 +74,7 @@ respectively.
 If you are using docker, you can just start the database with docker-compose:
 
 ```bash
-docker-compose up -d psdb
+docker compose up -d psdb
 ```
 
 In that case, you can use the following connection string:

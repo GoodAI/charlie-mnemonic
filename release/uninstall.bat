@@ -3,7 +3,7 @@ setlocal
 set HOME=%USERPROFILE%
 
 echo Stopping and removing Charlie Mnemonic containers...
-docker-compose down
+docker compose down
 
 echo Removing Docker images for Charlie Mnemonic...
 docker rmi goodaidev/charlie-mnemonic:latest

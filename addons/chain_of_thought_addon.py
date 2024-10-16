@@ -13,6 +13,8 @@ from utils import MessageSender, SettingsManager, AddonManager
 import utils
 import memory as _memory
 
+SHOW_DEBUG_PRINTS = False
+
 # Initialize colorama
 init(autoreset=True)
 
@@ -40,7 +42,8 @@ parameters = {
 
 
 def debug_print(message, color=Fore.WHITE):
-    print(f"{color}{message}{Style.RESET_ALL}")
+    if SHOW_DEBUG_PRINTS:
+        print(f"{color}{message}{Style.RESET_ALL}")
 
 
 def extract_json_from_text(text):

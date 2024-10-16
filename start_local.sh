@@ -19,7 +19,7 @@ docker info || { echo "Docker daemon is not running. Please start Docker before 
 
 # Ensure that Docker Compose is not already running using the same names
 echo "Stopping existing Docker containers to prevent name conflicts..."
-docker-compose down || true
+docker compose down || true
 
 # Attempt to remove containers explicitly, suppressing errors for non-existing containers
 docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env || true
@@ -32,7 +32,7 @@ fi
 
 # Start the application using Docker Compose
 echo "Starting Charlie Mnemonic using Docker Compose. First run may take a while..."
-docker-compose up --build || { echo "Docker Compose failed with error level $?."; exit 1; }
+docker compose up --build || { echo "Docker Compose failed with error level $?."; exit 1; }
 
 # Monitoring loop to check if the application is running
 while true; do
@@ -42,7 +42,7 @@ while true; do
         sleep 1
         xdg-open "$URL"
         docker logs -f charlie-mnemonic
-        docker-compose down
+        docker compose down
         exit 0
     else
         echo "Charlie Mnemonic is not available yet. Retrying in 5 seconds..."

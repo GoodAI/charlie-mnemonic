@@ -100,11 +100,11 @@ echo Removing any existing containers with the same names
 docker rm -f charlie-mnemonic psdb charlie-mnemonic-python-env 2>nul
 
 echo Stopping any existing Docker containers
-docker-compose down 2>nul
+docker compose down 2>nul
 
 echo Starting Charlie Mnemonic using Docker Compose...
 echo First run takes a while
-docker-compose up --build -d
+docker compose up --build -d
 
 if errorlevel 1 (
     echo Docker Compose up command failed.
@@ -129,7 +129,7 @@ if !ERRORLEVEL!==0 (
     timeout /t 1 /nobreak >nul
     start %URL%
     docker logs -f charlie-mnemonic
-    docker-compose down
+    docker compose down
 ) else (
     echo Not available yet. Retrying in 10 seconds...
     timeout /t 10 /nobreak >nul

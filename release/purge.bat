@@ -7,7 +7,7 @@ echo Warning, this will purge all Charlie Mnemonic data, are you sure you want t
 pause
 
 
-docker-compose --project-name charlie-mnemonic-windows down
+docker compose --project-name charlie-mnemonic-windows down
 docker volume rm charlie-mnemonic-windows_postgres-data
 
 if exist "%CHARLIE_MNEMONIC_USER_DIR%" (

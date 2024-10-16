@@ -9,6 +9,8 @@ const modelMaxTokens = {
     'gpt-4o': 4096,
     'gpt-4o-mini': 16384,
     'gpt-4-turbo': 4096,
+    'o1-mini': 65536,
+    'o1-preview': 32768,
     'claude-3-5-sonnet-20240620': 8192,
     'claude-3-opus-20240229': 4096
 };
@@ -120,39 +122,47 @@ function createAddonsTabContent(addons, tabId) {
     var addon_descriptions = [
         {
             name: 'get_current_weather',
-            description: 'Get the current weather in a location'
+            description: 'Get the current weather in a location.'
         },
         {
             name: 'get_search_results',
-            description: 'Get 5 search results from google or youtube'
+            description: 'Get 5 search results from google or youtube.'
         },
         {
             name: 'run_python_code',
-            description: 'Run python code (dockerized)'
+            description: 'Run python code (dockerized).'
         },
         {
             name: 'visit_website',
-            description: 'Visit a website (simple requests only)'
+            description: 'Visit a website (simple requests only).'
         },
         {
             name: 'generate_image',
-            description: 'Generate an image with Dalle 3'
+            description: 'Generate an image with Dalle 3.'
         },
         {
             name: 'get_image_descriptions',
-            description: 'Get descriptions of uploaded images using OpenAI GPT-4o'
+            description: 'Get descriptions of uploaded images using OpenAI GPT-4o.'
         },
         {
             name: 'calendar_addon',
-            description: 'Google Calendar integration to add/edit/delete events'
+            description: 'Google Calendar integration to add/edit/delete events.'
         },
         {
             name: 'gmail_addon',
-            description: 'Gmail Integration to read/write/delete emails'
+            description: 'Gmail Integration to read/write/delete emails.'
         },
         {
             name: 'google_search',
-            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback'
+            description: 'Search the web with Google (needs API key) or DuckDuckGo as a fallback.'
+        },
+        {
+            name: 'chain_of_thought_addon',
+            description: 'This addon implements a chain of thought process for executing complex tasks. It generates a plan, executes it step by step, and can use other enabled addons to complete the task.'
+        },
+        {
+            name: 'search_visual_history',
+            description: 'Search in your visual history (Charlie Recall) for screenshots and their descriptions. The results are semantic similar results.'
         }
     ];
 
@@ -1178,34 +1188,27 @@ function handlePlanMessage(msg) {
 }
 
 function handleFunctionCall(msg) {
-    // Ensure msg is an object and has the required properties
-    if (typeof msg === 'object' && msg.message && msg.message.arguments) {
-        var timestamp = new Date().toLocaleTimeString();
-        var addon = msg.message.function;
-        try {
-            // Ensure arguments are stringified if it's an object
-            var argsStr = typeof msg.message.arguments === 'string' ? msg.message.arguments : JSON.stringify(msg.message.arguments);
-            var args = parseComplexJson(argsStr);
+    const timestamp = new Date().toLocaleTimeString();
+    const addon = msg.message.function;
+    try {
+        const argsStr = typeof msg.message.arguments === 'string' ? msg.message.arguments : JSON.stringify(msg.message.arguments);
+        const args = parseComplexJson(argsStr);
 
-            var callDetails = {
-                "Function": addon,
-                "Arguments": args
-            };
+        const callDetails = {
+            "Function": addon,
+            "Arguments": args
+        };
 
-            updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
-        } catch (error) {
-            console.error('Error parsing JSON:', error);
-        }
-    } else {
-        console.error('Invalid message format received:', msg);
+        updateOrCreateDebugBubble("Function Call", timestamp, callDetails);
+    } catch (error) {
+        console.error('Error parsing JSON:', error);
     }
 }
 
 function handleFunctionResponse(msg) {
-    var timestamp = new Date().toLocaleTimeString();
-    var content = { "Response": msg.message };
+    const timestamp = new Date().toLocaleTimeString();
+    const content = { "Response": msg.message };
 
-    // Call updateOrCreateDebugBubble to handle the display
     updateOrCreateDebugBubble("Function Response", timestamp, content);
 }
 
@@ -1404,53 +1407,36 @@ function addBottomButtons(div, model) {
     div.appendChild(buttonsContainer);
 }
 
-async function handleStopMessage(msg) {
-    var target_chat_id = msg.chat_id;
+function handleStopMessage(msg) {
     resetDebugBubble();
-    // check if the current active tab is the same as the target chat id
+    var target_chat_id = msg.chat_id;
     var chatTabs = document.getElementById('chat-tabs-container');
     var activeTab = chatTabs.querySelector('.active');
     var current_chat_id = activeTab.id.replace('chat-tab-', '');
+    
     if (current_chat_id != target_chat_id) {
-        // if not, do nothing
         resetState();
         return;
     }
-    var lastMessage = document.querySelector('.last-message .bubble');
-    if (lastMessage) {
-        // Remove the typing indicator
-        removeTypingIndicator();
 
-        // Appending the new chunk to the existing content of the last message
-        lastMessage.innerHTML = parseAndFormatMessage(tempFullChunk);
-        
-        // Apply highlighting to the entire message
-        applyHighlighting(lastMessage);
+    if (currentMessageBubble) {
+        const bubbleContent = currentMessageBubble.querySelector('.bubble');
+        bubbleContent.innerHTML = parseAndFormatMessage(tempFullChunk);
+        highlightCodeBlocks(bubbleContent);
+        addBottomButtons(bubbleContent, msg.model);
     }
 
-    // Function to remove the typing indicator
-    function removeTypingIndicator() {
-        var typingIndicator = document.querySelector('.typing-indicator');
-        if (typingIndicator) {
-            typingIndicator.remove();
+    // Remove any remaining spinners
+    const spinners = document.querySelectorAll('.spinner');
+    spinners.forEach(spinner => {
+        const messageDiv = spinner.closest('.message');
+        if (messageDiv) {
+            messageDiv.remove();
         }
-    }
-
-    function applyHighlighting(element) {
-        element.querySelectorAll('pre code').forEach((block) => {
-            hljs.highlightElement(block);
-            // Force a re-highlight after a short delay
-            setTimeout(() => hljs.highlightElement(block), 100);
-        });
-    }
-
-    // add bottom buttons to the last message
-    var lastMessage = document.querySelector('.last-message .bubble');
-    if (lastMessage) {
-        addBottomButtons(lastMessage, msg.model);
-    }
+    });
 
     tempFullChunk = '';
+    currentMessageBubble = null;
     applyTooltips('[data-tooltip]');
     resetState();
     setTimeout(() => scrollToBottom(), 50);
@@ -1459,6 +1445,37 @@ async function handleStopMessage(msg) {
 let codeBlockOpen = false;
 let executeCodeOpen = false;
 let currentLanguage = '';
+
+function addMessageBubble(content, type = 'bot', model = '') {
+    const timestamp = new Date().toLocaleTimeString();
+    const messagesContainer = document.getElementById('messages');
+    
+    // Remove any existing spinner
+    const existingSpinner = messagesContainer.querySelector('.message.bot:last-child .spinner');
+    if (existingSpinner) {
+        existingSpinner.closest('.message').remove();
+    }
+
+    const bubbleDiv = document.createElement('div');
+    bubbleDiv.className = `message ${type}`;
+    bubbleDiv.innerHTML = `
+        <span class="timestamp">${timestamp}</span>
+        <div class="bubble">
+            ${content}
+        </div>
+    `;
+
+    messagesContainer.appendChild(bubbleDiv);
+    
+    if (type === 'bot') {
+        addBottomButtons(bubbleDiv.querySelector('.bubble'), model);
+    }
+
+    setTimeout(() => scrollToBottom(), 10);
+    return bubbleDiv;
+}
+
+let currentMessageBubble = null;
 
 function handleChunkMessage(msg) {
     const target_chat_id = msg.chat_id;
@@ -1470,30 +1487,66 @@ function handleChunkMessage(msg) {
         return;
     }
 
-    const timestamp = new Date().toLocaleTimeString();
     const chunkContent = msg.chunk_message;
     tempFullChunk += chunkContent;
 
-    const tempchild = document.getElementById('messages').lastChild;
-    if (tempchild && tempchild.querySelector) {
-        const spinner = tempchild.querySelector('.spinner');
-        if (spinner) {
-            spinner.remove();
-            tempchild.remove();
+    if (!currentMessageBubble) {
+        currentMessageBubble = addMessageBubble('', 'bot');
+    }
+
+    const bubbleContent = currentMessageBubble.querySelector('.bubble');
+    bubbleContent.innerHTML = parseAndFormatStreamingMessage(tempFullChunk);
+    highlightCodeBlocks(bubbleContent);
+}
+
+function handleCoTStep(msg) {
+    const { step_number, total_steps, step_description } = msg.content;
+    const timestamp = new Date().toLocaleTimeString();
+    const content = `
+        <div class="message cot-step">
+            <span class="timestamp">${timestamp}</span>
+            <div class="bubble">
+                <div class="cot-header" onclick="toggleCoTExpand(this)">
+                    <div class="cot-title">Step ${step_number}/${total_steps} - ${escapeHtml(step_description)}</div>
+                    <button class="toggle-expand">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                <div class="expandable-content" style="display: none;">
+                    <div class="cot-step-output">
+                        <h4>Step Output</h4>
+                        <pre class="step-output-content"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    document.getElementById('messages').insertAdjacentHTML('beforeend', content);
+}
+
+function handleCoTStepOutput(msg) {
+    const { step_number, total_steps, step_output } = msg.content;
+    const lastCoTStep = document.querySelector('.message.cot-step:last-child');
+    if (lastCoTStep) {
+        const outputContent = lastCoTStep.querySelector('.step-output-content');
+        if (outputContent) {
+            outputContent.textContent = step_output; // Use textContent to prevent HTML execution
         }
     }
+}
 
-    const lastMessage = document.querySelector('.last-message .bubble');
-    if (lastMessage) {
-        lastMessage.innerHTML = parseAndFormatStreamingMessage(tempFullChunk);
-        highlightCodeBlocks(lastMessage);
+function toggleCoTExpand(header) {
+    const bubble = header.closest('.bubble');
+    const expandableContent = bubble.querySelector('.expandable-content');
+    const icon = header.querySelector('i');
+    
+    if (expandableContent.style.display === 'none') {
+        expandableContent.style.display = 'block';
+        icon.classList.replace('fa-chevron-down', 'fa-chevron-up');
     } else {
-        const chatMessage = createNewChatMessage(timestamp, parseAndFormatStreamingMessage(chunkContent));
-        document.getElementById('messages').appendChild(chatMessage);
-        highlightCodeBlocks(chatMessage);
+        expandableContent.style.display = 'none';
+        icon.classList.replace('fa-chevron-up', 'fa-chevron-down');
     }
-
-    setTimeout(() => scrollToBottom(), 10);
 }
 
 function parseAndFormatStreamingMessage(content) {
@@ -2195,20 +2248,28 @@ function get_settings(username) {
                 handleFunctionResponse(msg);
             }
             else if (msg.type) {
-                if (msg.type == 'plan') {
-                    handlePlanMessage(msg);
-                }
-                else if (msg.type == 'note_taking') {
-                    handleNoteTaking(msg.content);
-                }
-                else if (msg.type == 'relations') {
-                    handleRelations(msg.content);
-                }
-                else if (msg.type == 'rate_limit') {
-                    handleRateLimit(msg);
-                }
-                else if (msg.type == 'confirm_email') {
-                    handleConfirmMail(msg);
+                switch (msg.type) {
+                    case 'plan':
+                        handlePlanMessage(msg);
+                        break;
+                    case 'note_taking':
+                        handleNoteTaking(msg.content);
+                        break;
+                    case 'relations':
+                        handleRelations(msg.content);
+                        break;
+                    case 'rate_limit':
+                        handleRateLimit(msg);
+                        break;
+                    case 'confirm_email':
+                        handleConfirmMail(msg);
+                        break;
+                    case 'cot_step':
+                        handleCoTStep(msg);
+                        break;
+                    case 'cot_step_output':
+                        handleCoTStepOutput(msg);
+                        break;
                 }
             }
             else if (msg.action == 'confirm_email') {
@@ -2244,7 +2305,6 @@ function get_settings(username) {
             else if (msg.auth) {
                 handleAuthMessage(msg);
             }
-
 
             if (msg.debug1 !== undefined) {
                 var debug1 = msg.debug1.replace(/\n/g, '<br>');
